@@ -1,54 +1,26 @@
-// Copyright Microsoft and Project Verona Contributors.
-// SPDX-License-Identifier: MIT
 #pragma once
 
-#include "source.h"
+#include <vector>
+#include <string>
 
-namespace verona::parser
-{
-  enum class TokenKind
-  {
-    Invalid,
-
-    // Builtin symbols
-    Dot,
-    Ellipsis,
-    Comma,
-    LParen,
-    RParen,
-    LSquare,
-    RSquare,
-    LBrace,
-    RBrace,
-    Semicolon,
-    Colon,
-    DoubleColon,
-    FatArrow,
-    Equals,
-
+namespace mlexer {
+  
+  enum TokenKind {
+    
     // Constants
-    EscapedString,
-    UnescapedString,
-    Character,
-    Int,
-    Float,
-    Hex,
-    Binary,
-    Bool,
+    True,
+    False,
 
     // Keywords
-    Class,
-    Type,
-    Try,
-    Catch,
-    Throw,
-    Match,
+    Iso,
+    Mut,
+    Imm,
+    Paused,
+    Stack,
+    Store,
     Var,
     Dup,
     Load,
-    Store,
-    Lookup,
-    Typetest,
     New,
     Call,
     Region,
@@ -57,37 +29,42 @@ namespace verona::parser
     Branch,
     Return,
     Error,
-    Acquire,
+    Catch,
+    acquire,
     Release,
     Fulfill,
 
-    // Types
-    Iso,
-    Mut,
-    Imm,
-    Paused,
-    Stack,
-    Self,
+    // Builtin symbols
+    Dot,
+    Comma,
+    LParen,
+    RParen,
+    Equals,
 
-    // Strategies
-    GC,
-    RC,
-    Arena,
-
-
-    // Symbols and identifiers
-    Symbol,
-    Ident,
-
-    End
   };
 
-  struct Token
-  {
+  struct Token {
+    //TODO figure out what we want.
     TokenKind kind;
-    Location location;
   };
 
-  Token lex(Source& source, size_t& i);
-}
+  struct Line {
+    std::vector<Token> tokens;
+  };
 
+  class Lexer {
+    public:
+    std::string file;
+    std::vector<Line> lines;
+
+    Lexer(std::string path);
+    ~Lexer();
+
+    private:
+    void parseFile();
+    Line parseLine(std::string line);
+    Token parseWord(std::string word);
+
+  };
+
+} // namespace mlexer;

@@ -2,8 +2,7 @@
 
 #include <map>
 #include <vector> 
-
-#include "source.h"
+#include <memory>
 
 namespace verona::ir {
   enum class Kind {
@@ -24,6 +23,8 @@ namespace verona::ir {
    Create,
    Branch,
    Return,
+   Error,
+   Catch,
    Acquire,
    Release,
    Fulfill,
@@ -35,6 +36,11 @@ namespace verona::ir {
    Imm,
    Paused,
    Stack,
+   UnionType,
+   IsectType,
+   TupleType,
+   Interface,
+   Class,
 
    // Constant
    True,
@@ -58,6 +64,9 @@ namespace verona::ir {
   template<typename T, typename Y>
   using Map = std::map<Node<T>, Node<Y>>;
 
+  using Ast = Node<NodeDef>;
+  using AstPath = List<NodeDef>;
+
 
 
 /**
@@ -68,8 +77,6 @@ namespace verona::ir {
  * @method kind: returns the kind of this particular node.
  */
   struct NodeDef {
-    verona::parser::Location location;
-
     virtual ~NodeDef() = default;
     virtual Kind kind() = 0;
 
@@ -118,10 +125,6 @@ namespace verona::ir {
   // x = Expr
   struct Assign: Expr {
     Node<ID> left;
-    
-    Kind kind() override {
-      return Kind::Assign;
-    }
   };
 
   // x = var
@@ -371,9 +374,19 @@ namespace verona::ir {
     }
   };
 
-  //TODO  what's this? | {f: T}-> structural interface, f has member of type T
+  //{f: T}-> structural interface, f has member of type T
   struct Interface : Type {
     List<Member> members;
+
+    Kind kind() override {
+      return Kind::Interface;
+    }
+  };
+
+  struct  Class: Interface {
+    Kind kind() override {
+      return Kind::Class;
+    }
   };
 
   // store T

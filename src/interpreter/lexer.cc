@@ -1,781 +1,105 @@
-// Copyright Microsoft and Project Verona Contributors.
-// SPDX-License-Identifier: MIT
-#include <map>
-
 #include "lexer.h"
+#include "helpers.h"
 
-#include "escaping.h"
+#include <map>
+#include <stdlib.h>
+#include <fstream>
+#include <iostream>
+#include <algorithm>
 
-namespace verona::parser
-{
-  constexpr uint8_t X = 0; // Invalid
-  constexpr uint8_t W = 1; // Whitespace sp\t\r\n
-  constexpr uint8_t Y = 2; // Symbol
-  constexpr uint8_t Q = 3; // Quote '"
-  constexpr uint8_t Z = 4; // Builtin symbol .,()[]{};
-  constexpr uint8_t L = 5; // Slash /
-  constexpr uint8_t N = 6; // Number start 0123456789
-  constexpr uint8_t I = 7; // Ident start
-  constexpr uint8_t C = 8; // Colon :
-  constexpr uint8_t E = 9; // Equal =
-  constexpr uint8_t Eof = 255; // End of file
+// Functions to parse strings.
+using namespace mlexer::helpers;
 
-  constexpr uint8_t lookup[] = {
-    X, X, X, X, X, X, X, X, X, W, W, X, X, W, X, X,
-    X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
+namespace mlexer {
 
-    W, Y, Q, Y, Y, Y, Y, Q, Z, Z, Y, Y, Z, Y, Z, L,
-    N, N, N, N, N, N, N, N, N, N, C, Z, Y, E, Y, Y,
-
-    Y, I, I, I, I, I, I, I, I, I, I, I, I, I, I, I,
-    I, I, I, I, I, I, I, I, I, I, I, Z, Y, Z, Y, I,
-
-    Y, I, I, I, I, I, I, I, I, I, I, I, I, I, I, I,
-    I, I, I, I, I, I, I, I, I, I, I, Z, Y, Z, Y, X,
-
-    X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
-    X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
-
-    X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
-    X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
-
-    X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
-    X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
-
-    X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
-    X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
+  // Replace thar thing with a map directly;
+  std::map<std::string, TokenKind> keywords = {
+    {std::string("true"),TokenKind::True},
+    {std::string("false"), TokenKind::False},
+    {std::string("iso"), TokenKind::Iso},
+    {std::string("mut"), TokenKind::Mut},
+    {std::string("imm"), TokenKind::Imm},
+    {std::string("paused"), TokenKind::Paused},
+    {std::string("stack"), TokenKind::Stack},
+    {std::string("store"), TokenKind::Store},
+    {std::string("var"), TokenKind::Var},
+    {std::string("dup"), TokenKind::Dup},
+    {std::string("load"), TokenKind::Load},
+    {std::string("new"), TokenKind::New},
+    {std::string("stack"), TokenKind::Stack},
+    {std::string("call"), TokenKind::Call},
+    {std::string("region"), TokenKind::Region},
+    {std::string("create"), TokenKind::Create},
+    {std::string("tailcall"), TokenKind::Tailcall},
+    {std::string("branch"), TokenKind::Branch},
+    {std::string("return"), TokenKind::Return,},
+    {std::string("error"), TokenKind::Error},
+    {std::string("catch"), TokenKind::Catch},
+    {std::string("acquire"), TokenKind::acquire,},
+    {std::string("release"), TokenKind::Release},
+    {std::string("fulfill"), TokenKind::Fulfill},
   };
 
-  struct Keyword
-  {
-    const char* text;
-    TokenKind kind;
+  std::map<std::string, TokenKind> builtins = {
+    {std::string("."), Dot},
+    {std::string(","), Comma},
+    {std::string("("), LParen},
+    {std::string(")"), RParen},
+    {std::string("="), Equals},
   };
 
-  constexpr Keyword keywords[] = {{"class", TokenKind::Class},
-                                  {"type", TokenKind::Type},
-                                  {"try", TokenKind::Try},
-                                  {"catch", TokenKind::Catch},
-                                  {"throw", TokenKind::Throw},
-                                  {"match", TokenKind::Match},
-                                  {"var", TokenKind::Var},
-                                  {"dup", TokenKind::Dup},
-                                  {"load", TokenKind::Load},
-                                  {"store", TokenKind::Store},
-                                  {"lookup", TokenKind::Lookup},
-                                  {"typetest", TokenKind::Typetest},
-                                  {"new", TokenKind::New},
-                                  {"call", TokenKind::Call},
-                                  {"region", TokenKind::Region},
-                                  {"create", TokenKind::Create},
-                                  {"tailcall", TokenKind::Tailcall},
-                                  {"branch", TokenKind::Branch},
-                                  {"return", TokenKind::Return},
-                                  {"error", TokenKind::Error},
-                                  {"acquire", TokenKind::Acquire},
-                                  {"release", TokenKind::Release},
-                                  {"fulfill", TokenKind::Fulfill},
-                                  {"iso", TokenKind::Iso},
-                                  {"mut", TokenKind::Mut},
-                                  {"imm", TokenKind::Imm},
-                                  {"paused", TokenKind::Paused},
-                                  {"stack", TokenKind::Stack},
-                                  {"Self", TokenKind::Self},
-                                  // TODO(aghosn) not sure about this yet
-                                  {"GC", TokenKind::GC},
-                                  {"RC", TokenKind::RC},
-                                  {"Arena", TokenKind::Arena},
-                                  {"true", TokenKind::Bool},
-                                  {"false", TokenKind::Bool},
-                                  {nullptr, TokenKind::Invalid}};
-
-  bool is_digit(char c)
-  {
-    return ((c >= '0') && (c <= '9')) || (c == '_');
+  Lexer::Lexer(std::string path): file(path) {
+    // Read the entire file.
+    this->parseFile(); 
   }
 
-  bool is_hex(char c)
-  {
-    return ((c >= 'a') && (c <= 'f')) || ((c >= 'A') && (c <= 'F')) ||
-      is_digit(c);
+  Lexer::~Lexer() {
   }
 
-  bool is_binary(char c)
-  {
-    return ((c >= '0') && (c <= '1')) || (c == '_');
-  }
-
-  uint8_t next(Source& source, size_t& i)
-  {
-    if ((i + 1) < source->contents.size())
-      return lookup[source->contents[++i]];
-
-    return Eof;
-  }
-
-  Token consume_invalid(Source& source, size_t& i)
-  {
-    auto start = i;
-    while (next(source, i) == X)
-    {
+  void Lexer::parseFile() {
+    std::ifstream file(this->file); 
+    if (file.fail()) {
+      std::cerr << "Could not open file "<< this->file << std::endl;
+      exit(EXIT_FAILURE);
     }
-    return {TokenKind::Invalid, {source, start, i - 1}};
-  }
 
-  Token consume_symbol(Source& source, size_t& i)
-  {
-    auto start = i;
-
-    while (true)
-    {
-      // Colons, slashes, and equals are valid symbol continuations.
-      switch (next(source, i))
-      {
-        case Y:
-        case L:
-        case C:
-        case E:
-          break;
-
-        default:
-          return {TokenKind::Symbol, {source, start, i - 1}};
+    std::string str;
+    while(std::getline(file, str)) {
+      // Skip empty lines
+      if (!std::all_of(str.begin(), str.end(), isspace)) {
+        this->lines.push_back(this->parseLine(str));
       }
     }
   }
 
-  Token consume_builtin_symbol(Source& source, size_t& i)
-  {
-    TokenKind kind;
-    auto start = i;
 
-    switch (source->contents[i])
-    {
-      case '.':
-      {
-        if (
-          ((i + 2) < source->contents.size()) &&
-          (source->contents[i + 1] == '.') && (source->contents[i + 2] == '.'))
-        {
-          kind = TokenKind::Ellipsis;
-          i += 2;
-        }
-        else
-        {
-          kind = TokenKind::Dot;
-        }
-        break;
-      }
+  // Helper function to split string according to whitespaces.
 
-      case ',':
-      {
-        kind = TokenKind::Comma;
-        break;
-      }
 
-      case '(':
-      {
-        kind = TokenKind::LParen;
-        break;
-      }
-
-      case ')':
-      {
-        kind = TokenKind::RParen;
-        break;
-      }
-
-      case '[':
-      {
-        kind = TokenKind::LSquare;
-        break;
-      }
-
-      case ']':
-      {
-        kind = TokenKind::RSquare;
-        break;
-      }
-
-      case '{':
-      {
-        kind = TokenKind::LBrace;
-        break;
-      }
-
-      case '}':
-      {
-        kind = TokenKind::RBrace;
-        break;
-      }
-
-      case ';':
-      {
-        kind = TokenKind::Semicolon;
-        break;
-      }
-
-      default:
-        abort();
+  Line Lexer::parseLine(std::string line) {
+    Line result;
+    auto words = split(line);
+    for (auto w: words) {
+      result.tokens.push_back(this->parseWord(w)); 
     }
-
-    return {kind, {source, start, i++}};
+    return result;
   }
 
-  Token consume_character_literal(Source& source, size_t& i)
-  {
-    auto start = i;
-    bool backslash = false;
-
-    while (++i < source->contents.size())
-    {
-      switch (source->contents[i])
-      {
-        case '\\':
-        {
-          backslash = true;
-          break;
-        }
-
-        case '\'':
-        {
-          if (!backslash)
-          {
-            Location loc{source, start + 1, i++ - 1};
-
-            if (!is_escaped(loc.view()))
-              return {TokenKind::Invalid, {source, start, i - 1}};
-
-            return {TokenKind::Character, loc};
-          }
-
-          backslash = false;
-          break;
-        }
-
-        default:
-        {
-          backslash = false;
-          break;
-        }
-      }
+  Token Lexer::parseWord(std::string word) {
+    Token result;
+    // This is a keyword
+    if (keywords.contains(word)) {
+      result.kind = keywords[word];
+      return result;
+    } 
+    
+    // Valid operations and symbols;
+    if (builtins.contains(word)) {
+      result.kind = builtins[word];
+      return result;
     }
-
-    return {TokenKind::Invalid, {source, start, i - 1}};
+    return result;
   }
 
-  Token consume_escaped_string(Source& source, size_t& i)
-  {
-    auto start = i;
-    bool backslash = false;
 
-    while (++i < source->contents.size())
-    {
-      switch (source->contents[i])
-      {
-        case '\\':
-        {
-          backslash = true;
-          break;
-        }
-
-        case '\"':
-        {
-          if (!backslash)
-          {
-            Location loc{source, start + 1, i++ - 1};
-
-            if (!is_escaped(loc.view()))
-              return {TokenKind::Invalid, {source, start, i - 1}};
-
-            return {TokenKind::EscapedString, loc};
-          }
-
-          backslash = false;
-          break;
-        }
-
-        default:
-        {
-          backslash = false;
-          break;
-        }
-      }
-    }
-
-    return {TokenKind::Invalid, {source, start, i - 1}};
-  }
-
-  Token consume_unescaped_string(Source& source, size_t& i, size_t len)
-  {
-    enum class State
-    {
-      Nesting,
-      Terminating,
-    };
-
-    auto start = i - len;
-    auto state = State::Nesting;
-    size_t count = 0;
-    size_t depth = 1;
-
-    while (++i < source->contents.size())
-    {
-      switch (source->contents[i])
-      {
-        case '\"':
-        {
-          if (state == State::Nesting)
-          {
-            if (count == len)
-              depth++;
-            else
-              state = State::Terminating;
-          }
-          else
-          {
-            state = State::Nesting;
-          }
-
-          count = 0;
-          break;
-        }
-
-        case '\'':
-        {
-          count++;
-
-          if ((count == len) && (state == State::Terminating))
-          {
-            depth--;
-            count = 0;
-
-            if (depth == 0)
-            {
-              Location loc{source, start + len + 1, i++ - len - 1};
-
-              if (!is_unescaped(loc.view()))
-                return {TokenKind::Invalid, {source, start, i - 1}};
-
-              return {TokenKind::UnescapedString, loc};
-            }
-          }
-          break;
-        }
-
-        default:
-        {
-          state = State::Nesting;
-          count = 0;
-          break;
-        }
-      }
-    }
-
-    return {TokenKind::Invalid, {source, start, i - 1}};
-  }
-
-  Token consume_string(Source& source, size_t& i)
-  {
-    // '* " is an unescaped string
-    // " is an escaped string
-    // ' is a character literal
-    if (source->contents[i] == '\"')
-      return consume_escaped_string(source, i);
-
-    auto start = i;
-
-    while (++i < source->contents.size())
-    {
-      switch (source->contents[i])
-      {
-        case '\'':
-          continue;
-
-        case '\"':
-          return consume_unescaped_string(source, i, i - start);
-      }
-      break;
-    }
-
-    if ((i - start) == 1)
-      return consume_character_literal(source, --i);
-
-    // It's an empty character literal.
-    i = start + 2;
-    return {TokenKind::Invalid, {source, start, i - 1}};
-  }
-
-  void consume_line_comment(Source& source, size_t& i)
-  {
-    while (++i < source->contents.size())
-    {
-      if (source->contents[i] == '\n')
-      {
-        i++;
-        break;
-      }
-    }
-  }
-
-  void consume_nested_comment(Source& source, size_t& i)
-  {
-    enum class State
-    {
-      Slash,
-      Star,
-      Other,
-    };
-
-    auto state = State::Other;
-    size_t depth = 1;
-
-    while (++i < source->contents.size())
-    {
-      auto c = source->contents[i];
-
-      switch (c)
-      {
-        case '/':
-        {
-          if (state == State::Star)
-          {
-            state = State::Other;
-
-            if (--depth == 0)
-            {
-              i++;
-              return;
-            }
-          }
-          else
-          {
-            state = State::Slash;
-          }
-          break;
-        }
-
-        case '*':
-        {
-          if (state == State::Slash)
-          {
-            state = State::Other;
-            depth++;
-          }
-          else
-          {
-            state = State::Star;
-          }
-          break;
-        }
-
-        default:
-        {
-          state = State::Other;
-          break;
-        }
-      }
-    }
-  }
-
-  bool consume_comment(Source& source, size_t& i)
-  {
-    if ((i + 1) >= source->contents.size())
-      return false;
-
-    auto start = i;
-    auto c = source->contents[++i];
-
-    switch (c)
-    {
-      case '/':
-      {
-        consume_line_comment(source, ++i);
-        return true;
-      }
-
-      case '*':
-      {
-        consume_nested_comment(source, ++i);
-        return true;
-      }
-    }
-
-    i = start;
-    return false;
-  }
-
-  Token consume_number(Source& source, size_t& i)
-  {
-    enum class State
-    {
-      LeadingZero,
-      Int,
-      HasDot,
-      Float,
-      Exponent1,
-      Exponent2,
-      Exponent3,
-      Hex,
-      Binary,
-    };
-
-    auto start = i;
-    auto state = State::Int;
-
-    if (source->contents[i] == '0')
-      state = State::LeadingZero;
-
-    while (++i < source->contents.size())
-    {
-      auto c = source->contents[i];
-
-      if (state == State::LeadingZero)
-      {
-        if (c == 'x')
-          state = State::Hex;
-        else if (c == 'b')
-          state = State::Binary;
-        else if (c == '.')
-          state = State::Float;
-        else if (is_digit(c))
-          state = State::Int;
-        else
-          break;
-      }
-      else if (state == State::Int)
-      {
-        if (c == '.')
-          state = State::HasDot;
-        else if (!is_digit(c))
-          break;
-      }
-      else if (state == State::HasDot)
-      {
-        if (is_digit(c))
-        {
-          state = State::Float;
-        }
-        else
-        {
-          // Don't consume the dot.
-          --i;
-          state = State::Int;
-          break;
-        }
-      }
-      else if (state == State::Float)
-      {
-        if (c == 'e')
-          state = State::Exponent1;
-        else if (!is_digit(c))
-          break;
-      }
-      else if (state == State::Exponent1)
-      {
-        if ((c == '-') || (c == '+'))
-          state = State::Exponent2;
-        else if (is_digit(c))
-          state = State::Exponent3;
-        else
-        {
-          // Don't consume the e.
-          --i;
-          state = State::Float;
-          break;
-        }
-      }
-      else if (state == State::Exponent2)
-      {
-        if (is_digit(c))
-        {
-          state = State::Exponent3;
-        }
-        else
-        {
-          // Don't consume the e or the +/-.
-          i -= 2;
-          state = State::Float;
-          break;
-        }
-      }
-      else if (state == State::Exponent3)
-      {
-        if (!is_digit(c))
-          break;
-      }
-      else if (state == State::Hex)
-      {
-        if (!is_hex(c))
-          break;
-      }
-      else if (state == State::Binary)
-      {
-        if (!is_binary(c))
-          break;
-      }
-    }
-
-    auto kind = TokenKind::Invalid;
-
-    switch (state)
-    {
-      case State::LeadingZero:
-      case State::Int:
-        kind = TokenKind::Int;
-        break;
-
-      case State::Float:
-      case State::Exponent3:
-        kind = TokenKind::Float;
-        break;
-
-      case State::Hex:
-        kind = TokenKind::Hex;
-        break;
-
-      case State::Binary:
-        kind = TokenKind::Binary;
-        break;
-
-      default:
-        // Shouldn't reach this, leave it as an invalid token.
-        break;
-    }
-
-    return {kind, {source, start, i - 1}};
-  }
-
-  Token consume_ident(Source& source, size_t& i)
-  {
-    auto start = i;
-
-    while (++i < source->contents.size())
-    {
-      auto c = lookup[source->contents[i]];
-
-      // Idents and numbers are valid ident continuations.
-      if ((c != I) && (c != N))
-      {
-        // Prime is the only other thing that's a valid ident continuation.
-        if ((c != Q) || (source->contents[i] != '\''))
-          break;
-      }
-    }
-
-    Token tok{TokenKind::Ident, {source, start, i - 1}};
-
-    for (auto kw = &keywords[0]; kw->text; kw++)
-    {
-      if (tok.location == kw->text)
-      {
-        tok.kind = kw->kind;
-        break;
-      }
-    }
-
-    return tok;
-  }
-
-  Token consume_colon(Source& source, size_t& i)
-  {
-    auto kind = TokenKind::Colon;
-    auto start = i;
-
-    if (++i < source->contents.size())
-    {
-      switch (lookup[source->contents[i]])
-      {
-        case C:
-          return {TokenKind::DoubleColon, {source, start, ++i - 1}};
-
-        case Y:
-        case E:
-          return consume_symbol(source, --i);
-
-        default:
-          break;
-      }
-    }
-
-    return {TokenKind::Colon, {source, start, i - 1}};
-  }
-
-  Token consume_equal(Source& source, size_t& i)
-  {
-    auto kind = TokenKind::Equals;
-    auto start = i;
-
-    if (++i < source->contents.size())
-    {
-      if (source->contents[i] == '>')
-        return {TokenKind::FatArrow, {source, start, ++i - 1}};
-
-      switch (lookup[source->contents[i]])
-      {
-        case Y:
-        case C:
-        case E:
-          return consume_symbol(source, --i);
-
-        default:
-          break;
-      }
-    }
-
-    return {TokenKind::Equals, {source, start, i - 1}};
-  }
-
-  Token lex(Source& source, size_t& i)
-  {
-    auto start = i;
-
-    while (i < source->contents.size())
-    {
-      switch (lookup[source->contents[i]])
-      {
-        case X:
-          return consume_invalid(source, i);
-
-        case W:
-        {
-          // Skip whitespace.
-          i++;
-          break;
-        }
-
-        case Y:
-          return consume_symbol(source, i);
-
-        case Q:
-          return consume_string(source, i);
-
-        case Z:
-          return consume_builtin_symbol(source, i);
-
-        case L:
-        {
-          if (consume_comment(source, i))
-            continue;
-
-          return consume_symbol(source, i);
-        }
-
-        case N:
-          return consume_number(source, i);
-
-        case I:
-          return consume_ident(source, i);
-
-        case C:
-          return consume_colon(source, i);
-
-        case E:
-          return consume_equal(source, i);
-      }
-    }
-
-    return {TokenKind::End, {source, start, i - 1}};
-  }
-
-}
-
+} // namespace mlexer
