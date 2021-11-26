@@ -16,6 +16,8 @@ namespace verona::ir {
 
   Parser::Parser(mlexer::Lexer& lexer): lexer(lexer) {
   }
+  
+  Parser::~Parser(){};
 
   // Parses an expression
   Node<Expr> Parser::parseStatement(){
@@ -55,10 +57,14 @@ namespace verona::ir {
         {
           auto branch = make_shared<Branch>(); 
           branch->condition = parseIdentifier();
+          
+          // First branch
           branch->branch1 = make_shared<Apply>();
           auto b1 =  parseApply();
           branch->branch1->function = b1.first;
-          branch->branch2->args = b1.second;
+          branch->branch1->args = b1.second;
+
+          // Second branch
           branch->branch2 = make_shared<Apply>();
           auto b2 = parseApply();
           branch->branch2->function = b2.first;
@@ -115,13 +121,18 @@ namespace verona::ir {
   List<ID> Parser::parseListUntil(TokenKind k) {
     assert(lexer.peek().kind == TokenKind::Identifier);
     List<ID> result;
+    bool id = true;
     while(lexer.peek().kind != k) {
       Token t = lexer.peek();
       assert(t.kind == TokenKind::Identifier || t.kind == TokenKind::Comma);
       if (t.kind == TokenKind::Comma) {
         assert(result.size() != 0);
+        assert(id == false);
+        dropExpected(TokenKind::Comma);
+        id = true;
         continue;
       }
+      id = false;
       result.push_back(parseIdentifier());
     }
     return result;
@@ -140,6 +151,9 @@ namespace verona::ir {
   void Parser::parseEOL() {
     assert(lexer.hasNext());
     Token t = lexer.peek();
+    if (!(t.kind == TokenKind::SemiColon)) {
+      assert(0);
+    } 
     assert(t.kind == TokenKind::SemiColon);
     lexer.next();
   }
@@ -150,8 +164,14 @@ namespace verona::ir {
     auto t = lexer.next();
     assert(t.kind == TokenKind::LParen);
     auto args = parseListUntil(TokenKind::RParen);
+    dropExpected(TokenKind::RParen);
     return std::pair<Node<ID>, List<ID>>(function, args);
   } 
+
+  void Parser::dropExpected(TokenKind k) {
+    assert(lexer.peek().kind == k);
+    lexer.next();
+  }
 
   AllocStrategy Parser::parseStrategy() {
     Token t = lexer.next();
@@ -174,9 +194,8 @@ namespace verona::ir {
   }
 
   Node<Assign> Parser::parseRight(List<ID> v) {
+    dropExpected(TokenKind::Equals);
     Token t = lexer.next();
-    assert(lexer.peek().kind == TokenKind::Equals); 
-    t = lexer.next();
     switch(t.kind) {
       case TokenKind::Catch:
         { 
@@ -292,16 +311,22 @@ namespace verona::ir {
   }
 
   Node<TypeId> Parser::parseTypeId() {
-    //TODO(aghosn)
-    return make_shared<TypeId>();
+    assert(lexer.hasNext());
+    Token t = lexer.peek();
+    assert(t.kind == TokenKind::Identifier);
+    lexer.next();
+    auto id = make_shared<TypeId>();
+    id->name = t.text;
+    return id;
   }
 
   bool Parser::parse() {
     while(lexer.hasNext()) {
-      this->parseStatement();
+      auto statement = parseStatement();
+      program.push_back(statement);
     } 
 
-    return false;
+    return true;
   }
   
 

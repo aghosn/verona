@@ -9,6 +9,7 @@ namespace verona::ir {
 
   class Parser {
     public:
+      AstPath program;
       mlexer::Lexer& lexer;
 
       Parser(mlexer::Lexer& lexer);
@@ -23,6 +24,7 @@ namespace verona::ir {
       std::pair<Node<ID>, List<ID>> parseApply();
       AllocStrategy parseStrategy();
       Node<TypeId> parseTypeId();
+      void dropExpected(mlexer::TokenKind k);
 
   };
 

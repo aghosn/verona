@@ -84,8 +84,10 @@ namespace mlexer {
     Line result;
     auto words = split(line);
     for (auto w: words) {
-      result.push_back(this->parseWord(w)); 
+      result.push_back(parseWord(w)); 
     }
+    Token t = {";", TokenKind::SemiColon};
+    result.push_back(t);
     return result;
   }
 
@@ -171,4 +173,83 @@ Empty:
       pos = lines.size()-1;
     }
   }
+
+  void Lexer::reset() {
+    la = 0;
+    pos = 0;
+  }
+
+
+  const char* tokenkindname(TokenKind t) {
+    switch(t) {
+      case TokenKind::True:
+        return "true";
+      case TokenKind::False:
+        return "false";
+      case TokenKind::Identifier:
+        return "identifier";
+      case TokenKind::Iso:
+        return "iso";
+      case TokenKind::Mut:
+        return "mut";
+      case TokenKind::Imm:
+        return "imm";
+      case TokenKind::Paused:
+        return "paused";
+      case TokenKind::Stack:
+        return "stack";
+      case TokenKind::Store:
+        return "store";
+      case TokenKind::Lookup:
+        return "lookup";
+      case TokenKind::Typetest:
+        return "typetest";
+      case TokenKind::Var:
+        return "var";
+      case TokenKind::Dup:
+        return "dup";
+      case TokenKind::Load:
+        return "load";
+      case TokenKind::New:
+        return "new";
+      case TokenKind::Call:
+        return "call";
+      case TokenKind::Region:
+        return "region";
+      case TokenKind::Create:
+        return "create";
+      case TokenKind::Tailcall:
+        return "tailcall";
+      case TokenKind::Branch:
+        return "branch";
+      case TokenKind::Return:
+        return "return";
+      case TokenKind::Error:
+        return "error";
+      case TokenKind::Catch:
+        return "catch";
+      case TokenKind::Acquire:
+        return "acquire";
+      case TokenKind::Release:
+        return "release";
+      case TokenKind::Fulfill:
+        return "fulfill";
+      case TokenKind::Dot:
+        return ".";
+      case TokenKind::Comma:
+        return ",";
+      case TokenKind::LParen:
+        return "(";
+      case TokenKind::RParen:
+        return ")";
+      case TokenKind::Equals:
+        return "=";
+      case TokenKind::SemiColon:
+        return ";\n";
+      default:
+        assert(0);
+    }
+    return nullptr;
+  }
+
 } // namespace mlexer

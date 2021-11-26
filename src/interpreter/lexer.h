@@ -76,6 +76,7 @@ namespace mlexer {
 
     Token peek();
     void rewind();
+    void reset();
 
     private:
     void parseFile();
@@ -83,5 +84,7 @@ namespace mlexer {
     Token parseWord(std::string word);
 
   };
+
+  const char* tokenkindname(TokenKind t);
 
 } // namespace mlexer;
