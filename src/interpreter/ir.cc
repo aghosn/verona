@@ -6,6 +6,12 @@ namespace verona::ir {
     switch(k) {
       case Kind::Invalid:
         return "Invalid";
+      case Kind::Identifier:
+        return "Identifier";
+      case Kind::ID:
+        return "ID";
+      case Kind::TypeID:
+        return "TypeID";
       case Kind::Var:
         return "Var";
       case Kind::Dup:
@@ -22,6 +28,8 @@ namespace verona::ir {
         return "NewAlloc";
       case Kind::StackAlloc:
         return "StackAlloc";
+      case Kind::Apply:
+        return "Apply";
       case Kind::Call:
         return "Call";
       case Kind::Tailcall:
@@ -34,6 +42,10 @@ namespace verona::ir {
         return "Branch";
       case Kind::Return:
         return "Return";
+      case Kind::Error:
+        return "Error";
+      case Kind::Catch:
+        return "Catch";
       case Kind::Acquire:
         return "Acquire";
       case Kind::Release:
@@ -42,6 +54,32 @@ namespace verona::ir {
         return "Fulfill";
       case Kind::Function:
         return "Function";
+      case Kind::Iso:
+        return "Iso";
+      case Kind::Mut:
+        return "Mut";
+      case Kind::Imm:
+        return "Imm";
+      case Kind::Paused:
+        return "Paused";
+      case Kind::Stack:
+        return "Stack";
+      case Kind::UnionType:
+        return "UniionType";
+      case Kind::IsectType:
+        return "IsectType";
+      case Kind::TupleType:
+        return "TupleType";
+      case Kind::Interface:
+        return "Interface";
+      case Kind::Class:
+        return "Class";
+      case Kind::True:
+        return "True";
+      case Kind::False:
+        return "False";
+      case Kind::Undef:
+        return "Undefined";
       case Kind::End:
         return "End";
       default:

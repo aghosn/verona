@@ -19,10 +19,10 @@ int main(int argc, const char** argv) {
   lexer.reset();
   
   Parser parser(lexer);
-  if (parser.parse()) {
-    cout << "Done parsing" << endl;
-  } else {
-    cout << "Could not parse" << endl;
-  } 
+  parser.parse();
+  
+  for (auto l: parser.program) {
+    cout << kindname(l->kind()) << endl; 
+  }
   return 0;
 }
