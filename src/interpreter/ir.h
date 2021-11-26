@@ -5,10 +5,11 @@
 #include <memory>
 
 namespace verona::ir {
-  enum class Kind {
-    
+  enum class Kind { 
    Invalid,
    Identifier,
+   ID,
+   TypeID,
    Var,
    Dup,
    Load,
@@ -17,6 +18,7 @@ namespace verona::ir {
    Typetest,
    NewAlloc,
    StackAlloc,
+   Apply,
    Call,
    Tailcall,
    Region,
@@ -28,7 +30,7 @@ namespace verona::ir {
    Acquire,
    Release,
    Fulfill,
-   Function,
+   Function, 
   
    // Types
    Iso,
@@ -55,6 +57,7 @@ namespace verona::ir {
 
   struct NodeDef;
 
+  //TODO(aghosn) figure out if we need that or not;
   template<typename T>
   using Node = std::shared_ptr<T>;
 
@@ -77,7 +80,7 @@ namespace verona::ir {
  * @method kind: returns the kind of this particular node.
  */
   struct NodeDef {
-    virtual ~NodeDef() = default;
+    //virtual ~NodeDef() = default;
     virtual Kind kind() = 0;
 
     template<typename T>
@@ -99,7 +102,6 @@ namespace verona::ir {
    */
     // Forward definition
   struct Value : Expr {} ;
-  struct TypeId;
 
   /**
    * Identifier
@@ -115,16 +117,27 @@ namespace verona::ir {
     }
   };
 
+  struct TypeId : Identifier {
+    Kind kind() override {
+      return Kind::TypeID;
+    }
+  };
+
   // Member ::= Function | Id
   struct Member : Expr {};
 
   //TODO(aghosn) quick way to change if I fucked up.
   //Let's take a litteral approach to the problem.
-  struct ID: Identifier, Member{};
+  struct ID: Identifier, Member {
+    
+    Kind kind() override {
+      return Kind::ID;
+    }
+  };
   
-  // x = Expr
+  // x* = Expr
   struct Assign: Expr {
-    Node<ID> left;
+    List<ID> left;
   };
 
   // x = var
@@ -146,7 +159,7 @@ namespace verona::ir {
  
   // x = load y
   struct Load: Assign {
-    Node<ID> y;
+    Node<ID> source;
 
     Kind kind() override {
       return Kind::Load;
@@ -204,9 +217,13 @@ namespace verona::ir {
   struct Apply : Expr {
     Node<ID> function;
     List<ID> args;
+
+    Kind kind() override {
+      return Kind::Apply;
+    }
   };
 
-  // x = call x(y*)
+  // x* = call x(y*)
   struct Call: Assign, Apply {
     Kind kind() override {
       return Kind::Call;
@@ -229,7 +246,7 @@ namespace verona::ir {
 
 
   // region y(z, z*) TODO(aghosn) not sure I understand this.
-  struct Region: Scope {
+  struct Region: Assign, Apply {
     Node<Identifier> name;
 
     Kind kind() override {
@@ -244,7 +261,7 @@ namespace verona::ir {
   };
 
   // create Epsi y(z*)
-  struct Create: Scope {
+  struct Create: Assign, Apply {
     AllocStrategy strategy;
 
     Kind kind() override {
@@ -254,10 +271,11 @@ namespace verona::ir {
 
   
   struct Branch: Expr {
-    Node<Expr> condition;
+    Node<ID> condition;
     // TODO(aghosn) is that correct?
-    Node<Expr> branch1;
-    Node<Expr> branch2;
+    // Or should it be apply?
+    Node<Apply> branch1;
+    Node<Apply> branch2;
 
     Kind kind() override {
       return Kind::Branch;
@@ -274,7 +292,8 @@ namespace verona::ir {
   };
 
   // error
-  struct Error: Expr {
+  struct Err: Expr {
+    int a;
     Kind kind() override {
       return Kind::Error; 
     }
@@ -297,7 +316,7 @@ namespace verona::ir {
 
   // release x | release v
   struct Release: Expr  {
-    Node<Expr> target;
+    Node<ID> target;
 
     Kind kind() override {
       return Kind::Release;
@@ -322,7 +341,7 @@ namespace verona::ir {
   /**
    * Types
    */
-  struct TypeId : Identifier {};
+
   struct Type: NodeDef {
     List<TypeId> typeids;
     Map<ID, Member> members;

@@ -1,6 +1,7 @@
 #include "lexer.h"
 #include "helpers.h"
 
+#include <cassert>
 #include <map>
 #include <stdlib.h>
 #include <fstream>
@@ -22,6 +23,8 @@ namespace mlexer {
     {std::string("paused"), TokenKind::Paused},
     {std::string("stack"), TokenKind::Stack},
     {std::string("store"), TokenKind::Store},
+    {std::string("lookup"), TokenKind::Lookup},
+    {std::string("typetest"), TokenKind::Typetest},
     {std::string("var"), TokenKind::Var},
     {std::string("dup"), TokenKind::Dup},
     {std::string("load"), TokenKind::Load},
@@ -35,7 +38,7 @@ namespace mlexer {
     {std::string("return"), TokenKind::Return,},
     {std::string("error"), TokenKind::Error},
     {std::string("catch"), TokenKind::Catch},
-    {std::string("acquire"), TokenKind::acquire,},
+    {std::string("acquire"), TokenKind::Acquire,},
     {std::string("release"), TokenKind::Release},
     {std::string("fulfill"), TokenKind::Fulfill},
   };
@@ -46,11 +49,12 @@ namespace mlexer {
     {std::string("("), LParen},
     {std::string(")"), RParen},
     {std::string("="), Equals},
+    {std::string(";"), SemiColon},
   };
 
-  Lexer::Lexer(std::string path): file(path) {
+  Lexer::Lexer(std::string path): file(path), la(0), pos(0) {
     // Read the entire file.
-    this->parseFile(); 
+    this->parseFile();
   }
 
   Lexer::~Lexer() {
@@ -80,13 +84,14 @@ namespace mlexer {
     Line result;
     auto words = split(line);
     for (auto w: words) {
-      result.tokens.push_back(this->parseWord(w)); 
+      result.push_back(this->parseWord(w)); 
     }
     return result;
   }
 
   Token Lexer::parseWord(std::string word) {
     Token result;
+    result.text = word;
     // This is a keyword
     if (keywords.contains(word)) {
       result.kind = keywords[word];
@@ -98,8 +103,72 @@ namespace mlexer {
       result.kind = builtins[word];
       return result;
     }
+
+    // Identifier
+    result.kind = Identifier;
     return result;
   }
 
+  bool Lexer::isEmpty(){
+    return lines.size() == 0;
+  }
 
+  bool Lexer::hasNext() {
+    return (!this->isEmpty() && la != -1);
+  }
+
+  //TODO(aghosn) improve that thing
+  Token Lexer::next() {
+    Token t;
+    if (!hasNext() || la >= lines.size()) {
+      goto Empty;
+    }
+
+    assert(la >= 0 && la < lines.size()); 
+    assert(pos >= 0 && pos < lines[la].size());
+    t = lines[la][pos];
+    pos++;
+
+
+    // Cleanup: handle the wrapping
+    if (pos >= lines[la].size()) {
+      la++;
+      pos = 0;
+    }
+    
+    // We are empty
+    if (la >= lines.size()) {
+      la = -1;
+    }
+
+    return t;
+  
+Empty:
+    la = -1;
+    pos = 0;
+    t = Token{"EOF", TokenKind::Eof};
+    return t;
+  }
+
+  Token Lexer::peek() {
+    if (!hasNext()) {
+      return Token{"EOF", TokenKind::Eof};
+    }
+    assert(la >= 0 && la <= lines.size()); 
+    
+    return lines[la][pos];
+  }
+
+  void Lexer::rewind() {
+    la = (la < 0)? lines.size() : la;
+    if (la == 0 && pos == 0) {
+      return;
+    }
+    pos--; 
+    if (pos < 0) {
+      la--;
+      assert(la >= 0 && la < lines.size());
+      pos = lines.size()-1;
+    }
+  }
 } // namespace mlexer

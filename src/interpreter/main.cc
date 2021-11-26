@@ -6,6 +6,8 @@
 
 #include "helpers.h"
 
+#include "ir.h"
+
 using namespace std;
 
 int main(int argc, const char** argv) {

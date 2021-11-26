@@ -10,6 +10,7 @@ namespace mlexer {
     // Constants
     True,
     False,
+    Identifier,
 
     // Keywords
     Iso,
@@ -18,6 +19,8 @@ namespace mlexer {
     Paused,
     Stack,
     Store,
+    Lookup,
+    Typetest,
     Var,
     Dup,
     Load,
@@ -30,7 +33,7 @@ namespace mlexer {
     Return,
     Error,
     Catch,
-    acquire,
+    Acquire,
     Release,
     Fulfill,
 
@@ -40,25 +43,39 @@ namespace mlexer {
     LParen,
     RParen,
     Equals,
+    SemiColon,
+
+    // Special End symbol
+    Eof,
 
   };
 
   struct Token {
     //TODO figure out what we want.
+    std::string text; 
     TokenKind kind;
   };
 
-  struct Line {
-    std::vector<Token> tokens;
-  };
+  using Line = std::vector<Token>;
 
+
+  // TODO(aghosn) make this iterable.
   class Lexer {
     public:
+    int la;
+    int pos;
     std::string file;
     std::vector<Line> lines;
 
     Lexer(std::string path);
     ~Lexer();
+
+    Token next();
+    bool isEmpty();
+    bool hasNext();
+
+    Token peek();
+    void rewind();
 
     private:
     void parseFile();
