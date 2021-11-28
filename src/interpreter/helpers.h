@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-namespace mlexer::helpers {
-
-std::vector<std::string> split(std::string &str);
+namespace mlexer::helpers
+{
+  std::vector<std::string> split(std::string& str);
 
 }
