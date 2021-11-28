@@ -4,12 +4,20 @@ project(verona-interpreter)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(verona-interpreter 
+set(ALL_SOURCE_FILES 
   main.cc
   lexer.cc
   ir.cc
   parser.cc
-  helpers.cc)
+  helpers.cc
+  rules.cc)
+
+add_executable(verona-interpreter 
+  ${ALL_SOURCE_FILES})
+
+## Clang-format target
+include(cmake/clangformat.cmake)
+clangformat_targets()
 
 # TODO(aghosn) cleanup afterwards.
 #find_package(Threads REQUIRED)
