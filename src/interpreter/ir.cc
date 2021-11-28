@@ -30,8 +30,6 @@ namespace verona::ir
         return "NewAlloc";
       case Kind::StackAlloc:
         return "StackAlloc";
-      case Kind::Apply:
-        return "Apply";
       case Kind::Call:
         return "Call";
       case Kind::Tailcall:
