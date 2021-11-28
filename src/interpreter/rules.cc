@@ -1,6 +1,8 @@
 #include "rules.h"
 
-namespace verona::ir {
+using namespace verona::ir;
+
+namespace interpreter {
 
 bool VarR::eval(Node<Var> ast) {
   // TODO(aghosn)
@@ -38,5 +40,7 @@ bool CatchR::eval(Node<Catch> ast) { return false; }
 bool AcquireR::eval(Node<Acquire> ast) { return false; }
 
 bool ReleaseR::eval(Node<Release> ast) { return false; }
+
+bool FulfillR::eval(Node<Fulfill> ast) {return false;}
 
 } // namespace verona::ir

@@ -95,7 +95,13 @@ struct Expr : NodeDef {};
  * Forward declarations.
  */
 // Forward definition
-struct Value : Expr {};
+struct Value: NodeDef {};
+
+/**
+ * Constants
+ */
+
+struct Constant : Value {};
 
 /**
  * Identifier
@@ -278,12 +284,6 @@ struct Fulfill : Expr {
 };
 
 /**
- * Constants
- */
-
-struct Constant : Expr {};
-
-/**
  * Types
  */
 
@@ -345,9 +345,8 @@ struct ClassID : TypeId {};
  * I think it does not have to be exprs, it should be stored somewhere else
  */
 
-// TODO(aghosn) I don't get that one.
 //ω       ∈ Object      ::= Region* × TypeId
-struct Object : Value {
+struct Object {
   List<Region> regions;
   Node<TypeId> typeId;
 };
@@ -357,18 +356,19 @@ struct ObjectId : Value, Identifier {};
 // Should be used for values direclty?
 // Sounds to me like offset to segment
 // i.e., raw data
-struct StorageLoc : Value, Identifier {
+struct StorageLoc : Value {
   Node<ObjectId> objectid;
+  Node<ID> id;
 };
 
-struct Function : Value, Identifier, Member {
+struct Function : Value, Member {
   List<ID> ids;
   List<Expr> exprs;
 
   Kind kind() override { return Kind::Function; }
 };
 
-struct Bool : Value, Constant {};
+struct Bool :  Constant {};
 struct True : Bool {
   Kind kind() override { return Kind::True; }
 };

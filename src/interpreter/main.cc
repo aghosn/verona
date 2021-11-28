@@ -4,11 +4,13 @@
 
 #include "lexer.h"
 #include "parser.h"
+#include "interpreter.h"
 
 #include "ir.h"
 
 using namespace std;
 using namespace verona::ir;
+using namespace interpreter;
 
 int main(int argc, const char **argv) {
   mlexer::Lexer lexer("tests/test.txt");
@@ -21,8 +23,16 @@ int main(int argc, const char **argv) {
   Parser parser(lexer);
   parser.parse();
 
+  Interpreter interp; // = Interpreter();
+  
   for (auto l : parser.program) {
-    cout << kindname(l->kind()) << endl;
+    auto res = interp.match(l);
+    if (res.size() == 0) {
+      cout << "No match" << endl;
+    }
+    for (auto r: res) {
+      cout << kindname(l->kind()) << "matches " << r->print() << endl;
+    }
   }
   return 0;
 }
