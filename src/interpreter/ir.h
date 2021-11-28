@@ -20,7 +20,6 @@ namespace verona::ir
     Typetest,
     NewAlloc,
     StackAlloc,
-    Apply,
     Call,
     Tailcall,
     Region,
@@ -72,6 +71,15 @@ namespace verona::ir
   using Ast = Node<NodeDef>;
   using AstPath = List<NodeDef>;
 
+
+  /**
+   * A visitor for Nodes
+   * */
+  class Visitor {
+    public:
+      virtual void visit(NodeDef* node) = 0;
+  };
+
   /**
    * Everything is a NodeDef.
    *
@@ -89,6 +97,11 @@ namespace verona::ir
     {
       return static_cast<T&>(*this);
     }
+
+    void accept(Visitor* visitor) {
+      visitor->visit(this);
+    }
+
   };
 
   /**
@@ -249,15 +262,10 @@ namespace verona::ir
   };
 
   // x(y*)
-  struct Apply : Expr
+  struct Apply 
   {
     Node<ID> function;
     List<ID> args;
-
-    Kind kind() override
-    {
-      return Kind::Apply;
-    }
   };
 
   // x* = call x(y*)
@@ -270,7 +278,7 @@ namespace verona::ir
   };
 
   // tailcall x(x*)
-  struct Tailcall : Apply
+  struct Tailcall : Expr, Apply
   {
     Kind kind() override
     {
