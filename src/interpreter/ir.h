@@ -31,6 +31,8 @@ namespace verona::ir
     Acquire,
     Release,
     Fulfill,
+    Freeze,
+    Merge,
     Function,
 
     // Types
@@ -71,13 +73,13 @@ namespace verona::ir
   using Ast = Node<NodeDef>;
   using AstPath = List<NodeDef>;
 
-
   /**
    * A visitor for Nodes
    * */
-  class Visitor {
-    public:
-      virtual void visit(NodeDef* node) = 0;
+  class Visitor
+  {
+  public:
+    virtual void visit(NodeDef* node) = 0;
   };
 
   /**
@@ -98,10 +100,10 @@ namespace verona::ir
       return static_cast<T&>(*this);
     }
 
-    void accept(Visitor* visitor) {
+    void accept(Visitor* visitor)
+    {
       visitor->visit(this);
     }
-
   };
 
   /**
@@ -262,7 +264,7 @@ namespace verona::ir
   };
 
   // x(y*)
-  struct Apply 
+  struct Apply
   {
     Node<ID> function;
     List<ID> args;
@@ -399,6 +401,24 @@ namespace verona::ir
     }
   };
 
+  struct Freeze : Assign
+  {
+    Node<ID> target;
+    Kind kind() override
+    {
+      return Kind::Freeze;
+    }
+  };
+
+  struct Merge : Assign
+  {
+    Node<ID> target;
+    Kind kind() override
+    {
+      return Kind::Merge;
+    }
+  };
+
   /**
    * Types
    */
@@ -499,19 +519,6 @@ namespace verona::ir
   struct ClassID : TypeId
   {};
 
-  /**
-   * Globals for the execution of the program.
-   * TODO(aghosn) Not sure this should be here.
-   * I think it does not have to be exprs, it should be stored somewhere else
-   */
-
-  //ω       ∈ Object      ::= Region* × TypeId
-  struct Object
-  {
-    List<Region> regions;
-    Node<TypeId> typeId;
-  };
-
   struct ObjectId : Value, Identifier
   {};
 
@@ -526,7 +533,7 @@ namespace verona::ir
 
   struct Function : Value, Member
   {
-    List<ID> ids;
+    List<ID> args;
     List<Expr> exprs;
 
     Kind kind() override
@@ -568,24 +575,40 @@ namespace verona::ir
     Map<Identifier, Member> members;
   };
 
-  // ϕ       ∈ Frame       ::= Region* × (Id → Value) × Id* × Expression*
-  struct Frame : NodeDef
+  /**
+   * Runtime related structures
+   */
+  struct _runtime
+  {};
+
+  //ω       ∈ Object      ::= Region* × TypeId
+  struct Object : _runtime
   {
     List<Region> regions;
-    Map<Identifier, Value> values;
-    // TODO(aghosn) not sure how to parse this.
-    // Ids?
-    // Expr?
+    Node<TypeId> typeId;
   };
 
-  struct State : NodeDef
+  // ϕ       ∈ Frame       ::= Region* × (Id → Value) × Id* × Expression*
+  struct Frame : _runtime
+  {
+    List<Region> regions;
+    Map<Identifier, Value> lookup;
+    List<Identifier> rets;
+    List<Expr> cont;
+  };
+
+  // σ       ∈ State       ::= Frame*
+  //                       × (ObjectId → Object)
+  //                       × (StorageLoc → Value)
+  //                       × (Region → Strategy)
+  //                       × Bool
+  struct State : _runtime
   {
     List<Frame> frames;
     Map<ObjectId, Object> objects;
-    Map<StorageLoc, Value> values;
+    Map<StorageLoc, Value> fields;
     Map<Region, AllocStrategy> regions;
-    // TODO(aghosn) What the hell is the bool?
+    Node<Bool> except;
   };
 
-  // TODO(aghosn) do the constants as well.
 } // namespace verona::ir

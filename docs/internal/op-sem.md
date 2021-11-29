@@ -124,6 +124,7 @@ e       ∈ Expression  ::= x = var
                         | release x
                         | release v
                         | fulfill x
+                        | freeze x
 ```
 
 ## Shape

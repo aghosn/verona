@@ -37,6 +37,8 @@ namespace mlexer
     Acquire,
     Release,
     Fulfill,
+    Freeze,
+    Merge,
 
     // Builtin symbols
     Dot,

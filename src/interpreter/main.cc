@@ -26,7 +26,8 @@ int main(int argc, const char** argv)
 
   SimplePrinter printer;
 
-  for (auto l: parser.program) {
+  for (auto l : parser.program)
+  {
     l->accept(&printer);
   }
 

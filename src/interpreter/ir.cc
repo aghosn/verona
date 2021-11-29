@@ -52,6 +52,10 @@ namespace verona::ir
         return "Release";
       case Kind::Fulfill:
         return "Fulfill";
+      case Kind::Freeze:
+        return "Freeze";
+      case Kind::Merge:
+        return "Merge";
       case Kind::Function:
         return "Function";
       case Kind::Iso:

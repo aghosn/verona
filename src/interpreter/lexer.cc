@@ -48,6 +48,8 @@ namespace mlexer
     },
     {std::string("release"), TokenKind::Release},
     {std::string("fulfill"), TokenKind::Fulfill},
+    {std::string("freeze"), TokenKind::Freeze},
+    {std::string("merge"), TokenKind::Merge},
   };
 
   std::map<std::string, TokenKind> builtins = {

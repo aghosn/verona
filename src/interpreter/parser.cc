@@ -117,6 +117,9 @@ namespace verona::ir
         return fulfill;
       }
         assert(0);
+      default:
+        // No match
+        assert(0);
     }
     return nullptr;
   }
@@ -318,6 +321,23 @@ namespace verona::ir
         create->args = apply.second;
         return create;
       }
+        assert(0);
+      case TokenKind::Freeze:
+      {
+        auto freeze = make_shared<Freeze>();
+        freeze->target = parseIdentifier();
+        parseEOL();
+        return freeze;
+      }
+        assert(0);
+      case TokenKind::Merge:
+      {
+        auto merge = make_shared<Merge>();
+        merge->target = parseIdentifier();
+        parseEOL();
+        return merge;
+      }
+        assert(0);
       default:
         std::cerr << "Could not parse right expression: '" << t.kind
                   << std::endl;
