@@ -262,6 +262,10 @@ namespace mlexer
         return "release";
       case TokenKind::Fulfill:
         return "fulfill";
+      case TokenKind::Freeze:
+        return "freeze";
+      case TokenKind::Merge:
+        return "merge";
       case TokenKind::Dot:
         return ".";
       case TokenKind::Comma:

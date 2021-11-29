@@ -325,16 +325,16 @@ namespace verona::ir
       case TokenKind::Freeze:
       {
         auto freeze = make_shared<Freeze>();
+        freeze->left = v;
         freeze->target = parseIdentifier();
-        parseEOL();
         return freeze;
       }
         assert(0);
       case TokenKind::Merge:
       {
         auto merge = make_shared<Merge>();
+        merge->left = v;
         merge->target = parseIdentifier();
-        parseEOL();
         return merge;
       }
         assert(0);
