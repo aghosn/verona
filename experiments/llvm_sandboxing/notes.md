@@ -45,6 +45,7 @@ Need to write a more generic matcher then...
 Because it expects to store a type not a decl.
 
 ### At the IR level
+
 ```
 auto c = mod->getOrInsertFunction("sandbox_init",
       llvm::IntegerType::get(mod->getContext(), 32), NULL);
@@ -100,7 +101,6 @@ void define_function(Function* proto, Module& mod) {
   builder.CreateRet(nullptr);
   verifyFunction(*proto);
 }
-}
 ```
 
 ### Notes on LLVM:
@@ -110,3 +110,21 @@ phi nodes -> when the value comes externally to a basic block.
 ## TODOs
 
 1. Read documentation about clang and llvm.
+
+### Implementation plan
+
+1. See if I can get the sandbox library linked.
+2. Find it from the module.
+3. Use it as a target instead of stupid_function.
+
+OR
+
+1. Take the one I define from the agtests
+2. Register calls.
+3. Then try to replace it with the one from the library.
+
+The second option might be better.
+
+```
+in __GI___assert_fail (assertion=0x555558401d42 "(i >= FTy->getNumParams() || FTy->getParamType(i) == Args[i]->getType()) && \"Calling a function with a bad signature!\"", file=0x555558401591 "/agent/_work/1/s/llvm/lib/IR/Instructions.cpp", line=498, function=0x555558401c28 "void llvm::CallInst::init(llvm::FunctionType *, llvm::Value *, ArrayRef<llvm::Value *>, ArrayRef<llvm::OperandBundleDef>, const llvm::Twine &)") at assert.c:101
+```
