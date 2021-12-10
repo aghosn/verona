@@ -4,10 +4,12 @@
 #include "CXXInterface.h"
 #include "FS.h"
 #include "config.h"
+#include "instrumentation.h"
 
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <filesystem> // C++17
 
 using namespace std;
 using namespace verona::interop;
@@ -84,29 +86,28 @@ namespace
   /// Parse config file adding args to the args globals
   void parseCommandLine(int argc, char** argv, vector<string>& includePath)
   {
-    // Replace "--config file" with the contents of file
-    CmdLineAppend app;
-    if (!app.parse(argc, argv))
-    {
-      auto paths = app.configPaths();
-      // Whatever error was on the last config file
-      auto lastConfig = paths[paths.size() - 1];
-      cerr << "Error opening config file " << lastConfig.c_str() << endl;
-      exit(1);
-    }
-
-    // Add the path to the config files to the include path
-    auto paths = app.configPaths();
-    for (auto path : paths)
-    {
-      auto conf = FSHelper::getRealPath(path);
-      auto dir = FSHelper::getDirName(conf);
-      includePath.push_back(dir);
-    }
-
     // Parse the command line
-    cl::ParseCommandLineOptions(
-      app.argc(), app.argv(), "Verona Interop test\n");
+    cl::ParseCommandLineOptions(argc, argv, "Verona Interop test\n");
+    std::vector<std::string> paths;
+    if (!config.empty()) {
+      std::ifstream file(config);
+      if (!file.good()) {
+         cerr << "Error opening config file " << config << endl;
+         exit(1);
+      }
+      paths.push_back(config);
+    }
+
+   // Add the path to the config files to the include path
+   for (auto path : paths)
+   {
+     auto conf = FSHelper::getRealPath(path);
+     auto dir = FSHelper::getDirName(conf);
+     if (std::filesystem::is_directory(conf)) {
+       dir = conf;
+     }
+     includePath.push_back(dir);
+   }
   }
 
   /// Test call
@@ -284,6 +285,8 @@ int main(int argc, char** argv)
   // Emit whatever is left on the main file
   // This is silent, just to make sure nothing breaks here
   auto mod = interface.emitLLVM();
+
+  generate_sandbox_init(*mod);
 
   // Dump LLVM IR for debugging purposes
   // NOTE: Output is not stable, don't use it for tests
