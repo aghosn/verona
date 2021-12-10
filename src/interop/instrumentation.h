@@ -16,26 +16,14 @@ using namespace llvm;
  * The fully qualified name of the export_function function.
  */
 static const char* exportFunctionName = "void myNameSpace::export_function";
-map<FunctionType*, Function*> tpe2export;
+map<Type*, Function*> tpe2export;
 set<Function*> exportFns; 
 
 
-Function* declare_stupid_function(IRBuilder<>& builder, Module& mod) {
-  // Declare the function
-  vector<Type*> voids(0);
-  FunctionType *FT = FunctionType::get(Type::getVoidTy(mod.getContext()), voids, false);
-  Function *proto = Function::Create(FT, Function::ExternalLinkage, "stupid_function", mod);
-
-  // Fill its body
-  BasicBlock *BB = BasicBlock::Create(mod.getContext(), "entry", proto);
-  builder.SetInsertPoint(BB);
-  builder.CreateRet(nullptr);
-  verifyFunction(*proto);
-
-  return proto;
-}
-
-//TODO this is just stupid
+/**
+ * Generates a call to `callee` passing `target` as an argument in the current
+ * basic block.
+ */
 Value* generate_export_call(IRBuilder<>& builder, Module& mod, Function* callee, Function* target) {
   vector<Value*> args(1, target); 
   return builder.CreateCall(callee, args);
@@ -47,18 +35,6 @@ Value* generate_export_call(IRBuilder<>& builder, Module& mod, Function* callee,
  * And should handle the various templated functions.
  * Which themselves should be generated automatically.
  */
-static set<Function*> findExportFunction(Module& mod) {
-  set<Function*> templates;
-  for (auto &f: mod) {
-    std::string name = demangle(f.getName().str());
-    if (name.find(exportFunctionName) == 0) {
-      cout << "inserting " << f.getName().str() << endl;
-      templates.insert(&f);
-    }
-  }
-  return templates;
-}
-
 static void init_export_templates(Module& mod) {
   static bool inited = false;
   if (inited) 
@@ -67,28 +43,26 @@ static void init_export_templates(Module& mod) {
     std::string name = demangle(f.getName().str());
     if (name.find(exportFunctionName) == 0) {
       exportFns.insert(&f);
-      tpe2export[f.getFunctionType()] = &f;
+      FunctionType* tpe = f.getFunctionType();
+      assert(tpe != nullptr && tpe->getNumParams() == 1);
+      Type* paramtpe = tpe->getParamType(0);
+      assert(paramtpe != nullptr);
+      tpe2export[paramtpe] = &f;
+      cout << "export function " << f.getName().str() << endl;
     }
   }
   // Done with the initilization
   inited = true;
 }
 
-static bool type_match(Function* callee, Value* arg) {
-  FunctionType* tpe = callee->getFunctionType();
-  assert(tpe->getNumParams() == 1); 
-  auto *argType = tpe->getParamType(0);
-  return (argType == arg->getType());
-}
-
 void generate_sandbox_init(Module& mod) {
   IRBuilder<> builder(mod.getContext());
   vector<Function*> functions;
-  set<Function*> templates = findExportFunction(mod);
+  init_export_templates(mod);
 
   //Register all the functions.
   for (auto &f: mod) {
-    if (templates.count(&f) == 0) {
+    if (exportFns.count(&f) == 0) {
       functions.push_back(&f);
       cout << "The name of the function " << demangle(f.getName().str()) << endl; 
     }
@@ -102,14 +76,13 @@ void generate_sandbox_init(Module& mod) {
   BasicBlock *BB = BasicBlock::Create(mod.getContext(), "entry", proto);
   builder.SetInsertPoint(BB);
 
-  // For each of the functions listed, create a call to target function.
-  // TODO for the moment we only call the stupid function, next we'll call
-  // the export function.
-  auto exporter = *(templates.begin());
+  // TODO only do this for functions found in the json config.
   for (auto *callee: functions) {
-    if (type_match(exporter, callee)) {
+    Type* t = callee->getType();
+    if (tpe2export.find(t) != tpe2export.end()) {
+      Function* exporter = tpe2export[t];
       Value* instr = generate_export_call(builder, mod, exporter, callee);
-    }
+    } 
   }
   builder.CreateRet(nullptr);
 }
