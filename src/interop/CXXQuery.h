@@ -414,17 +414,28 @@ namespace verona::interop
     };
 
     /**
-     * getByName finds a decl by name.
+     * getDeclByMatch finds a DeclTy according to specified matcher.
+     */
+    template<typename DeclTy>
+    DeclTy* getDeclByMatch(internal::Matcher<clang::Decl> match) const
+    {
+      MatchFinder finder;
+      auto declMatch =
+        std::make_unique<CXXNameMatcher<DeclTy>>();
+      finder.addMatcher(
+        match, declMatch.get());
+      finder.matchAST(*ast);
+      return (DeclTy*)declMatch->store;
+    }
+
+    /**
+     * getFunctionTemplate finds a function template with the provided fully
+     * qualified name.
      */
     clang::FunctionTemplateDecl* getFunctionTemplate(std::string name) const
     {
-      MatchFinder finder;
-      auto fnDeclMatch =
-        std::make_unique<CXXNameMatcher<clang::FunctionTemplateDecl>>();
-      finder.addMatcher(
-        functionTemplateDecl(hasName(name)).bind("id"), fnDeclMatch.get());
-      finder.matchAST(*ast);
-      return (clang::FunctionTemplateDecl*)fnDeclMatch->store;
+      auto matcher = functionTemplateDecl(hasName(name)).bind("id");
+      return getDeclByMatch<clang::FunctionTemplateDecl>(matcher);
     }
   };
 } // namespace verona::interop

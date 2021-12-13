@@ -282,7 +282,7 @@ int main(int argc, char** argv)
     test_function("verona_wrapper_fn_1", interface);
   }
 
-  // Find export_function.
+  // Find export_function template.
   if (sandbox) {
     const CXXQuery* query = interface.getQuery();
     auto *fnDecl = query->getFunctionTemplate("myNameSpace::export_function");
