@@ -392,5 +392,39 @@ namespace verona::interop
         const_cast<clang::NamedDecl*>(decl))};
       return ast->getCanonicalTemplateSpecializationType(templ, args);
     }
+
+    /*
+     * CXXNameMatcher finds a declaration by fully qualified name.
+     * This is used to search for function declarations for examples.
+     */
+    template<class DeclTy>
+    class CXXNameMatcher : public MatchFinder::MatchCallback
+    {
+    public:
+      const DeclTy* store;
+
+      void run(const MatchFinder::MatchResult& Result) override
+      {
+        auto *decl = Result.Nodes.getNodeAs<DeclTy>("id");
+        store = decl;
+      }
+
+    public:
+      CXXNameMatcher() {}
+    };
+
+    /**
+     * getByName finds a decl by name.
+     */
+    clang::FunctionTemplateDecl* getFunctionTemplate(std::string name) const
+    {
+      MatchFinder finder;
+      auto fnDeclMatch =
+        std::make_unique<CXXNameMatcher<clang::FunctionTemplateDecl>>();
+      finder.addMatcher(
+        functionTemplateDecl(hasName(name)).bind("id"), fnDeclMatch.get());
+      finder.matchAST(*ast);
+      return (clang::FunctionTemplateDecl*)fnDeclMatch->store;
+    }
   };
 } // namespace verona::interop

@@ -27,6 +27,13 @@ namespace cl = llvm::cl;
 
 namespace
 {
+  //Options (@aghosn) for sandboxing instrumentation
+  cl::opt<bool> sandbox(
+    "sandbox",
+    cl::desc("Generates sandbox instrumentation"),
+    cl::Optional,
+    cl::init(false));
+
   // For help's sake, will never be parsed, as we intercept
   cl::opt<string> config(
     "config",
@@ -275,6 +282,17 @@ int main(int argc, char** argv)
     test_function("verona_wrapper_fn_1", interface);
   }
 
+  // Find export_function.
+  if (sandbox) {
+    const CXXQuery* query = interface.getQuery();
+    auto *fnDecl = query->getFunctionTemplate("myNameSpace::export_function");
+    assert(fnDecl != nullptr);
+    if (!fnDecl->isTemplated()) {
+      fnDecl->dump();
+    }
+    assert(fnDecl->isTemplated());
+  }
+
   // Dumps the AST before trying to emit LLVM for debugging purposes
   // NOTE: Output is not stable, don't use it for tests
   if (dumpIR)
@@ -285,8 +303,10 @@ int main(int argc, char** argv)
   // Emit whatever is left on the main file
   // This is silent, just to make sure nothing breaks here
   auto mod = interface.emitLLVM();
-
-  generate_sandbox_init(*mod);
+  
+  if (sandbox) {
+    generate_sandbox_init(*mod);
+  }
 
   // Dump LLVM IR for debugging purposes
   // NOTE: Output is not stable, don't use it for tests
