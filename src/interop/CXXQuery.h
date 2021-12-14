@@ -395,7 +395,7 @@ namespace verona::interop
 
     /*
      * CXXNameMatcher finds a declaration by fully qualified name.
-     * This is used to search for function declarations for examples.
+     * This is used to search for function declarations for example.
      */
     template<class DeclTy>
     class CXXNameMatcher : public MatchFinder::MatchCallback
@@ -436,6 +436,12 @@ namespace verona::interop
     {
       auto matcher = functionTemplateDecl(hasName(name)).bind("id");
       return getDeclByMatch<clang::FunctionTemplateDecl>(matcher);
+    }
+
+    clang::FunctionDecl* getFunction(std::string name) const
+    {
+      auto matcher = functionDecl(hasName(name)).bind("id");
+      return getDeclByMatch<clang::FunctionDecl>(matcher);
     }
   };
 } // namespace verona::interop

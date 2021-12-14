@@ -4,8 +4,10 @@
 #include "CXXInterface.h"
 #include "FS.h"
 #include "config.h"
-#include "instrumentation.h"
+#include "IRinstr.h"
+#include "ASTinstr.h"
 
+#include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -291,6 +293,10 @@ int main(int argc, char** argv)
       fnDecl->dump();
     }
     assert(fnDecl->isTemplated());
+
+    // TODO try to see if I can get the functions.
+    specialize_export_function(query);
+    
   }
 
   // Dumps the AST before trying to emit LLVM for debugging purposes
