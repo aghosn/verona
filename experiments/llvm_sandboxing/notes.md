@@ -47,6 +47,7 @@ Because it expects to store a type not a decl.
 ### At the IR level
 
 ```
+
 auto c = mod->getOrInsertFunction("sandbox_init",
       llvm::IntegerType::get(mod->getContext(), 32), NULL);
   auto tmp = (c.getCallee());
@@ -101,6 +102,7 @@ void define_function(Function* proto, Module& mod) {
   builder.CreateRet(nullptr);
   verifyFunction(*proto);
 }
+
 ```
 
 ### Notes on LLVM:
@@ -126,5 +128,55 @@ OR
 The second option might be better.
 
 ```
+
 in __GI___assert_fail (assertion=0x555558401d42 "(i >= FTy->getNumParams() || FTy->getParamType(i) == Args[i]->getType()) && \"Calling a function with a bad signature!\"", file=0x555558401591 "/agent/_work/1/s/llvm/lib/IR/Instructions.cpp", line=498, function=0x555558401c28 "void llvm::CallInst::init(llvm::FunctionType *, llvm::Value *, ArrayRef<llvm::Value *>, ArrayRef<llvm::OperandBundleDef>, const llvm::Twine &)") at assert.c:101
+
+```
+
+
+### Status right now
+
+Problem is that I cannot instantiate a specialization apparently.
+Second problem is the template argument format, the args from the function are ArgPack kind.
+-> I can try to provide that sort of functionality, at least it might be useful in the future.
+
+We gonna have the same issue afterwards I guess with the ExportedFunction class that we need to instantiate.
+That's a bummer...
+ Apprently Renato does not know either.
+
+The other thing we can do now is to try to instantiate the class specialization for the ExportedFunction class. 
+
+
+Saving some bullshit code here:
+
+```
+
+//TODO remove afterwards this is bullshit I test to debug.
+      clang::FunctionDecl* instantiated = query->getFunction(EXPORTER_NAME);
+      assert(instantiated != nullptr);
+
+      cout << "Instantiated signature " << instantiated->getType().getAsString() << endl;
+      assert(instantiated->isFunctionTemplateSpecialization());
+      Exposer* exposer = static_cast<Exposer*>(exporter);
+      clang::FunctionTemplateSpecializationInfo* inf = instantiated->getTemplateSpecializationInfo();
+      assert(inf != nullptr);
+      assert(inf->getTemplateSpecializationKind() == clang::TemplateSpecializationKind::TSK_ImplicitInstantiation);
+      auto argArray = inf->TemplateArguments->asArray();
+      for (auto a: argArray) {
+        if (a.getKind() == clang::TemplateArgument::ArgKind::Type) {
+          cout << "An argument " << a.getAsType().getAsString() << endl;
+        } else if (a.getKind() == clang::TemplateArgument::ArgKind::Pack) {
+          auto unpacked = a.getPackAsArray();
+          for (auto p: unpacked) {
+            assert(p.getKind() == clang::TemplateArgument::ArgKind::Type);
+            cout << "The packed argument " << p.getAsType().getAsString() << endl;
+          }
+        }
+      }
+      // TODO this line fails obviously because the specialization already exists.
+      //exposer->expose_spec(instantiated->getTemplateSpecializationInfo(), ins_point);
+      
+      // We now try to instantiate it.
+      //assert(ins_point == nullptr);
+
 ```

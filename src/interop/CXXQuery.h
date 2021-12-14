@@ -443,5 +443,10 @@ namespace verona::interop
       auto matcher = functionDecl(hasName(name)).bind("id");
       return getDeclByMatch<clang::FunctionDecl>(matcher);
     }
+
+    clang::ClassTemplateDecl* getClassTemplate(std::string name) const {
+      auto matcher = classTemplateDecl(hasName(name)).bind("id");
+      return getDeclByMatch<clang::ClassTemplateDecl>(matcher);
+    }
   };
 } // namespace verona::interop

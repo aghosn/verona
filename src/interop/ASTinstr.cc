@@ -8,34 +8,49 @@ using namespace std;
 namespace verona::interop {
   
   static const char* EXPORTER_NAME = "myNameSpace::export_function";
+  static const char* EXPORTER_CLASS_NAME = "myNameSpace::ExportedFunction";
 
-  vector<clang::QualType> find_targets_types(const CXXQuery* query) {
-    assert(query != nullptr);
-    vector<clang::QualType> types;
-    for (auto target: targets) {
-      clang::FunctionDecl *decl = query->getFunction(target); 
-      assert(decl != nullptr);
-      types.push_back(decl->getType());
+  vector<clang::TemplateArgument> build_fn_template_type(clang::FunctionDecl* decl) {
+    assert(decl != nullptr);
+    vector<clang::TemplateArgument> result;
+
+    // The return type
+    result.push_back(decl->getReturnType());
+
+    // The arguments.
+    // We have to dynamically allocate for TemplateArgument.
+    vector<clang::TemplateArgument>* args = new vector<clang::TemplateArgument>();
+    for (auto *p: decl->parameters()) {
+      args->push_back(clang::TemplateArgument(p->getType()));
     }
-    return types;
+
+    // Convert the args into a pack Template Argument.
+    clang::TemplateArgument packed = clang::TemplateArgument(*args);
+    assert(packed.getKind() == clang::TemplateArgument::ArgKind::Pack);
+
+    result.push_back(packed);
+    
+    // The final result should be (return type, pack(args...))
+    return result;
   }
 
-  vector<vector<clang::TemplateArgument>> find_targets_types2(const CXXQuery* query) {
+  vector<vector<clang::TemplateArgument>> find_targets_types(const CXXQuery* query) {
     assert(query != nullptr);
     vector<vector<clang::TemplateArgument>> types;
     for (auto target: targets) {
       clang::FunctionDecl *decl = query->getFunction(target); 
       assert(decl != nullptr);
-      vector<clang::TemplateArgument> args;
-      args.push_back(clang::TemplateArgument(decl->getReturnType()));
-      for (auto *p: decl->parameters()) {
-        args.push_back(clang::TemplateArgument(p->getType()));
-      }
-      types.push_back(args);
+      types.push_back(build_fn_template_type(decl));
     }
     return types;
   }
 
+
+  /**
+   * Exposer is a stupid class that allows us to access the protected
+   * method addSpecialization from the FunctionTemplateDecl class.
+   * @TODO find a better way to build specialization information.
+   */
   class Exposer: public clang::FunctionTemplateDecl {
     public:
       void expose_spec(clang::FunctionTemplateSpecializationInfo* Info, void* InsertPos) {
@@ -43,40 +58,98 @@ namespace verona::interop {
       }
   };
 
-  void specialize_export_function(const CXXQuery* query) {
-    // Find the export function
+  /**
+   * create_info creates the specialization information for a templated
+   * function instance.
+   */
+  clang::FunctionTemplateSpecializationInfo* create_info() {
+    // We have the kind
+    clang::TemplateSpecializationKind kind = clang::TemplateSpecializationKind::TSK_ImplicitInstantiation;
+    return nullptr;
+  }
+
+  clang::FunctionDecl* function_specialization(
+      CXXInterface& interface,
+      clang::FunctionTemplateDecl* base,
+      llvm::ArrayRef<clang::TemplateArgument> t)
+  {
+    assert(base != nullptr);
+
+    // Find previous declaration.
+    void* ins_point = nullptr;
+    clang::FunctionDecl* retval = base->findSpecialization(t, ins_point);
+
+    // It already exists
+    if (retval != nullptr){
+      return retval;
+    }
+
+    // TODO build the function template specialization.
+    return nullptr;
+  }
+
+  clang::ClassTemplateSpecializationDecl* class_specialization(CXXInterface& interface,
+      clang::ClassTemplateDecl* base,
+      llvm::ArrayRef<clang::TemplateArgument> t)
+  {
+    assert(base != nullptr);
+
+    // Find a previous declaration.
+    void *ins_point = nullptr;
+    clang::ClassTemplateSpecializationDecl* retval = base->findSpecialization(t, ins_point);
+
+    // It already exists.
+    if (retval != nullptr) {
+      return retval;
+    }
+
+    // TODO instantiate the class.
+    return nullptr;
+  }
+
+  void specialize_export_function(CXXInterface& interface) {
+    const CXXQuery* query = interface.getQuery();
     assert(query != nullptr);
+    
+    // Find the template export function
     clang::FunctionTemplateDecl* exporter = query->getFunctionTemplate(EXPORTER_NAME);
     assert(exporter != nullptr);
     assert(exporter->isTemplated());
 
-    // Now find the types
-    vector<vector<clang::TemplateArgument>> types = find_targets_types2(query); 
+    // Find the ExportedFunction class template.
+    clang::ClassTemplateDecl* exporterClass = query->getClassTemplate(EXPORTER_CLASS_NAME);
+    assert(exporterClass != nullptr);
+    assert(exporterClass->isTemplated());
 
-    // For all types found, try to specialize the template.
+    // Build the template arguments for the functions we expose.
+    vector<vector<clang::TemplateArgument>> types = find_targets_types(query); 
+
+    // For all types found, try to specialize both templates.
     for (auto t: types) {
-      void* ins_point = nullptr;
-      clang::FunctionDecl* retval = exporter->findSpecialization(t, ins_point);
-      
-      // It already exists
-      if (retval != nullptr) {
-        continue;
-      }
+        auto *classSpecialization = class_specialization(interface, exporterClass, t);
+        auto *fnSpecialization = function_specialization(interface, exporter, t);
 
-      //TODO remove afterwards this is bullshit I test to debug.
-      clang::FunctionDecl* instantiated = query->getFunction(EXPORTER_NAME);
-      assert(instantiated != nullptr);
-
-      cout << "Oh fuck " << instantiated->getType().getAsString() << endl;
-      cout << "Fuck: " << instantiated->isFunctionTemplateSpecialization() << endl;
-      Exposer* exposer = static_cast<Exposer*>(exporter);
-      clang::FunctionTemplateSpecializationInfo* inf = instantiated->getTemplateSpecializationInfo();
-      assert(inf != nullptr);
-      cout << "The TK: " << inf->getTemplateSpecializationKind() << endl;
-      exposer->expose_spec(instantiated->getTemplateSpecializationInfo(), ins_point);
-      
-      // We now try to instantiate it.
-      //assert(ins_point == nullptr);
+        // TODO debugging case.
+        if (classSpecialization == nullptr || fnSpecialization == nullptr) {
+          assert(t.size() == 2);
+          auto retType = t[0];
+          assert(retType.getKind() == clang::TemplateArgument::ArgKind::Type);
+          cout << retType.getAsType().getAsString() << " (*f) (";
+          auto argTypes = t[1];
+          assert(argTypes.getKind() == clang::TemplateArgument::ArgKind::Pack);
+          auto argArray = argTypes.getPackAsArray();
+          for (auto a: argArray) {          
+            if (a.getKind() != clang::TemplateArgument::ArgKind::Type) {
+              cout << "Oups " << a.getKind() << endl;
+            }
+            assert(a.getKind() == clang::TemplateArgument::ArgKind::Type);
+            cout << a.getAsType().getAsString() << " ";
+          }
+          cout << ")" << endl;
+        }
+        assert(classSpecialization != nullptr);
+        assert(fnSpecialization != nullptr);
+        cout << "Found Some specialization!" << endl;
     }
   }
 

@@ -3,7 +3,7 @@
 #include <vector>
 #include <clang/AST/Decl.h>
 
-#include "CXXQuery.h"
+#include "CXXInterface.h"
 
 using namespace std;
 
@@ -15,6 +15,6 @@ namespace verona::interop {
     "func2",
   };
 
-  void specialize_export_function(const CXXQuery* query);
+  void specialize_export_function(CXXInterface& interface);
 
 } // namespace verona::interop;

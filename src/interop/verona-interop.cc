@@ -295,7 +295,7 @@ int main(int argc, char** argv)
     assert(fnDecl->isTemplated());
 
     // TODO try to see if I can get the functions.
-    specialize_export_function(query);
+    specialize_export_function(interface);
     
   }
 
