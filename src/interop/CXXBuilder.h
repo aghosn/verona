@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <iostream>
+
 #include "CXXQuery.h"
 #include "CXXType.h"
 #include "Compiler.h"
@@ -37,12 +39,20 @@ namespace verona::interop
         return CXXType{};
       }
 
-      auto& S = Clang->getSema();
-
       // Check if this specialisation is already present in the AST
       // (declaration, definition, used).
       clang::ClassTemplateDecl* ClassTemplate =
         classTemplate.getAs<clang::ClassTemplateDecl>();
+      void* InsertPos = nullptr;
+      clang::ClassTemplateSpecializationDecl* Def = _instantiateClassTemplate(ClassTemplate, args);
+      return CXXType{Def};
+    }
+
+    clang::ClassTemplateSpecializationDecl* _instantiateClassTemplate(
+      clang::ClassTemplateDecl* ClassTemplate,
+      llvm::ArrayRef<clang::TemplateArgument> args) const
+    {
+      auto& S = Clang->getSema();
       void* InsertPos = nullptr;
       clang::ClassTemplateSpecializationDecl* Decl =
         ClassTemplate->findSpecialization(args, InsertPos);
@@ -88,9 +98,11 @@ namespace verona::interop
           Decl->getDefinition());
       }
 
-      auto* DC = ast->getTranslationUnitDecl();
-      DC->addDecl(Def);
-      return CXXType{Def};
+      //TODO(aghosn): these lines fault.
+      // For some reason the getLexicalContext of Def is not DC.
+      //auto* DC = ast->getTranslationUnitDecl();
+      //DC->addDecl(Def);
+      return Def;
     }
 
     /**
@@ -210,6 +222,12 @@ namespace verona::interop
 
       // Instantiate and return the definition
       return instantiateClassTemplate(ty, args);
+    }
+
+    clang::ClassTemplateSpecializationDecl* 
+    buildTemplateType(clang::ClassTemplateDecl* ty, llvm::ArrayRef<clang::TemplateArgument> params) const
+    {
+      return _instantiateClassTemplate(ty, params);
     }
 
     /**

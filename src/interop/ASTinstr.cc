@@ -103,8 +103,11 @@ namespace verona::interop {
       return retval;
     }
 
-    // TODO instantiate the class.
-    return nullptr;
+    const CXXBuilder* builder = interface.getBuilder();
+    assert(builder != nullptr);
+    retval = builder->buildTemplateType(base, t);
+    assert(retval != nullptr);
+    return retval;
   }
 
   void specialize_export_function(CXXInterface& interface) {

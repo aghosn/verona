@@ -414,6 +414,45 @@ namespace verona::interop
     };
 
     /**
+     * A convenient structure for iterating a some specific decls from a DeclContext
+     */
+    template <typename DeclType>
+    struct RangeOf {
+        typedef clang::DeclContext::specific_decl_iterator<DeclType> iterator;
+    
+        iterator _begin;
+        iterator _end;
+    
+        explicit RangeOf(clang::DeclContext* decl)
+            : _begin(decl->decls_begin()), _end(decl->decls_end())
+        {}
+    
+        iterator begin() const { return _begin; }
+        iterator end() const { return _end; }
+    };
+
+
+    /**
+     * findDecl is an easier way of finding declarations by
+     * compared to creating a matcher.
+     * It is however potentially less efficient.
+     */
+    template <typename DeclType>
+    DeclType* find(clang::DeclContext* parent, const char* name) {
+        for (auto decl : RangeOf<DeclType>(parent)) {
+            if (decl->getName() == name) {
+                return decl;
+            }
+            if (auto decl_context = llvm::dyn_cast<clang::DeclContext>(decl)) {
+                if (auto deeper_result = find<DeclType>(decl_context, name)) {
+                    return deeper_result;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    /**
      * getDeclByMatch finds a DeclTy according to specified matcher.
      */
     template<typename DeclTy>

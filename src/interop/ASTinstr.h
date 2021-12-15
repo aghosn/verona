@@ -13,6 +13,7 @@ namespace verona::interop {
   static const string targets[] = {
     "func1",
     "func2",
+    "func3",
   };
 
   void specialize_export_function(CXXInterface& interface);
