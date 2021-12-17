@@ -108,7 +108,8 @@ namespace verona::interop {
     assert(builder != nullptr);
     retval = builder->buildTemplateType(base, t);
     assert(retval != nullptr);
-
+    
+    builder->markAsUsed(retval);
     return retval;
   }
 
@@ -128,20 +129,22 @@ namespace verona::interop {
     assert(exporterClass != nullptr);
     assert(exporterClass->isTemplated());
 
-    // Build the template arguments for the functions we expose.
-    vector<vector<clang::TemplateArgument>> types = find_targets_types(query); 
-
-
     // Create sandbox_init in the main file
     auto intTy = query->getQualType(CXXType::getInt());
     llvm::SmallVector<clang::QualType, 0> args{};
-    auto func = builder->buildFunction(SANDBOX_INIT, args, intTy);
+    auto sbInit = builder->buildFunction(SANDBOX_INIT, args, intTy);
     // TODO Create constant literal for the return, find how to declare void.
     auto* fourLiteral = builder->createIntegerLiteral(32, 4);
 
 
-    // For all types found, try to specialize both templates.
-    for (auto t: types) {
+    // For all types found, try to specialize the templates.
+    // Accumulate calls for the body of sandbox_init.
+    std::vector<clang::Stmt*> calls;
+    for (auto target: targets) {
+        clang::FunctionDecl *decl = query->getFunction(target); 
+        assert(decl != nullptr);
+        auto t = build_fn_template_type(decl);
+
         auto *classSpecialization = class_specialization(interface, exporterClass, t);
         assert(classSpecialization != nullptr);
 
@@ -154,8 +157,27 @@ namespace verona::interop {
         }
         assert(exportFunction != nullptr);
 
-        // TODO Create the call
+        //TODO this does not work yet.
+        // Create argument
+        
+        cout << decl->getType().getAsString() << endl;
+        std::vector<clang::ValueDecl*> args;
+        args.push_back(decl);
+        auto call = builder->createMemberCall2(exportFunction, args, intTy, sbInit); 
+        calls.push_back(call); 
     }
+    // Return statement
+    //builder->createReturn(fourLiteral, sbInit);
+    clang::SourceLocation loc = sbInit->getLocation();
+    auto retStmt =
+        clang::ReturnStmt::Create(*builder->getASTContext(), 
+            sbInit->getLocation(), fourLiteral, nullptr);
+    calls.push_back(retStmt);
+    auto compStmt = clang::CompoundStmt::Create(*builder->getASTContext(), calls, loc, loc);
+    sbInit->setBody(compStmt);
+    cout << "Dumping the sandbox function" << endl;
+    sbInit->dump();
+    cout << "\n\n\n" << endl;
   }
 
 } // namespace verona::interop;

@@ -387,5 +387,81 @@ namespace verona::interop
       func->setBody(retStmt);
       return retStmt;
     }
+
+
+    /**
+     * Marks a declaration as being used to prevent DCE.
+     */
+    void markAsUsed(clang::Decl* decl) const 
+    {
+      assert(decl!=nullptr);
+      auto &S = Clang->getSema();
+      clang::AttributeCommonInfo CommonInfo = {clang::SourceRange{}};
+      decl->addAttr(clang::UsedAttr::Create(S.Context, CommonInfo));
+    }
+
+
+    /**
+     * Create a call instruction
+     *
+     * TODO: Create all the ones we use in code generation
+     */
+    clang::Expr* createMemberCall2(
+      clang::CXXMethodDecl* method,
+      llvm::ArrayRef<clang::ValueDecl*> args,
+      clang::QualType retTy,
+      clang::FunctionDecl* caller) const
+    {
+      clang::SourceLocation loc = caller->getLocation();
+      clang::DeclarationNameInfo info;
+      clang::NestedNameSpecifierLoc spec;
+      auto& S = Clang->getSema();
+
+      // Create an expression for each argument
+      llvm::SmallVector<clang::Expr*, 1> argExpr;
+      for (auto arg : args)
+      {
+        // Get expression from declaration
+        auto e = clang::DeclRefExpr::Create(
+          *ast,
+          spec,
+          loc,
+          arg,
+          /*capture=*/false,
+          info,
+          arg->getType(),
+          clang::VK_LValue);
+
+        // Implicit cast to r-value
+        auto cast = clang::ImplicitCastExpr::Create(
+          *ast,
+          e->getType(),
+          clang::CK_LValueToRValue,
+          e,
+          /*base path=*/nullptr,
+          clang::VK_PRValue,
+          clang::FPOptionsOverride());
+
+        argExpr.push_back(cast);
+      }
+
+      // Create a call to the method
+      auto expr = getCXXMethodPtr(method, loc);
+      auto callStmt = callCXXMethod(method, expr, argExpr, retTy, loc);
+      //auto compStmt = clang::CompoundStmt::Create(*ast, {callStmt}, loc, loc);
+
+      // Mark method as used
+      clang::AttributeCommonInfo CommonInfo = {clang::SourceRange{}};
+      method->addAttr(clang::UsedAttr::Create(S.Context, CommonInfo));
+
+      //caller->setBody(compStmt);
+      return callStmt;
+    }
+
+    clang::ASTContext* getASTContext() const {
+      return ast;
+    }
+    
+
   };
 } // namespace verona::interop
