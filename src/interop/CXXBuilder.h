@@ -98,10 +98,12 @@ namespace verona::interop
           Decl->getDefinition());
       }
 
-      //TODO(aghosn): these lines fault.
-      // For some reason the getLexicalContext of Def is not DC.
-      //auto* DC = ast->getTranslationUnitDecl();
-      //DC->addDecl(Def);
+      // TODO I modified the following lines because they faulted.
+      // The lexical context from def was different than DC.
+      // This seems to fix it.
+      auto* DC = ast->getTranslationUnitDecl();
+      Def->setLexicalDeclContext(DC);
+      DC->addDecl(Def);
       return Def;
     }
 

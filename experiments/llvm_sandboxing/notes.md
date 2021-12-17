@@ -180,3 +180,28 @@ Saving some bullshit code here:
       //assert(ins_point == nullptr);
 
 ```
+
+
+```
+        // TODO debugging case.
+        if (classSpecialization == nullptr || fnSpecialization == nullptr) {
+          assert(t.size() == 2);
+          auto retType = t[0];
+          assert(retType.getKind() == clang::TemplateArgument::ArgKind::Type);
+          cout << retType.getAsType().getAsString() << " (*f) (";
+          auto argTypes = t[1];
+          assert(argTypes.getKind() == clang::TemplateArgument::ArgKind::Pack);
+          auto argArray = argTypes.getPackAsArray();
+          for (auto a: argArray) {          
+            if (a.getKind() != clang::TemplateArgument::ArgKind::Type) {
+              cout << "Oups " << a.getKind() << endl;
+            }
+            assert(a.getKind() == clang::TemplateArgument::ArgKind::Type);
+            cout << a.getAsType().getAsString() << " ";
+          }
+          cout << ")" << endl;
+        }
+
+```
+
+There is something weird, the classTemplateDecl shows only a templateSpecialization, not a specializationDecl

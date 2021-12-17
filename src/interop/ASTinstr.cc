@@ -6,7 +6,8 @@
 
 using namespace std;
 namespace verona::interop {
-  
+  static const char* SANDBOX_INIT = "sandbox_init"; 
+  static const char* METHOD_NAME = "export_function";
   static const char* EXPORTER_NAME = "myNameSpace::export_function";
   static const char* EXPORTER_CLASS_NAME = "myNameSpace::ExportedFunction";
 
@@ -107,12 +108,15 @@ namespace verona::interop {
     assert(builder != nullptr);
     retval = builder->buildTemplateType(base, t);
     assert(retval != nullptr);
+
     return retval;
   }
 
   void specialize_export_function(CXXInterface& interface) {
     const CXXQuery* query = interface.getQuery();
+    const CXXBuilder* builder = interface.getBuilder();
     assert(query != nullptr);
+    assert(builder != nullptr);
     
     // Find the template export function
     clang::FunctionTemplateDecl* exporter = query->getFunctionTemplate(EXPORTER_NAME);
@@ -127,32 +131,30 @@ namespace verona::interop {
     // Build the template arguments for the functions we expose.
     vector<vector<clang::TemplateArgument>> types = find_targets_types(query); 
 
+
+    // Create sandbox_init in the main file
+    auto intTy = query->getQualType(CXXType::getInt());
+    llvm::SmallVector<clang::QualType, 0> args{};
+    auto func = builder->buildFunction(SANDBOX_INIT, args, intTy);
+    // TODO Create constant literal for the return, find how to declare void.
+    auto* fourLiteral = builder->createIntegerLiteral(32, 4);
+
+
     // For all types found, try to specialize both templates.
     for (auto t: types) {
         auto *classSpecialization = class_specialization(interface, exporterClass, t);
-        auto *fnSpecialization = function_specialization(interface, exporter, t);
-
-        // TODO debugging case.
-        if (classSpecialization == nullptr || fnSpecialization == nullptr) {
-          assert(t.size() == 2);
-          auto retType = t[0];
-          assert(retType.getKind() == clang::TemplateArgument::ArgKind::Type);
-          cout << retType.getAsType().getAsString() << " (*f) (";
-          auto argTypes = t[1];
-          assert(argTypes.getKind() == clang::TemplateArgument::ArgKind::Pack);
-          auto argArray = argTypes.getPackAsArray();
-          for (auto a: argArray) {          
-            if (a.getKind() != clang::TemplateArgument::ArgKind::Type) {
-              cout << "Oups " << a.getKind() << endl;
-            }
-            assert(a.getKind() == clang::TemplateArgument::ArgKind::Type);
-            cout << a.getAsType().getAsString() << " ";
-          }
-          cout << ")" << endl;
-        }
         assert(classSpecialization != nullptr);
-        assert(fnSpecialization != nullptr);
-        cout << "Found Some specialization!" << endl;
+
+        clang::CXXMethodDecl* exportFunction = nullptr; 
+        for (auto *c: classSpecialization->methods()) {
+          if (c->isStatic() && c->getName() == METHOD_NAME) {
+            exportFunction = c;
+            break;
+          }  
+        }
+        assert(exportFunction != nullptr);
+
+        // TODO Create the call
     }
   }
 

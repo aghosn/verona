@@ -1,4 +1,8 @@
+#include <iostream> 
+
 #include "IRinstr.h"
+
+using namespace std;
 
 namespace verona::interop
 {
@@ -17,6 +21,8 @@ namespace verona::interop
     for (auto& f : mod)
     {
       std::string name = demangle(f.getName().str());
+      cout << "A function " << name << endl;
+
       if (name.find(exportFunctionName) == 0)
       {
         exportFns.insert(&f);
