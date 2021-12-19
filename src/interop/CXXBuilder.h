@@ -402,9 +402,8 @@ namespace verona::interop
 
 
     /**
-     * Create a call instruction
+     * Create a call instruction with func pointer argument.
      *
-     * TODO: Create all the ones we use in code generation
      */
     clang::Expr* createMemberCall2(
       clang::CXXMethodDecl* method,
@@ -421,6 +420,9 @@ namespace verona::interop
       llvm::SmallVector<clang::Expr*, 1> argExpr;
       for (auto arg : args)
       {
+       
+        auto funcTy = arg->getFunctionType();
+        auto funcQualTy = clang::QualType(funcTy, 0);
         // Get expression from declaration
         auto e = clang::DeclRefExpr::Create(
           *ast,
@@ -429,19 +431,18 @@ namespace verona::interop
           arg,
           /*capture=*/false,
           info,
-          arg->getType(),
+          funcQualTy,
           clang::VK_LValue);
-
+          
         // Implicit cast to r-value
         auto cast = clang::ImplicitCastExpr::Create(
           *ast,
-          e->getType(),
-          clang::CK_LValueToRValue,
+          ast->getPointerType(funcQualTy),
+          clang::CK_FunctionToPointerDecay,
           e,
           /*base path=*/nullptr,
-          clang::VK_PRValue,
+          clang::VK_LValue,
           clang::FPOptionsOverride());
-
         argExpr.push_back(cast);
       }
 
@@ -461,7 +462,5 @@ namespace verona::interop
     clang::ASTContext* getASTContext() const {
       return ast;
     }
-    
-
   };
 } // namespace verona::interop

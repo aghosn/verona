@@ -286,15 +286,14 @@ int main(int argc, char** argv)
 
   // Find export_function template.
   if (sandbox) {
-    const CXXQuery* query = interface.getQuery();
-    auto *fnDecl = query->getFunctionTemplate("myNameSpace::export_function");
-    assert(fnDecl != nullptr);
-    if (!fnDecl->isTemplated()) {
-      fnDecl->dump();
-    }
-    assert(fnDecl->isTemplated());
+    //const CXXQuery* query = interface.getQuery();
+    //auto *fnDecl = query->getFunctionTemplate("myNameSpace::export_function");
+    //assert(fnDecl != nullptr);
+    //if (!fnDecl->isTemplated()) {
+    //  fnDecl->dump();
+    //}
+    //assert(fnDecl->isTemplated());
 
-    // TODO try to see if I can get the functions.
     specialize_export_function(interface);
     
   }
@@ -311,7 +310,7 @@ int main(int argc, char** argv)
   auto mod = interface.emitLLVM();
   
   if (sandbox) {
-    generate_sandbox_init(*mod);
+    //generate_sandbox_init(*mod);
   }
 
   // Dump LLVM IR for debugging purposes

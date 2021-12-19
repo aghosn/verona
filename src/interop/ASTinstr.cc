@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cassert>
 #include <clang/AST/DeclTemplate.h>
+#include <typeinfo>
 
 #include "ASTinstr.h"
 
@@ -46,19 +47,6 @@ namespace verona::interop {
     return types;
   }
 
-
-  /**
-   * Exposer is a stupid class that allows us to access the protected
-   * method addSpecialization from the FunctionTemplateDecl class.
-   * @TODO find a better way to build specialization information.
-   */
-  class Exposer: public clang::FunctionTemplateDecl {
-    public:
-      void expose_spec(clang::FunctionTemplateSpecializationInfo* Info, void* InsertPos) {
-        this->addSpecialization(Info, InsertPos);
-      }
-  };
-
   /**
    * create_info creates the specialization information for a templated
    * function instance.
@@ -66,26 +54,6 @@ namespace verona::interop {
   clang::FunctionTemplateSpecializationInfo* create_info() {
     // We have the kind
     clang::TemplateSpecializationKind kind = clang::TemplateSpecializationKind::TSK_ImplicitInstantiation;
-    return nullptr;
-  }
-
-  clang::FunctionDecl* function_specialization(
-      CXXInterface& interface,
-      clang::FunctionTemplateDecl* base,
-      llvm::ArrayRef<clang::TemplateArgument> t)
-  {
-    assert(base != nullptr);
-
-    // Find previous declaration.
-    void* ins_point = nullptr;
-    clang::FunctionDecl* retval = base->findSpecialization(t, ins_point);
-
-    // It already exists
-    if (retval != nullptr){
-      return retval;
-    }
-
-    // TODO build the function template specialization.
     return nullptr;
   }
 
@@ -156,28 +124,19 @@ namespace verona::interop {
           }  
         }
         assert(exportFunction != nullptr);
-
-        //TODO this does not work yet.
-        // Create argument
-        
-        cout << decl->getType().getAsString() << endl;
         std::vector<clang::ValueDecl*> args;
         args.push_back(decl);
         auto call = builder->createMemberCall2(exportFunction, args, intTy, sbInit); 
         calls.push_back(call); 
     }
-    // Return statement
-    //builder->createReturn(fourLiteral, sbInit);
     clang::SourceLocation loc = sbInit->getLocation();
+    // Return statement
     auto retStmt =
         clang::ReturnStmt::Create(*builder->getASTContext(), 
             sbInit->getLocation(), fourLiteral, nullptr);
     calls.push_back(retStmt);
     auto compStmt = clang::CompoundStmt::Create(*builder->getASTContext(), calls, loc, loc);
     sbInit->setBody(compStmt);
-    cout << "Dumping the sandbox function" << endl;
-    sbInit->dump();
-    cout << "\n\n\n" << endl;
   }
 
 } // namespace verona::interop;
