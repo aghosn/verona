@@ -303,14 +303,16 @@ int main(int argc, char** argv)
   if (dumpIR)
   {
     interface.dumpAST();
+    std::cout << "End of dump " << std::endl;
   }
+
 
   // Emit whatever is left on the main file
   // This is silent, just to make sure nothing breaks here
   auto mod = interface.emitLLVM();
   
   if (sandbox) {
-    //generate_sandbox_init(*mod);
+    generate_sandbox_init(*mod);
   }
 
   // Dump LLVM IR for debugging purposes

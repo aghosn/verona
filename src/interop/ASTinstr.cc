@@ -137,6 +137,7 @@ namespace verona::interop {
     calls.push_back(retStmt);
     auto compStmt = clang::CompoundStmt::Create(*builder->getASTContext(), calls, loc, loc);
     sbInit->setBody(compStmt);
+    builder->markAsUsed(sbInit); 
   }
 
 } // namespace verona::interop;

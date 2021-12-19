@@ -47,13 +47,14 @@ namespace verona::interop
     // Register all the functions.
     for (auto& f : mod)
     {
-      if (exportFns.count(&f) == 0)
-      {
+     // if (exportFns.count(&f) == 0)
+     // {
         functions.push_back(&f);
         cout << "The name of the function " << demangle(f.getName().str())
              << endl;
-      }
+     // }
     }
+    return;
     // Declare the sandbox_init function
     vector<Type*> voids(0);
     FunctionType* FT =

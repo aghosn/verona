@@ -441,7 +441,7 @@ namespace verona::interop
           clang::CK_FunctionToPointerDecay,
           e,
           /*base path=*/nullptr,
-          clang::VK_LValue,
+          clang::VK_PRValue,
           clang::FPOptionsOverride());
         argExpr.push_back(cast);
       }
@@ -454,8 +454,7 @@ namespace verona::interop
       // Mark method as used
       clang::AttributeCommonInfo CommonInfo = {clang::SourceRange{}};
       method->addAttr(clang::UsedAttr::Create(S.Context, CommonInfo));
-
-      //caller->setBody(compStmt);
+    
       return callStmt;
     }
 
