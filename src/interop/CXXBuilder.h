@@ -3,11 +3,11 @@
 
 #pragma once
 
-#include <iostream>
-
 #include "CXXQuery.h"
 #include "CXXType.h"
 #include "Compiler.h"
+
+#include <iostream>
 
 namespace verona::interop
 {
@@ -44,7 +44,8 @@ namespace verona::interop
       clang::ClassTemplateDecl* ClassTemplate =
         classTemplate.getAs<clang::ClassTemplateDecl>();
       void* InsertPos = nullptr;
-      clang::ClassTemplateSpecializationDecl* Def = _instantiateClassTemplate(ClassTemplate, args);
+      clang::ClassTemplateSpecializationDecl* Def =
+        _instantiateClassTemplate(ClassTemplate, args);
       return CXXType{Def};
     }
 
@@ -226,8 +227,9 @@ namespace verona::interop
       return instantiateClassTemplate(ty, args);
     }
 
-    clang::ClassTemplateSpecializationDecl* 
-    buildTemplateType(clang::ClassTemplateDecl* ty, llvm::ArrayRef<clang::TemplateArgument> params) const
+    clang::ClassTemplateSpecializationDecl* buildTemplateType(
+      clang::ClassTemplateDecl* ty,
+      llvm::ArrayRef<clang::TemplateArgument> params) const
     {
       return _instantiateClassTemplate(ty, params);
     }
@@ -388,18 +390,16 @@ namespace verona::interop
       return retStmt;
     }
 
-
     /**
      * Marks a declaration as being used to prevent DCE.
      */
-    void markAsUsed(clang::Decl* decl) const 
+    void markAsUsed(clang::Decl* decl) const
     {
-      assert(decl!=nullptr);
-      auto &S = Clang->getSema();
+      assert(decl != nullptr);
+      auto& S = Clang->getSema();
       clang::AttributeCommonInfo CommonInfo = {clang::SourceRange{}};
       decl->addAttr(clang::UsedAttr::Create(S.Context, CommonInfo));
     }
-
 
     /**
      * Create a call instruction with func pointer argument.
@@ -421,7 +421,6 @@ namespace verona::interop
       llvm::SmallVector<clang::Expr*, 1> argExpr;
       for (auto arg : args)
       {
-       
         auto funcTy = arg->getFunctionType();
         auto funcQualTy = clang::QualType(funcTy, 0);
         // Get expression from declaration
@@ -434,7 +433,7 @@ namespace verona::interop
           info,
           funcQualTy,
           clang::VK_LValue);
-          
+
         // Implicit cast to r-value
         auto cast = clang::ImplicitCastExpr::Create(
           *ast,
@@ -454,11 +453,12 @@ namespace verona::interop
       // Mark method as used
       clang::AttributeCommonInfo CommonInfo = {clang::SourceRange{}};
       method->addAttr(clang::UsedAttr::Create(S.Context, CommonInfo));
-    
+
       return callStmt;
     }
 
-    clang::ASTContext* getASTContext() const {
+    clang::ASTContext* getASTContext() const
+    {
       return ast;
     }
   };

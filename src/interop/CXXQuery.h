@@ -405,7 +405,7 @@ namespace verona::interop
 
       void run(const MatchFinder::MatchResult& Result) override
       {
-        auto *decl = Result.Nodes.getNodeAs<DeclTy>("id");
+        auto* decl = Result.Nodes.getNodeAs<DeclTy>("id");
         store = decl;
       }
 
@@ -414,42 +414,54 @@ namespace verona::interop
     };
 
     /**
-     * A convenient structure for iterating a some specific decls from a DeclContext
+     * A convenient structure for iterating a some specific decls from a
+     * DeclContext
      */
-    template <typename DeclType>
-    struct RangeOf {
-        typedef clang::DeclContext::specific_decl_iterator<DeclType> iterator;
-    
-        iterator _begin;
-        iterator _end;
-    
-        explicit RangeOf(clang::DeclContext* decl)
-            : _begin(decl->decls_begin()), _end(decl->decls_end())
-        {}
-    
-        iterator begin() const { return _begin; }
-        iterator end() const { return _end; }
-    };
+    template<typename DeclType>
+    struct RangeOf
+    {
+      typedef clang::DeclContext::specific_decl_iterator<DeclType> iterator;
 
+      iterator _begin;
+      iterator _end;
+
+      explicit RangeOf(clang::DeclContext* decl)
+      : _begin(decl->decls_begin()), _end(decl->decls_end())
+      {}
+
+      iterator begin() const
+      {
+        return _begin;
+      }
+      iterator end() const
+      {
+        return _end;
+      }
+    };
 
     /**
      * findDecl is an easier way of finding declarations by
      * compared to creating a matcher.
      * It is however potentially less efficient.
      */
-    template <typename DeclType>
-    DeclType* find(clang::DeclContext* parent, const char* name) {
-        for (auto decl : RangeOf<DeclType>(parent)) {
-            if (decl->getName() == name) {
-                return decl;
-            }
-            if (auto decl_context = llvm::dyn_cast<clang::DeclContext>(decl)) {
-                if (auto deeper_result = find<DeclType>(decl_context, name)) {
-                    return deeper_result;
-                }
-            }
+    template<typename DeclType>
+    DeclType* find(clang::DeclContext* parent, const char* name)
+    {
+      for (auto decl : RangeOf<DeclType>(parent))
+      {
+        if (decl->getName() == name)
+        {
+          return decl;
         }
-        return nullptr;
+        if (auto decl_context = llvm::dyn_cast<clang::DeclContext>(decl))
+        {
+          if (auto deeper_result = find<DeclType>(decl_context, name))
+          {
+            return deeper_result;
+          }
+        }
+      }
+      return nullptr;
     }
 
     /**
@@ -459,10 +471,8 @@ namespace verona::interop
     DeclTy* getDeclByMatch(internal::Matcher<clang::Decl> match) const
     {
       MatchFinder finder;
-      auto declMatch =
-        std::make_unique<CXXNameMatcher<DeclTy>>();
-      finder.addMatcher(
-        match, declMatch.get());
+      auto declMatch = std::make_unique<CXXNameMatcher<DeclTy>>();
+      finder.addMatcher(match, declMatch.get());
       finder.matchAST(*ast);
       return (DeclTy*)declMatch->store;
     }
@@ -483,7 +493,8 @@ namespace verona::interop
       return getDeclByMatch<clang::FunctionDecl>(matcher);
     }
 
-    clang::ClassTemplateDecl* getClassTemplate(std::string name) const {
+    clang::ClassTemplateDecl* getClassTemplate(std::string name) const
+    {
       auto matcher = classTemplateDecl(hasName(name)).bind("id");
       return getDeclByMatch<clang::ClassTemplateDecl>(matcher);
     }

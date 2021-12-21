@@ -1,16 +1,15 @@
 // Copyright Microsoft and Project Verona Contributors.
 // SPDX-License-Identifier: MIT
 
+#include "ASTinstr.h"
 #include "CXXInterface.h"
 #include "FS.h"
 #include "config.h"
-#include "ASTinstr.h"
 
-#include <iostream>
+#include <filesystem> // C++17
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <filesystem> // C++17
 
 using namespace std;
 using namespace verona::interop;
@@ -28,7 +27,7 @@ namespace cl = llvm::cl;
 
 namespace
 {
-  //Options (@aghosn) for sandboxing instrumentation
+  // Options (@aghosn) for sandboxing instrumentation
   // Turn on sandboxing
   cl::opt<bool> sandbox(
     "sandbox",
@@ -105,40 +104,46 @@ namespace
     // Parse the command line
     cl::ParseCommandLineOptions(argc, argv, "Verona Interop test\n");
     std::vector<std::string> paths;
-    if (!config.empty()) {
+    if (!config.empty())
+    {
       std::ifstream file(config);
-      if (!file.good()) {
-         cerr << "Error opening config file " << config << endl;
-         exit(1);
+      if (!file.good())
+      {
+        cerr << "Error opening config file " << config << endl;
+        exit(1);
       }
       paths.push_back(config);
     }
 
     // Parsing targets
-    if (!config.empty()) {
+    if (!config.empty())
+    {
       std::ifstream file(targets);
-      if (!file.good()) {
+      if (!file.good())
+      {
         cerr << "Error opening targets file " << targets << endl;
         exit(1);
       }
 
       // Read the file and add all of functions (one per line) to the targets.
       std::string line;
-      while (std::getline(file, line)) {
+      while (std::getline(file, line))
+      {
         target_functions.push_back(line);
       }
     }
 
-   // Add the path to the config files to the include path
-   for (auto path : paths)
-   {
-     auto conf = FSHelper::getRealPath(path);
-     auto dir = FSHelper::getDirName(conf);
-     if (std::filesystem::is_directory(conf)) {
-       dir = conf;
-     }
-     includePath.push_back(dir);
-   }
+    // Add the path to the config files to the include path
+    for (auto path : paths)
+    {
+      auto conf = FSHelper::getRealPath(path);
+      auto dir = FSHelper::getDirName(conf);
+      if (std::filesystem::is_directory(conf))
+      {
+        dir = conf;
+      }
+      includePath.push_back(dir);
+    }
   }
 
   /// Test call
@@ -306,8 +311,9 @@ int main(int argc, char** argv)
     test_function("verona_wrapper_fn_1", interface);
   }
 
-  //  Generate the sandbox instrumentation. 
-  if (sandbox) {
+  //  Generate the sandbox instrumentation.
+  if (sandbox)
+  {
     // Check that we have the list of targets.
 
     specialize_export_function(interface);
@@ -320,11 +326,10 @@ int main(int argc, char** argv)
     interface.dumpAST();
   }
 
-
   // Emit whatever is left on the main file
   // This is silent, just to make sure nothing breaks here
   auto mod = interface.emitLLVM();
-  
+
   // Dump LLVM IR for debugging purposes
   // NOTE: Output is not stable, don't use it for tests
   if (dumpIR)
