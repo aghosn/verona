@@ -9,7 +9,6 @@ using namespace std;
 namespace verona::interop {
   static const char* SANDBOX_INIT = "sandbox_init"; 
   static const char* METHOD_NAME = "export_function";
-  static const char* EXPORTER_NAME = "myNameSpace::export_function";
   static const char* EXPORTER_CLASS_NAME = "myNameSpace::ExportedFunction";
 
   vector<clang::TemplateArgument> build_fn_template_type(clang::FunctionDecl* decl) {
@@ -34,27 +33,6 @@ namespace verona::interop {
     
     // The final result should be (return type, pack(args...))
     return result;
-  }
-
-  vector<vector<clang::TemplateArgument>> find_targets_types(const CXXQuery* query) {
-    assert(query != nullptr);
-    vector<vector<clang::TemplateArgument>> types;
-    for (auto target: targets) {
-      clang::FunctionDecl *decl = query->getFunction(target); 
-      assert(decl != nullptr);
-      types.push_back(build_fn_template_type(decl));
-    }
-    return types;
-  }
-
-  /**
-   * create_info creates the specialization information for a templated
-   * function instance.
-   */
-  clang::FunctionTemplateSpecializationInfo* create_info() {
-    // We have the kind
-    clang::TemplateSpecializationKind kind = clang::TemplateSpecializationKind::TSK_ImplicitInstantiation;
-    return nullptr;
   }
 
   clang::ClassTemplateSpecializationDecl* class_specialization(CXXInterface& interface,
@@ -87,11 +65,6 @@ namespace verona::interop {
     assert(query != nullptr);
     assert(builder != nullptr);
     
-    // Find the template export function
-    clang::FunctionTemplateDecl* exporter = query->getFunctionTemplate(EXPORTER_NAME);
-    assert(exporter != nullptr);
-    assert(exporter->isTemplated());
-
     // Find the ExportedFunction class template.
     clang::ClassTemplateDecl* exporterClass = query->getClassTemplate(EXPORTER_CLASS_NAME);
     assert(exporterClass != nullptr);
@@ -102,13 +75,13 @@ namespace verona::interop {
     llvm::SmallVector<clang::QualType, 0> args{};
     auto sbInit = builder->buildFunction(SANDBOX_INIT, args, intTy);
     // TODO Create constant literal for the return, find how to declare void.
-    auto* fourLiteral = builder->createIntegerLiteral(32, 4);
+    auto* fourLiteral = builder->createIntegerLiteral(32, 42);
 
 
     // For all types found, try to specialize the templates.
     // Accumulate calls for the body of sandbox_init.
     std::vector<clang::Stmt*> calls;
-    for (auto target: targets) {
+    for (auto target: target_functions) {
         clang::FunctionDecl *decl = query->getFunction(target); 
         assert(decl != nullptr);
         auto t = build_fn_template_type(decl);
@@ -126,7 +99,7 @@ namespace verona::interop {
         assert(exportFunction != nullptr);
         std::vector<clang::ValueDecl*> args;
         args.push_back(decl);
-        auto call = builder->createMemberCall2(exportFunction, args, intTy, sbInit); 
+        auto call = builder->createMemberCallFunctionArg(exportFunction, args, intTy, sbInit); 
         calls.push_back(call); 
     }
     clang::SourceLocation loc = sbInit->getLocation();

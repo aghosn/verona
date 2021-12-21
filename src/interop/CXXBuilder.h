@@ -403,9 +403,10 @@ namespace verona::interop
 
     /**
      * Create a call instruction with func pointer argument.
+     * @warn does not set the caller body to allow for compoud statements.
      *
      */
-    clang::Expr* createMemberCall2(
+    clang::Expr* createMemberCallFunctionArg(
       clang::CXXMethodDecl* method,
       llvm::ArrayRef<clang::ValueDecl*> args,
       clang::QualType retTy,
@@ -449,7 +450,6 @@ namespace verona::interop
       // Create a call to the method
       auto expr = getCXXMethodPtr(method, loc);
       auto callStmt = callCXXMethod(method, expr, argExpr, retTy, loc);
-      //auto compStmt = clang::CompoundStmt::Create(*ast, {callStmt}, loc, loc);
 
       // Mark method as used
       clang::AttributeCommonInfo CommonInfo = {clang::SourceRange{}};

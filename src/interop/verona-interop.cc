@@ -4,7 +4,6 @@
 #include "CXXInterface.h"
 #include "FS.h"
 #include "config.h"
-#include "IRinstr.h"
 #include "ASTinstr.h"
 
 #include <iostream>
@@ -30,11 +29,19 @@ namespace cl = llvm::cl;
 namespace
 {
   //Options (@aghosn) for sandboxing instrumentation
+  // Turn on sandboxing
   cl::opt<bool> sandbox(
     "sandbox",
-    cl::desc("Generates sandbox instrumentation"),
+    cl::desc("Generate sandbox instrumentation. Expects --targets to be on."),
     cl::Optional,
     cl::init(false));
+
+  // Supply the list of target functions.
+  cl::opt<string> targets(
+    "targets",
+    cl::desc("<targets file> A list of the library functions to expose"),
+    cl::Optional,
+    cl::value_desc(targets));
 
   // For help's sake, will never be parsed, as we intercept
   cl::opt<string> config(
@@ -105,6 +112,21 @@ namespace
          exit(1);
       }
       paths.push_back(config);
+    }
+
+    // Parsing targets
+    if (!config.empty()) {
+      std::ifstream file(targets);
+      if (!file.good()) {
+        cerr << "Error opening targets file " << targets << endl;
+        exit(1);
+      }
+
+      // Read the file and add all of functions (one per line) to the targets.
+      std::string line;
+      while (std::getline(file, line)) {
+        target_functions.push_back(line);
+      }
     }
 
    // Add the path to the config files to the include path
@@ -284,18 +306,11 @@ int main(int argc, char** argv)
     test_function("verona_wrapper_fn_1", interface);
   }
 
-  // Find export_function template.
+  //  Generate the sandbox instrumentation. 
   if (sandbox) {
-    //const CXXQuery* query = interface.getQuery();
-    //auto *fnDecl = query->getFunctionTemplate("myNameSpace::export_function");
-    //assert(fnDecl != nullptr);
-    //if (!fnDecl->isTemplated()) {
-    //  fnDecl->dump();
-    //}
-    //assert(fnDecl->isTemplated());
+    // Check that we have the list of targets.
 
     specialize_export_function(interface);
-    
   }
 
   // Dumps the AST before trying to emit LLVM for debugging purposes
@@ -303,7 +318,6 @@ int main(int argc, char** argv)
   if (dumpIR)
   {
     interface.dumpAST();
-    std::cout << "End of dump " << std::endl;
   }
 
 
@@ -311,10 +325,6 @@ int main(int argc, char** argv)
   // This is silent, just to make sure nothing breaks here
   auto mod = interface.emitLLVM();
   
-  if (sandbox) {
-    generate_sandbox_init(*mod);
-  }
-
   // Dump LLVM IR for debugging purposes
   // NOTE: Output is not stable, don't use it for tests
   if (dumpIR)
