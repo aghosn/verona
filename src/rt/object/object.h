@@ -37,6 +37,7 @@ namespace verona::rt
    *  SCC_PTR  |  Union-find parent pointer for SCC           | Immutable object
    *  Pending  |  Depth of longest chain in SCC               | Immutable object
    *  Cown     |  Reference count                             | Cown object
+   *  Open ISO |  Region specific scratch space               | Root of region
    *
    *
    * *Pending* is used during operations to construct an SCC.
@@ -129,6 +130,13 @@ namespace verona::rt
     SCANNED = 0x4,
   };
 
+  enum class RcColour : uint8_t
+  {
+    GREEN = 0x0,
+    RED = 0x1,
+    BLACK = 0x2,
+  };
+
   inline std::ostream& operator<<(std::ostream& os, EpochMark e)
   {
     switch (e)
@@ -170,7 +178,8 @@ namespace verona::rt
       ISO = 0x4,
       PENDING = 0x5,
       NONATOMIC_RC = 0x6,
-      COWN = 0x7
+      COWN = 0x7,
+      OPEN_ISO = 0x8
     };
 
     inline friend std::ostream& operator<<(std::ostream& os, RegionMD md)
@@ -228,7 +237,11 @@ namespace verona::rt
         size_t bits;
       };
 
-      std::atomic<const Descriptor*> descriptor;
+      union
+      {
+        std::atomic<const Descriptor*> descriptor;
+        uintptr_t descriptor_bits;
+      };
     };
 
   private:
@@ -403,6 +416,12 @@ namespace verona::rt
       return (intptr_t)get_header().bits >> SHIFT;
     }
 
+    bool is_rc_candidate()
+    {
+      return get_class() == RegionMD::UNMARKED ||
+        get_class() == RegionMD::MARKED || get_class() == RegionMD::ISO;
+    }
+
     Object* debug_immutable_root()
     {
       return immutable();
@@ -434,6 +453,7 @@ namespace verona::rt
     friend class ObjectMap;
     friend class Message;
     friend class LocalEpoch;
+    friend size_t debug_get_ref_count(Object* o);
 
     friend class LinkedObjectStack;
 
@@ -482,20 +502,42 @@ namespace verona::rt
       return (Object*)(get_header().bits & ~MASK);
     }
 
-    inline RefCount* get_ref_count()
+    inline size_t get_ref_count()
     {
       assert(
+        (get_class() == RegionMD::OPEN_ISO) ||
         (get_class() == RegionMD::MARKED) ||
         (get_class() == RegionMD::UNMARKED));
-      return (RefCount*)(get_header().bits & ~MASK);
+      return (size_t)(get_header().bits >> SHIFT);
     }
 
-    inline void set_ref_count(RefCount* rc)
+    inline void incref_rc_region()
     {
-      // The MARKED/UNMARKED tags are not used by RegionRc, so we don't need to
-      // bother restoring the bit, and can simply leave it unset (i.e.
-      // UNMARKED).
-      get_header().next = (Object*)rc;
+      assert(
+        (get_class() == RegionMD::OPEN_ISO) ||
+        (get_class() == RegionMD::MARKED) ||
+        (get_class() == RegionMD::UNMARKED));
+      get_header().bits += ONE_RC;
+    }
+
+    inline void decref_rc_region()
+    {
+      assert(
+        (get_class() == RegionMD::OPEN_ISO) ||
+        (get_class() == RegionMD::MARKED) ||
+        (get_class() == RegionMD::UNMARKED));
+      get_header().bits -= ONE_RC;
+    }
+
+    inline void init_ref_count()
+    {
+      get_header().bits = RegionMD::UNMARKED + ONE_RC;
+    }
+
+    inline void init_iso_ref_count(size_t count)
+    {
+      assert(get_class() == RegionMD::ISO);
+      get_header().bits = (count << SHIFT) | (uint8_t)RegionMD::OPEN_ISO;
     }
 
     inline void set_next(Object* o)
@@ -504,15 +546,17 @@ namespace verona::rt
       get_header().next = o;
     }
 
+  public:
     inline RegionBase* get_region()
     {
       assert(get_class() == RegionMD::ISO);
       return (RegionBase*)(get_header().bits & ~MASK);
     }
 
+  private:
     inline void set_region(RegionBase* region)
     {
-      assert(get_class() == RegionMD::ISO);
+      assert(get_class() == RegionMD::ISO || get_class() == RegionMD::OPEN_ISO);
       get_header().bits = (size_t)region | (uint8_t)RegionMD::ISO;
     }
 
@@ -620,10 +664,21 @@ namespace verona::rt
       get_header().bits |= (uint8_t)RegionMD::MARKED;
     }
 
+    inline void mark_iso()
+    {
+      assert(get_class() == RegionMD::ISO);
+      get_header().bits |= (uint8_t)RegionMD::MARKED;
+    }
+
     inline void unmark()
     {
       assert(get_class() == RegionMD::MARKED);
       get_header().bits &= ~(size_t)RegionMD::MARKED;
+    }
+
+    inline bool is_opened()
+    {
+      return get_class() == RegionMD::OPEN_ISO;
     }
 
   public:
@@ -667,6 +722,17 @@ namespace verona::rt
         (e == EpochMark::EPOCH_B) || (e == EpochMark::SCANNED));
 
       set_epoch_mark(e);
+    }
+
+    inline void set_rc_colour(RcColour colour)
+    {
+      get_header().descriptor_bits =
+        (get_header().descriptor_bits & ~MARK_MASK) | (uintptr_t)colour;
+    }
+
+    inline RcColour get_rc_colour()
+    {
+      return (RcColour)((uintptr_t)get_header().descriptor_bits & MARK_MASK);
     }
 
     inline bool has_ext_ref()
@@ -882,7 +948,8 @@ namespace verona::rt
     {
       // Should be the entry-point of the region.
       assert(
-        (region == nullptr) || (region->get_class() == Object::RegionMD::ISO));
+        (region == nullptr) || (region->get_class() == Object::RegionMD::ISO) ||
+        (region->get_class() == Object::RegionMD::OPEN_ISO));
       // Have to be careful about internal references to the entry point for the
       // `region` i.e. when obj == region we are refering to the entry point
       // from inside the region and should not treat this as a subregion
