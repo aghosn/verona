@@ -15,6 +15,8 @@ set(ALL_SOURCE_FILES
 add_executable(verona-interpreter 
   ${ALL_SOURCE_FILES})
 
+target_link_libraries(verona-interpreter verona_rt)
+
 ## Clang-format target
 include(cmake/clangformat.cmake)
 clangformat_targets()

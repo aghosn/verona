@@ -1,12 +1,19 @@
 #include "visitors.h"
+#include "state.h"
 
 #include <cassert>
 #include <iostream>
+#include <verona.h>
 
 using namespace verona::ir;
+namespace rt = verona::rt; 
 
 namespace interpreter
 {
+  
+  //TODO move this and pass it as an argument I guess.
+  thread_local State state;
+
   void SimplePrinter::visit(NodeDef* node)
   {
     std::cout << "The type " << verona::ir::kindname(node->kind()) << std::endl;
@@ -82,11 +89,62 @@ namespace interpreter
     }
   }
 
-  void Interpreter::evalVar(verona::ir::Var& node) {}
-  void Interpreter::evalDup(verona::ir::Dup& node) {}
-  void Interpreter::evalLoad(verona::ir::Load& node) {}
-  void Interpreter::evalStore(verona::ir::Store& node) {}
-  void Interpreter::evalLookup(verona::ir::Lookup& node) {}
+  void Interpreter::evalVar(verona::ir::Var& node) {
+    assert(node.left.size() == 1);
+    auto id = node.left[0];
+
+    // Check the variable does not exist. 
+    // TODO: handle errors properly.
+    assert((!state.store.contains(id->name)) && "Name already defined"); 
+
+    // The variable does not exist, we can create it.
+    //TODO how do we get the type for the variable?
+    //How do we specify the descriptor.
+    auto x0 = rt::api::create_object(nullptr);
+    
+    state.store[id->name] = x0;
+    // Missing a lookup and a release of x0.
+
+  }
+
+  void Interpreter::evalDup(verona::ir::Dup& node) {
+    assert(node.left.size() == 1);
+    string x = node.left[0]->name; 
+    string y = node.y->name;
+    assert(!state.store.contains(x));
+    assert(state.store.contains(y));
+
+    rt::Object* target = state.store[y];
+    assert(!target->debug_is_iso());
+    state.store[x] = target;
+  }
+
+  void Interpreter::evalLoad(verona::ir::Load& node) {
+    assert(node.left.size() == 1);
+    string x = node.left[0]->name;
+    string y = node.source->name;
+
+    assert(!state.store.contains(x));
+    assert(state.store.contains(y));
+
+    //TODO what is the difference with Dup? I see there is one, but I don't see
+    // how to express it using the API.
+    rt::Object* target = state.store[y];
+    assert(!target->debug_is_iso());
+    //TODO how to get the storage location?
+  }
+
+  void Interpreter::evalStore(verona::ir::Store& node) {
+    //TODO read rules more carefully and figure that one out.
+  }
+  
+  void Interpreter::evalLookup(verona::ir::Lookup& node) {
+    string name = node.y->name;
+    assert(state.store.contains(name));
+    rt::Object* y = state.store[name];
+
+    //TODO get the descriptor of y, lookup for member z? 
+  }
   void Interpreter::evalTypetest(verona::ir::Typetest& node) {}
   void Interpreter::evalNewAlloc(verona::ir::NewAlloc& node) {}
   void Interpreter::evalStackAlloc(verona::ir::StackAlloc& node) {}

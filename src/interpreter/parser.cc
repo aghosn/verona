@@ -193,12 +193,12 @@ namespace verona::ir
     assert(t.kind == TokenKind::Identifier);
     if (t.text == "GC")
     {
-      return AllocStrategy::GC;
+      return AllocStrategy::Trace; //GC;
     }
 
     if (t.text == "RC")
     {
-      return AllocStrategy::RC;
+      return AllocStrategy::Rc;
     }
 
     if (t.text == "Arena")
@@ -208,7 +208,7 @@ namespace verona::ir
 
     std::cerr << "Wrong alloc strategy :'" << t.text << "'" << std::endl;
     assert(0);
-    return AllocStrategy::GC;
+    return AllocStrategy::Trace;
   }
 
   Node<Assign> Parser::parseRight(List<ID> v)

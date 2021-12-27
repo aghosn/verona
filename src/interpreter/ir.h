@@ -3,6 +3,9 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <verona.h>
+
+namespace rt = verona::rt;
 
 namespace verona::ir
 {
@@ -307,12 +310,12 @@ namespace verona::ir
     }
   };
 
-  enum class AllocStrategy
-  {
+ using AllocStrategy = rt::RegionType;
+ /* {
     GC,
-    RC,
     Arena,
-  };
+    RC,
+  };*/
 
   // create Epsi y(z*)
   struct Create : Assign, Apply

@@ -7,13 +7,21 @@
 #include <string>
 #include <vector>
 
+#include <verona.h> 
+
 using namespace std;
 using namespace verona::ir;
 using namespace interpreter;
+using namespace verona::rt::api;
 
 int main(int argc, const char** argv)
 {
-  mlexer::Lexer lexer("tests/test.txt");
+  if (argc < 2)
+  {
+    cerr << "No file supplied." << endl;
+    exit(1);
+  }
+  mlexer::Lexer lexer(argv[1]);
 
   while (lexer.hasNext())
   {
