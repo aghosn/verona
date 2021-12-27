@@ -193,7 +193,7 @@ namespace verona::ir
     assert(t.kind == TokenKind::Identifier);
     if (t.text == "GC")
     {
-      return AllocStrategy::Trace; //GC;
+      return AllocStrategy::Trace; // GC;
     }
 
     if (t.text == "RC")
@@ -251,8 +251,8 @@ namespace verona::ir
       {
         auto store = make_shared<Store>();
         store->left = v;
-        store->source = parseIdentifier();
-        store->dest = parseIdentifier();
+        store->y = parseIdentifier();
+        store->z = parseIdentifier();
         return store;
       }
         assert(0);
@@ -269,7 +269,7 @@ namespace verona::ir
       {
         auto tpetest = make_shared<Typetest>();
         tpetest->left = v;
-        tpetest->x = parseIdentifier();
+        tpetest->y = parseIdentifier();
         tpetest->type = parseTypeId();
         return tpetest;
       }

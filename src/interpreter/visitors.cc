@@ -1,4 +1,5 @@
 #include "visitors.h"
+
 #include "state.h"
 
 #include <cassert>
@@ -6,12 +7,11 @@
 #include <verona.h>
 
 using namespace verona::ir;
-namespace rt = verona::rt; 
+namespace rt = verona::rt;
 
 namespace interpreter
 {
-  
-  //TODO move this and pass it as an argument I guess.
+  // TODO move this and pass it as an argument I guess.
   thread_local State state;
 
   void SimplePrinter::visit(NodeDef* node)
@@ -89,66 +89,137 @@ namespace interpreter
     }
   }
 
-  void Interpreter::evalVar(verona::ir::Var& node) {
+  void Interpreter::evalVar(verona::ir::Var& node)
+  {
     assert(node.left.size() == 1);
     auto id = node.left[0];
 
-    // Check the variable does not exist. 
+    // Check the variable does not exist.
     // TODO: handle errors properly.
-    assert((!state.store.contains(id->name)) && "Name already defined"); 
+    assert((!state.containsVariable(id->name)) && "Name already defined");
 
     // The variable does not exist, we can create it.
-    //TODO how do we get the type for the variable?
-    //How do we specify the descriptor.
+    // TODO how do we get the type for the variable?
+    // How do we specify the descriptor.
     auto x0 = rt::api::create_object(nullptr);
-    
-    state.store[id->name] = x0;
+
+    state.addVar(id->name, x0);
     // Missing a lookup and a release of x0.
-
   }
 
-  void Interpreter::evalDup(verona::ir::Dup& node) {
+  void Interpreter::evalDup(verona::ir::Dup& node)
+  {
     assert(node.left.size() == 1);
-    string x = node.left[0]->name; 
+    string x = node.left[0]->name;
     string y = node.y->name;
-    assert(!state.store.contains(x));
-    assert(state.store.contains(y));
+    assert(!state.containsVariable(x));
+    assert(state.containsVariable(y));
 
-    rt::Object* target = state.store[y];
+    rt::Object* target = state.getVarByName(y);
     assert(!target->debug_is_iso());
-    state.store[x] = target;
+    state.addVar(x, target);
   }
 
-  void Interpreter::evalLoad(verona::ir::Load& node) {
+  void Interpreter::evalLoad(verona::ir::Load& node)
+  {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
     string y = node.source->name;
 
-    assert(!state.store.contains(x));
-    assert(state.store.contains(y));
+    assert(!state.containsVariable(x));
+    assert(state.containsVariable(y));
 
-    //TODO what is the difference with Dup? I see there is one, but I don't see
+    // TODO what is the difference with Dup? I see there is one, but I don't see
     // how to express it using the API.
-    rt::Object* target = state.store[y];
+    rt::Object* target = state.getVarByName(y);
     assert(!target->debug_is_iso());
-    //TODO how to get the storage location?
+    // TODO how to get the storage location?
   }
 
-  void Interpreter::evalStore(verona::ir::Store& node) {
-    //TODO read rules more carefully and figure that one out.
-  }
-  
-  void Interpreter::evalLookup(verona::ir::Lookup& node) {
-    string name = node.y->name;
-    assert(state.store.contains(name));
-    rt::Object* y = state.store[name];
+  void Interpreter::evalStore(verona::ir::Store& node)
+  {
+    // TODO read rules more carefully and figure that one out.
+    assert(node.left.size() == 1);
+    string x = node.left[0]->name;
+    string y = node.y->name;
+    string z = node.z->name;
 
-    //TODO get the descriptor of y, lookup for member z? 
+    assert(!state.containsVariable(x));
+    assert(state.containsVariable(y));
+    assert(state.containsVariable(z));
+
+    // TODO figure out the storageloc thing.
+    // probably will get the objects and do *y = *z
   }
-  void Interpreter::evalTypetest(verona::ir::Typetest& node) {}
-  void Interpreter::evalNewAlloc(verona::ir::NewAlloc& node) {}
-  void Interpreter::evalStackAlloc(verona::ir::StackAlloc& node) {}
-  void Interpreter::evalCall(verona::ir::Call& node) {}
+
+  void Interpreter::evalLookup(verona::ir::Lookup& node)
+  {
+    assert(node.left.size() == 1);
+    string x = node.left[0]->name;
+    string y = node.y->name;
+
+    assert(!state.containsVariable(x));
+    assert(state.containsVariable(y));
+    rt::Object* yobj = state.getVarByName(y);
+    // TODO get the descriptor of y, lookup for member z?
+  }
+
+  void Interpreter::evalTypetest(verona::ir::Typetest& node)
+  {
+    assert(node.left.size() == 1);
+    string x = node.left[0]->name;
+    string y = node.y->name;
+    string tpe = node.type->name;
+    assert(!state.containsVariable(x));
+    assert(state.containsType(tpe));
+
+    if (!state.containsVariable(y))
+    {
+      // TODO set x to false and return
+      return;
+    }
+
+    rt::Object* yobj = state.getVarByName(y);
+    TypeObj* tpeObj = state.getTypeByName(tpe);
+    // TODO do the type test and set the result.
+  }
+
+  void Interpreter::evalNewAlloc(verona::ir::NewAlloc& node)
+  {
+    assert(node.left.size() == 1);
+    string x = node.left[0]->name;
+    string tpe = node.type->name;
+    assert(!state.containsVariable(x));
+    assert(state.containsType(tpe));
+
+    TypeObj* tpeObj = state.getTypeByName(tpe);
+
+    // TODO figure that out, how do I use the type?
+    // What is the difference with x = var?;
+    rt::Object* obj = rt::api::create_object(nullptr);
+
+    state.addVar(x, obj);
+  }
+
+  void Interpreter::evalStackAlloc(verona::ir::StackAlloc& node)
+  {
+    assert(node.left.size() == 1);
+    string x = node.left[0]->name;
+    string tpe = node.type->name;
+    assert(!state.containsVariable(x));
+    assert(state.containsType(tpe));
+
+    TypeObj* tpeObj = state.getTypeByName(tpe);
+
+    // TODO Again figure that out;
+    rt::Object* obj = rt::api::create_object(nullptr);
+    state.addVar(x, obj);
+  }
+
+  void Interpreter::evalCall(verona::ir::Call& node)
+  {
+    // TODO requires to define a frame.
+  }
   void Interpreter::evalTailcall(verona::ir::Tailcall& node) {}
   void Interpreter::evalRegion(verona::ir::Region& node) {}
   void Interpreter::evalCreate(verona::ir::Create& node) {}

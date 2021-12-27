@@ -6,8 +6,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
-
-#include <verona.h> 
+#include <verona.h>
 
 using namespace std;
 using namespace verona::ir;

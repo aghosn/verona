@@ -211,8 +211,8 @@ namespace verona::ir
 
   struct Store : Assign
   {
-    Node<ID> source;
-    Node<ID> dest;
+    Node<ID> y;
+    Node<ID> z;
 
     Kind kind() override
     {
@@ -235,7 +235,7 @@ namespace verona::ir
   // typetest x τ
   struct Typetest : Assign
   {
-    Node<ID> x;
+    Node<ID> y;
     Node<TypeId> type;
 
     Kind kind() override
@@ -310,12 +310,12 @@ namespace verona::ir
     }
   };
 
- using AllocStrategy = rt::RegionType;
- /* {
-    GC,
-    Arena,
-    RC,
-  };*/
+  using AllocStrategy = rt::RegionType;
+  /* {
+     GC,
+     Arena,
+     RC,
+   };*/
 
   // create Epsi y(z*)
   struct Create : Assign, Apply
