@@ -219,10 +219,51 @@ namespace interpreter
   void Interpreter::evalCall(verona::ir::Call& node)
   {
     // TODO requires to define a frame.
+    // Something like
+    assert(node.left.size() > 0);
+    for (auto x: node.left) {
+      assert(!state.containsVariable(x->name));
+    }
+
+    // Check the function is defined.
+    assert(state.containsVariable(node.function->name));
+    //TODO apparently the arguments are named variables for the moment.
+    //Is that correct?
+    for (auto arg: node.args) {
+      assert(state.containsVariable(arg->name));
+    }
+    rt::api::RegionContext::push(nullptr, rt::api::RegionContext::get_region());
+    //TODO remap variables to values in the state.
+    //Probably needs to create a new map, same global mappings, args.
+    //TODO also change the next instruction
   }
-  void Interpreter::evalTailcall(verona::ir::Tailcall& node) {}
-  void Interpreter::evalRegion(verona::ir::Region& node) {}
-  void Interpreter::evalCreate(verona::ir::Create& node) {}
+  void Interpreter::evalTailcall(verona::ir::Tailcall& node) {
+    //TODO reuses the same frame.
+    assert(state.containsVariable(node.function->name));
+    for (auto arg: node.args) {
+      assert(state.containsVariable(arg->name));
+    }
+    //TODO same as above.
+  }
+  void Interpreter::evalRegion(verona::ir::Region& node) {
+    for (auto x: node.left) {
+      assert(!state.containsVariable(x->name));
+    }
+    assert(state.containsVariable(node.function->name));
+    assert(node.args.size() > 0);
+    for (auto arg: node.args) {
+      assert(state.containsVariable(arg->name));
+    }
+    //TODO figure out what unpin is.
+    //TODO need a new frame
+    rt::api::RegionContext::push(nullptr, rt::api::RegionContext::get_region());
+  } 
+  void Interpreter::evalCreate(verona::ir::Create& node) {
+    //TODO how do you create a region?
+    for (auto x: node.left) {
+      assert(!state.containsVariable(x->name));
+    }
+  }
   void Interpreter::evalBranch(verona::ir::Branch& node) {}
   void Interpreter::evalReturn(verona::ir::Return& node) {}
   void Interpreter::evalError(verona::ir::Err& node) {}
@@ -230,7 +271,32 @@ namespace interpreter
   void Interpreter::evalAcquire(verona::ir::Acquire& node) {}
   void Interpreter::evalRelease(verona::ir::Release& node) {}
   void Interpreter::evalFulfill(verona::ir::Fulfill& node) {}
-  void Interpreter::evalFreeze(verona::ir::Freeze& node) {}
-  void Interpreter::evalMerge(verona::ir::Merge& node) {}
+
+  void Interpreter::evalFreeze(verona::ir::Freeze& node) {
+    assert(node.left.size() == 1);
+    string x = node.left[0]->name;
+    assert(!state.containsVariable(x));
+    string y = node.target->name;
+    assert(state.containsVariable(y));
+    rt::Object* target = state.getVarByName(y);
+    assert(target->debug_is_iso());
+    
+    rt::Object* res = rt::api::freeze(target);
+    //TODO is that correct?
+    state.addVar(x, res);
+  }
+  void Interpreter::evalMerge(verona::ir::Merge& node) {
+    assert(node.left.size() == 1);
+    string x = node.left[0]->name;
+    assert(!state.containsVariable(x));
+    string y = node.target->name;
+    assert(state.containsVariable(y));
+    rt::Object* target = state.getVarByName(y);
+    assert(target->debug_is_iso());
+    //TODO something with the frame.
+    rt::Object* res = rt::api::merge(target);
+    //TODO is that correct?
+    state.addVar(x, res);
+  }
 
 } // namespace interpreter

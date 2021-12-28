@@ -14,11 +14,22 @@ namespace interpreter
   //TODO fix once I know how types are represented.
   typedef rt::Object TypeObj;
 
+  //σ       ∈ State       ::= Frame*
+  //                      × (ObjectId → Object)
+  //                      × (StorageLoc → Value)
+  //                      × (Region → Strategy)
+  //                      × Bool
   // TODO figure this out. 
   // For the moment just do it stupidly.
   // TODO Shoud probably have frames for names, e.g., a stack of maps.
   // For the moment leave that on the side.
   struct State {
+    //TODO use RegionContext for frames.
+    
+    //TODO need a stack frame.
+    
+    //TODO need the current instruction.
+    
     // Named live variables.
     // Map from name -> (object, ast definition);
     map<string, rt::Object*> store;
