@@ -1,12 +1,17 @@
 #pragma once
 #include <map>
+#include <vector>
 #include <utility>
 #include <verona.h>
 
 #include "ir.h"
+#include "type.h"
+#include "utils.h" 
+#include "object.h"
 
 using namespace std;
-namespace rt = verona::rt;
+
+using ObjectId = string;
 
 namespace interpreter
 {
@@ -14,21 +19,37 @@ namespace interpreter
   //TODO fix once I know how types are represented.
   typedef rt::Object TypeObj;
 
-  //σ       ∈ State       ::= Frame*
-  //                      × (ObjectId → Object)
-  //                      × (StorageLoc → Value)
-  //                      × (Region → Strategy)
-  //                      × Bool
-  // TODO figure this out. 
-  // For the moment just do it stupidly.
-  // TODO Shoud probably have frames for names, e.g., a stack of maps.
-  // For the moment leave that on the side.
+  // P ∈ Program ::= (Id → Function) × (TypeId → Type)
+  struct Program {
+    Map<Id, ir::Function*> functions;
+    Map<TypeId, ir::Type> types;
+  };
+
+  // ϕ ∈ Frame ::= Region* × (Id → Value) × Id* × Expression*
+  struct Frame {
+    List<rt::Region*> regions; 
+    Map<Id, Shared<ir::Value>> lookup;
+    List<Id> rets;
+    List<Shared<ir::Expr>> continuations;
+  };
+
+  //σ ∈ State ::= Frame*
+  //          × (ObjectId → Object)
+  //          × (StorageLoc → Value)
+  //          × (Region → Strategy)
+  //          × Bool
   struct State {
-    //TODO use RegionContext for frames.
+    List<Shared<Frame>> frames;
     
-    //TODO need a stack frame.
-    
-    //TODO need the current instruction.
+    // TODO not sure why this is needed.
+    // This really needs to be an ObjectID
+    Map<ObjectId, Shared<Object>> objects;
+
+    Map<Shared<StorageLoc>, Shared<ir::Value>> fields;
+
+    Map<rt::Region*, rt::RegionType> regions; 
+
+    bool except; 
     
     // Named live variables.
     // Map from name -> (object, ast definition);

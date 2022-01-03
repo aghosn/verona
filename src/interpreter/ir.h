@@ -578,40 +578,4 @@ namespace verona::ir
     Map<Identifier, Member> members;
   };
 
-  /**
-   * Runtime related structures
-   */
-  struct _runtime
-  {};
-
-  //ω       ∈ Object      ::= Region* × TypeId
-  struct Object : _runtime
-  {
-    List<Region> regions;
-    Node<TypeId> typeId;
-  };
-
-  // ϕ       ∈ Frame       ::= Region* × (Id → Value) × Id* × Expression*
-  struct Frame : _runtime
-  {
-    List<Region> regions;
-    Map<Identifier, Value> lookup;
-    List<Identifier> rets;
-    List<Expr> cont;
-  };
-
-  // σ       ∈ State       ::= Frame*
-  //                       × (ObjectId → Object)
-  //                       × (StorageLoc → Value)
-  //                       × (Region → Strategy)
-  //                       × Bool
-  struct State : _runtime
-  {
-    List<Frame> frames;
-    Map<ObjectId, Object> objects;
-    Map<StorageLoc, Value> fields;
-    Map<Region, AllocStrategy> regions;
-    Node<Bool> except;
-  };
-
 } // namespace verona::ir
