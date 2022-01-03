@@ -315,7 +315,6 @@ int main(int argc, char** argv)
   if (sandbox)
   {
     // Check that we have the list of targets.
-
     specialize_export_function(interface);
   }
 
