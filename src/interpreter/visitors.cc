@@ -96,14 +96,14 @@ namespace interpreter
 
     // Check the variable does not exist.
     // TODO: handle errors properly.
-    assert((!state.containsVariable(id->name)) && "Name already defined");
+    assert((!state.isObjectDefined(id->name)) && "Name already defined");
 
     // The variable does not exist, we can create it.
     // TODO how do we get the type for the variable?
     // How do we specify the descriptor.
-    auto x0 = rt::api::create_object(nullptr);
+    //auto x0 = rt::api::create_object(nullptr);
 
-    state.addVar(id->name, x0);
+    //state.addVar(id->name, x0);
     // Missing a lookup and a release of x0.
   }
 
@@ -112,12 +112,12 @@ namespace interpreter
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
     string y = node.y->name;
-    assert(!state.containsVariable(x));
-    assert(state.containsVariable(y));
+    assert(!state.isObjectDefined(x) && "Name already defined");
+    assert(state.isObjectDefined(y) && "Object not defined");
 
-    rt::Object* target = state.getVarByName(y);
-    assert(!target->debug_is_iso());
-    state.addVar(x, target);
+    Shared<Object> target = state.getObjectByName(y);
+    assert(!target->obj->debug_is_iso());
+    state.addInFrame(x, state.getValueByName(y));
   }
 
   void Interpreter::evalLoad(verona::ir::Load& node)
@@ -126,16 +126,24 @@ namespace interpreter
     string x = node.left[0]->name;
     string y = node.source->name;
 
-    assert(!state.containsVariable(x));
-    assert(state.containsVariable(y));
+    assert(!state.isObjectDefined(x));
+    assert(state.isObjectDefined(y));
 
     // TODO what is the difference with Dup? I see there is one, but I don't see
     // how to express it using the API.
-    rt::Object* target = state.getVarByName(y);
-    assert(!target->debug_is_iso());
+    Shared<Object> target = state.getObjectByName(y);
+    assert(!target->obj->debug_is_iso());
     // TODO how to get the storage location?
   }
 
+  // Load a StorageLoc and replace its content in a single step.
+  //x ∉ σ
+  //norepeat(y; z)
+  //f = σ(y)
+  //v = σ(z)
+  //store(σ, f.id, v)
+  //--- [store]
+  //σ, x = store y z; e* → σ[f↦v][x↦σ(f)]\{z}, e*
   void Interpreter::evalStore(verona::ir::Store& node)
   {
     // TODO read rules more carefully and figure that one out.
@@ -144,61 +152,101 @@ namespace interpreter
     string y = node.y->name;
     string z = node.z->name;
 
-    assert(!state.containsVariable(x));
-    assert(state.containsVariable(y));
-    assert(state.containsVariable(z));
+    assert(!state.isObjectDefined(x));
+    assert(state.isObjectDefined(y));
+    assert(state.isObjectDefined(z));
 
     // TODO figure out the storageloc thing.
-    // probably will get the objects and do *y = *z
+    auto value = state.getValueByName(z);
+    //TODO for y it is supposed to be a storageloc BUT how do you name a storageloc?
+    state.addInFrame(x, value);
+    Shared<Object> yobj = state.getObjectByName(y); 
+    // TODO is y supposed to be objid.id?
+    //Shared<StorageLoc> f = yobj->getStorageLoc(???);
+    //remove z from frame.
+    state.removeFromFrame(z);
   }
 
+  // Look in the descriptor table of an object.
+  // We can't lookup a StorageLoc unless the object is not iso.
+  //x ∉ σ
+  //ι = σ(y)
+  //m = σ(ι)(z)
+  //v = (ι, m) if m ∈ Id
+  //    m if m ∈ Function
+  //v ∈ StorageLoc ⇒ ¬iso(σ, ι)
+  //--- [lookup]
+  //σ, x = lookup y z; e* → σ[x↦v], acquire x; e*
   void Interpreter::evalLookup(verona::ir::Lookup& node)
   {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
     string y = node.y->name;
+    string z = node.z->name;
 
-    assert(!state.containsVariable(x));
-    assert(state.containsVariable(y));
-    rt::Object* yobj = state.getVarByName(y);
-    // TODO get the descriptor of y, lookup for member z?
+    assert(!state.isObjectDefined(x));
+    assert(state.isObjectDefined(y));
+    Shared<Object> yobj = state.getObjectByName(y);
+
+    Shared<ir::Value> v = nullptr;
+    if (yobj->fields.contains(z)) {
+      v = yobj->getStorageLoc(z);
+    } else {
+      //TODO This is a function, how the hell do you get a function? 
+    }
+    state.addInFrame(x, v);
   }
 
+
+  // Check abstract subtyping.
+  // TODO: stuck if not an object?
+  //x ∉ σ
+  //v = σ(ι) <: τ if ι ∈ ObjectId where ι = σ(y)
+  //    false otherwise
+  //--- [typetest]
+  //σ, x = typetest y τ; e* → σ[x↦v], e*
   void Interpreter::evalTypetest(verona::ir::Typetest& node)
   {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
     string y = node.y->name;
     string tpe = node.type->name;
-    assert(!state.containsVariable(x));
+    assert(!state.isObjectDefined(x));
     assert(state.containsType(tpe));
+    assert(state.isObjectDefined(y));
 
-    if (!state.containsVariable(y))
-    {
-      // TODO set x to false and return
-      return;
+    Shared<Object> yobj = state.getObjectByName(y);
+    Shared<ir::Value> res = nullptr;
+    if (yobj->type == tpe) {
+      res = make_shared<ir::True>();
+    } else {
+      res = make_shared<ir::False>();
     }
-
-    rt::Object* yobj = state.getVarByName(y);
-    TypeObj* tpeObj = state.getTypeByName(tpe);
-    // TODO do the type test and set the result.
+    state.addInFrame(x, res);
   }
 
+  // Create a new object in the current open region, i.e. a heap object.
+  // All fields are initially undefined.
+  //x ∉ σ
+  //ι ∉ σ
+  //σ.frame.regions = (ρ*; ρ)
+  //--- [new]
+  //σ, x = new τ; e* → σ[ι↦(ρ, τ)][x↦ι], e*
   void Interpreter::evalNewAlloc(verona::ir::NewAlloc& node)
   {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
     string tpe = node.type->name;
-    assert(!state.containsVariable(x));
+    assert(!state.isObjectDefined(x));
     assert(state.containsType(tpe));
 
-    TypeObj* tpeObj = state.getTypeByName(tpe);
+    //TypeObj* tpeObj = state.getTypeByName(tpe);
 
     // TODO figure that out, how do I use the type?
     // What is the difference with x = var?;
     rt::Object* obj = rt::api::create_object(nullptr);
 
-    state.addVar(x, obj);
+    //state.addVar(x, obj);
   }
 
   void Interpreter::evalStackAlloc(verona::ir::StackAlloc& node)
@@ -206,14 +254,14 @@ namespace interpreter
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
     string tpe = node.type->name;
-    assert(!state.containsVariable(x));
+    assert(!state.isObjectDefined(x));
     assert(state.containsType(tpe));
 
-    TypeObj* tpeObj = state.getTypeByName(tpe);
+    //TypeObj* tpeObj = state.getTypeByName(tpe);
 
     // TODO Again figure that out;
     rt::Object* obj = rt::api::create_object(nullptr);
-    state.addVar(x, obj);
+    //state.addVar(x, obj);
   }
 
   void Interpreter::evalCall(verona::ir::Call& node)
@@ -222,15 +270,15 @@ namespace interpreter
     // Something like
     assert(node.left.size() > 0);
     for (auto x: node.left) {
-      assert(!state.containsVariable(x->name));
+      assert(!state.isObjectDefined(x->name));
     }
 
     // Check the function is defined.
-    assert(state.containsVariable(node.function->name));
+    assert(state.isObjectDefined(node.function->name));
     //TODO apparently the arguments are named variables for the moment.
     //Is that correct?
     for (auto arg: node.args) {
-      assert(state.containsVariable(arg->name));
+      assert(state.isObjectDefined(arg->name));
     }
     rt::api::RegionContext::push(nullptr, rt::api::RegionContext::get_region());
     //TODO remap variables to values in the state.
@@ -239,20 +287,20 @@ namespace interpreter
   }
   void Interpreter::evalTailcall(verona::ir::Tailcall& node) {
     //TODO reuses the same frame.
-    assert(state.containsVariable(node.function->name));
+    assert(state.isObjectDefined(node.function->name));
     for (auto arg: node.args) {
-      assert(state.containsVariable(arg->name));
+      assert(state.isObjectDefined(arg->name));
     }
     //TODO same as above.
   }
   void Interpreter::evalRegion(verona::ir::Region& node) {
     for (auto x: node.left) {
-      assert(!state.containsVariable(x->name));
+      assert(!state.isObjectDefined(x->name));
     }
-    assert(state.containsVariable(node.function->name));
+    assert(state.isObjectDefined(node.function->name));
     assert(node.args.size() > 0);
     for (auto arg: node.args) {
-      assert(state.containsVariable(arg->name));
+      assert(state.isObjectDefined(arg->name));
     }
     //TODO figure out what unpin is.
     //TODO need a new frame
@@ -261,7 +309,7 @@ namespace interpreter
   void Interpreter::evalCreate(verona::ir::Create& node) {
     //TODO how do you create a region?
     for (auto x: node.left) {
-      assert(!state.containsVariable(x->name));
+      assert(!state.isObjectDefined(x->name));
     }
   }
   void Interpreter::evalBranch(verona::ir::Branch& node) {}
@@ -275,28 +323,28 @@ namespace interpreter
   void Interpreter::evalFreeze(verona::ir::Freeze& node) {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
-    assert(!state.containsVariable(x));
+    assert(!state.isObjectDefined(x));
     string y = node.target->name;
-    assert(state.containsVariable(y));
-    rt::Object* target = state.getVarByName(y);
-    assert(target->debug_is_iso());
+    assert(state.isObjectDefined(y));
+    Shared<Object> target = state.getObjectByName(y);
+    assert(target->obj->debug_is_iso());
     
-    rt::Object* res = rt::api::freeze(target);
+    //rt::Object* res = rt::api::freeze(target);
     //TODO is that correct?
-    state.addVar(x, res);
+    //state.addVar(x, res);
   }
   void Interpreter::evalMerge(verona::ir::Merge& node) {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
-    assert(!state.containsVariable(x));
+    assert(!state.isObjectDefined(x));
     string y = node.target->name;
-    assert(state.containsVariable(y));
-    rt::Object* target = state.getVarByName(y);
-    assert(target->debug_is_iso());
+    assert(state.isObjectDefined(y));
+    Shared<Object> target = state.getObjectByName(y);
+    assert(target->obj->debug_is_iso());
     //TODO something with the frame.
-    rt::Object* res = rt::api::merge(target);
+    //rt::Object* res = rt::api::merge(target);
     //TODO is that correct?
-    state.addVar(x, res);
+    //state.addVar(x, res);
   }
 
 } // namespace interpreter

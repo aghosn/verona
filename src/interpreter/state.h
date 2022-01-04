@@ -31,6 +31,21 @@ namespace interpreter
     Map<Id, Shared<ir::Value>> lookup;
     List<Id> rets;
     List<Shared<ir::Expr>> continuations;
+    
+    bool containsObject(Id name) {
+      if (!lookup.contains(name)) {
+        return false;
+      }
+      auto value = lookup[name];
+      return (value->kind() == ir::Kind::Object); 
+    }
+
+    Shared<ir::Value> getValueByName(Id name) {
+      assert(lookup.contains(name));
+      auto obj = lookup[name];
+      assert(obj->kind() == ir::Kind::ObjectID);
+      return obj;
+    }
   };
 
   //σ ∈ State ::= Frame*
@@ -45,38 +60,52 @@ namespace interpreter
     // This really needs to be an ObjectID
     Map<ObjectId, Shared<Object>> objects;
 
-    Map<Shared<StorageLoc>, Shared<ir::Value>> fields;
+    Map<Shared<ir::StorageLoc>, Shared<ir::Value>> fields;
 
     Map<rt::Region*, rt::RegionType> regions; 
 
     bool except; 
+
+    Map<TypeId, Shared<Type>> types; 
     
-    // Named live variables.
-    // Map from name -> (object, ast definition);
-    map<string, rt::Object*> store;
-
-    //TODO figure out how they represent types.
-    map<string, rt::Object*> types;
-
     // Checks wheter a name is defined in the current scope.
-    // TODO handle multi scope/frames.
-    bool containsVariable(string name) {
-      return store.contains(name);
+    bool isObjectDefined(string name) {
+      assert(frames.size() > 0);
+      return frames.back()->containsObject(name);
     }
 
-    rt::Object* getVarByName(string name) {
-      return store[name];
+    Shared<Object> getObjectByName(string name) {
+      assert(frames.size() > 0);
+      auto val = frames.back()->getValueByName(name);
+      assert(val->kind() == ir::Kind::ObjectID && "Value is not an ObjectID");
+      Shared<ir::ObjectId> objid = dynamic_pointer_cast<ir::ObjectId>(val);
+      
+      assert(objects.contains(objid->name) && "Object does not exist");
+      
+      return objects[objid->name];
     }
 
-    void addVar(string name, rt::Object* o) {
-      store[name] = o;
+    Shared<ir::Value> getValueByName(string name) {
+      assert(frames.size() > 0);
+      return frames.back()->getValueByName(name);
     }
 
-    bool containsType(string name) {
+    void addInFrame(Id name, Shared<ir::Value> o) {
+      assert(frames.size() > 0);
+      //TODO should we check if the name already exists?
+      frames.back()->lookup[name] = o; 
+    }
+
+    void removeFromFrame(Id name) {
+      assert(frames.size() > 0);
+      frames.back()->lookup.erase(name);
+    }
+
+    bool containsType(TypeId name) {
       return types.contains(name);
     }
 
-    TypeObj* getTypeByName(string name) {
+    Shared<Type> getTypeByName(TypeId name) {
       return types[name];
     }
   };

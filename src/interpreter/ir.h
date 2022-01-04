@@ -15,6 +15,7 @@ namespace verona::ir
     Identifier,
     ID,
     TypeID,
+    ObjectID,
     Var,
     Dup,
     Load,
@@ -54,6 +55,9 @@ namespace verona::ir
     True,
     False,
     Undef,
+
+    // Values
+    Object,
 
     End,
 
@@ -523,11 +527,14 @@ namespace verona::ir
   {};
 
   struct ObjectId : Value, Identifier
-  {};
+  {
+    Kind kind() override
+    {
+      return Kind::ObjectID;
+    }
+  };
 
-  // Should be used for values direclty?
-  // Sounds to me like offset to segment
-  // i.e., raw data
+  // f ∈ StorageLoc ::= ObjectId × Id
   struct StorageLoc : Value
   {
     Node<ObjectId> objectid;
@@ -569,13 +576,10 @@ namespace verona::ir
     }
   };
 
-  // TODO(aghosn) instead of havin an id, make it extend a named type.
-  // TODO(aghosn) maybe have a decl Node too, and make it extended by this.
-  // Type        ::= TypeId* × (Id → Member)
-  struct TypeDecl : Type
-  {
-    Node<Identifier> typeName;
-    Map<Identifier, Member> members;
-  };
+  //TODO add expressions for program, function, and type fields and methods.
+  //Program ::= x(y*): e*
+  //        | type x: y* {(Method|Field)*}
+  //Method ::= fun x: y
+  //Field :: = x
 
 } // namespace verona::ir

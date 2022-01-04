@@ -14,6 +14,8 @@ namespace verona::ir
         return "ID";
       case Kind::TypeID:
         return "TypeID";
+      case Kind::ObjectID:
+        return "ObjectID";
       case Kind::Var:
         return "Var";
       case Kind::Dup:
@@ -84,6 +86,8 @@ namespace verona::ir
         return "False";
       case Kind::Undef:
         return "Undefined";
+      case Kind::Object:
+        return "Object";
       case Kind::End:
         return "End";
       default:
