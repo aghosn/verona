@@ -236,17 +236,42 @@ namespace interpreter
     string y = node.y->name;
     string z = node.z->name;
 
+    //x ∉ σ
     assert(!state.isDefinedInFrame(x));
-    assert(state.isDefinedInFrame(y));
-    Shared<Object> yobj = state.getObjectByName(y);
 
+    //ι = σ(y)
+    assert(state.isDefinedInFrame(y));
+    auto _l = state.getValueByName(y);
+    assert(_l->kind() == Kind::ObjectID);
+    auto l = dynamic_pointer_cast<ir::ObjectID>(_l);
+    
+    // m = σ(ι)(z)
+    // v = (ι, m)
+    assert(state.fields.contains(l->name) && "The objectId is invalid");
+    assert(state.fields[l->name].contains(z) && "There is no such field in the object");
+    auto m = state.fields[l->name][z];
+
+    // v = (ι, m) if m ∈ Id
+    //     m if m ∈ Function
+    // v ∈ StorageLoc ⇒ ¬iso(σ, ι)
     Shared<ir::Value> v = nullptr;
-    if (yobj->fields.contains(z)) {
-      v = yobj->getStorageLoc(z);
-    } else {
-      //TODO This is a function, how the hell do you get a function? 
+    switch(m->kind()) {
+      case Kind::Function:
+        v = m;
+        break;
+      case Kind::StorageLoc:
+        assert(state.objects[l->name]->obj->debug_is_iso() && "Lookup with an iso storageloc");
+      case Kind::ObjectID:
+       v = m; 
+       break;
+      default:
+        assert(0 && "Can a lookup map to a bool or undefined?");
     }
+
+    // σ[x↦v]
     state.addInFrame(x, v);
+
+    //TODO acquire x
   }
 
 
@@ -263,17 +288,31 @@ namespace interpreter
     string x = node.left[0]->name;
     string y = node.y->name;
     string tpe = node.type->name;
+
+    // x ∉ σ
     assert(!state.isDefinedInFrame(x));
     assert(state.containsType(tpe));
     assert(state.isDefinedInFrame(y));
 
-    Shared<Object> yobj = state.getObjectByName(y);
-    Shared<ir::Value> res = nullptr;
+    // v = σ(ι) <: τ if ι ∈ ObjectId where ι = σ(y)
+    Shared<ir::Value> res = make_shared<ir::False>();
+    Shared<Object> yobj = nullptr;
+    Shared<ir::ObjectID> oid = nullptr;
+    auto l = state.frameLookup(y);
+    if (l->kind() != Kind::ObjectID) {
+      goto end;
+    }
+    oid = dynamic_pointer_cast<ir::ObjectID>(l);
+    if (!state.objects.contains(oid->name))
+    {
+      goto end;
+    }
+    yobj = state.objects[oid->name];
     if (yobj->type == tpe) {
       res = make_shared<ir::True>();
-    } else {
-      res = make_shared<ir::False>();
     }
+    
+end:
     state.addInFrame(x, res);
   }
 
