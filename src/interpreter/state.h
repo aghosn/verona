@@ -21,7 +21,7 @@ namespace interpreter
 
   // P ∈ Program ::= (Id → Function) × (TypeId → Type)
   struct Program {
-    Map<Id, ir::Function*> functions;
+    Map<Id, ir::Node<ir::Function>> functions;
     Map<TypeId, ir::Type> types;
   };
 
@@ -116,6 +116,15 @@ namespace interpreter
 
     Shared<Type> getTypeByName(TypeId name) {
       return types[name];
+    }
+
+    bool isFunction(Id name) {
+      // TODO Implement
+      return true;
+    }
+
+    ir::Node<ir::Function> getFunction(Id name) {
+      return nullptr;
     }
   };
 

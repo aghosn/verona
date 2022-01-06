@@ -377,47 +377,134 @@ end:
     state.addInFrame(x, oid); 
   }
 
+  // Push a new frame.
+  // norepeat(y; z*)
+  // x ∉ σ
+  // σ₂, e₂* = newframe(σ₁, (), x*, y, z*, e₁*)
+  // --- [call]
+  // σ₁, x* = call y(z*); e₁* → σ₂, e₂*
   void Interpreter::evalCall(verona::ir::Call& node)
   {
-    // TODO requires to define a frame.
-    // Something like
+    // x ∉ σ
     assert(node.left.size() > 0);
     for (auto x: node.left) {
       assert(!state.isDefinedInFrame(x->name));
     }
+    
+    // σ₂, e₂* = newframe(σ₁, (), x*, y, z*, e₁*)
+    string y = node.function->name; 
+    assert(state.isFunction(y) && "Undefined Function");
+    auto yfunc = state.getFunction(y);
+    for (auto z: node.args) 
+    {
+      assert(state.isDefinedInFrame(z->name));
+    }
 
-    // Check the function is defined.
-    assert(state.isDefinedInFrame(node.function->name));
-    //TODO apparently the arguments are named variables for the moment.
-    //Is that correct?
-    for (auto arg: node.args) {
-      assert(state.isDefinedInFrame(arg->name));
+    Shared<Frame> frame = make_shared<Frame>();
+    // TODO regions
+    // TODO ret
+    // TODO continuations
+    // TODO what does () means in terms of region?
+    // TODO why is frame 1 removing y and z*?
+    assert(yfunc->args.size() == node.args.size() && "Wrong number of arguments");
+    for (int i = 0; i < node.args.size(); i++) {
+      auto name = yfunc->args[i]->name;
+      auto value = state.frameLookup(node.args[i]->name);
+      frame->lookup[name] = value;
     }
-    rt::api::RegionContext::push(nullptr, rt::api::RegionContext::get_region());
-    //TODO remap variables to values in the state.
-    //Probably needs to create a new map, same global mappings, args.
-    //TODO also change the next instruction
+
+    // (ϕ*; ϕ₁\{y, z*}; ϕ₂)
+    state.frames.push_back(frame);
+
+    // TODO change next instruction + call rt functions 
+    // e₁* → σ₂, e₂*
   }
+
+  // Reuse the current frame.
+  // live(σ, x; y*)
+  // λ = σ(x)
+  // --- [tailcall]
+  // σ, tailcall x(y*) → σ[λ.args↦σ(y*)], λ.expr
   void Interpreter::evalTailcall(verona::ir::Tailcall& node) {
-    //TODO reuses the same frame.
-    assert(state.isDefinedInFrame(node.function->name));
-    for (auto arg: node.args) {
-      assert(state.isDefinedInFrame(arg->name));
+    // live(σ, x) && λ = σ(x)
+    auto x = node.function->name; 
+    assert(state.isDefinedInFrame(x));
+    auto _f = state.frameLookup(x);
+    assert(_f->kind() == Kind::Function);
+    auto lambda = dynamic_pointer_cast<ir::Function>(_f);
+
+    // live(σ, y*)
+    assert(node.args.size() == lambda->args.size());
+    for (auto y: node.args) {
+      assert(state.isDefinedInFrame(y->name));
     }
-    //TODO same as above.
+
+    // σ[λ.args↦σ(y*)]
+    for (int i = 0; i < node.args.size(); i++) {
+      auto name = lambda->args[i]->name;
+      auto val = state.frameLookup(node.args[i]->name);
+      state.addInFrame(name, val); 
+    } 
+
+    // λ.expr
+    // TODO
   }
+
+  // Push a new frame with the specified heap region.
+  // norepeat(y; z; z*)
+  // x ∉ σ
+  // ι = σ(z)
+  // ρ = σ(ι).regions
+  // iso(σ, ι)
+  // σ₂, e₂* = newframe(σ₁, ρ, x*, y, (z; z*), (unpin(σ₁, z*); e₁*))
+  // --- [region]
+  // σ₁, x* = region y(z, z*); e₁* → σ₂, e₂*
   void Interpreter::evalRegion(verona::ir::Region& node) {
+    // TODO
+    // norepeat(y; z; z*)
+    // x ∉ σ
     for (auto x: node.left) {
       assert(!state.isDefinedInFrame(x->name));
     }
-    assert(state.isDefinedInFrame(node.function->name));
+    
+    string y = node.function->name;
+    assert(state.isDefinedInFrame(y));
+    auto v = state.frameLookup(y);
+    assert(v->kind() == Kind::Function && "y is not a function");
+    auto yfunc = dynamic_pointer_cast<ir::Function>(v);
+
     assert(node.args.size() > 0);
+    assert(node.args.size() == yfunc->args.size());
     for (auto arg: node.args) {
       assert(state.isDefinedInFrame(arg->name));
     }
-    //TODO figure out what unpin is.
-    //TODO need a new frame
-    rt::api::RegionContext::push(nullptr, rt::api::RegionContext::get_region());
+    
+    // ι = σ(z)
+    string z = node.args[0]->name;
+    auto _l = state.frameLookup(z);
+    assert(_l->kind() == Kind::ObjectID && "Argument is not an object id");
+    auto l = state.getObjectByName(z);
+
+    // ρ = σ(ι).regions
+    auto regions = l->regions;
+
+    // iso(σ, ι)
+    assert(l->obj->debug_is_iso() && "z must reference an iso object");
+
+    // σ₂, e₂* = newframe(σ₁, ρ, x*, y, (z; z*), (unpin(σ₁, z*); e₁*))
+    Shared<Frame> frame = make_shared<Frame>();
+    // TODO regions 
+    // Is it all from the last frame + all from l?
+
+    // [λ.args↦σ(z*)]
+    for (int i = 0; i < node.args.size();i++) {
+      auto name = yfunc->args[i]->name;
+      auto value = state.frameLookup(node.args[i]->name);
+      frame->lookup[name] = value;
+    }
+    
+    // TODO unpin
+    // TODO continuation and ret? 
   } 
   void Interpreter::evalCreate(verona::ir::Create& node) {
     //TODO how do you create a region?
