@@ -19,8 +19,13 @@ namespace interpreter {
     //TODO figure out if we need this.
     rt::Object* obj;
 
+    // For convenience, we store the ObjectId here as well.
+    ObjectId id;
+
     Shared<ir::StorageLoc> getStorageLoc(Id name) {
       return fields[name];
     }
   }; 
+
+  std::string nextObjectId();
 } // namespace interpreter

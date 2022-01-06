@@ -158,6 +158,23 @@ namespace verona::ir
     return id;
   }
 
+  Node<StorageLoc> Parser::parseStorageLoc()
+  {
+    assert(lexer.hasNext());
+    auto oid = parseIdentifier();
+    
+    // parse the dot
+    assert(lexer.hasNext());
+    Token t = lexer.peek();
+    assert(t.kind == TokenKind::Dot);
+    lexer.next();
+    auto id = parseIdentifier();
+    auto storage = make_shared<StorageLoc>();
+    storage->objectid = oid;
+    storage->id = id;
+    return storage;
+  }
+
   void Parser::parseEOL()
   {
     assert(lexer.hasNext());
@@ -251,7 +268,7 @@ namespace verona::ir
       {
         auto store = make_shared<Store>();
         store->left = v;
-        store->y = parseIdentifier();
+        store->y = parseStorageLoc();
         store->z = parseIdentifier();
         return store;
       }

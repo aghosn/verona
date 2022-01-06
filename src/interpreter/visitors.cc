@@ -89,51 +89,97 @@ namespace interpreter
     }
   }
 
+  // x ∉ σ
+  // ι ∉ σ
+  // --- [var]
+  // σ, x = var; e* → σ[ι↦(σ.frame.regions, τᵩ)][x↦(ι, x)], acquire x; e*
   void Interpreter::evalVar(verona::ir::Var& node)
   {
     assert(node.left.size() == 1);
-    auto id = node.left[0];
+    string x = node.left[0]->name;
 
-    // Check the variable does not exist.
-    // TODO: handle errors properly.
-    assert((!state.isObjectDefined(id->name)) && "Name already defined");
+    // x ∉ σ
+    assert((!state.isDefinedInFrame(x)) && "Name already defined");
+    assert(state.containsType(node.type->name) && "Undefined type");
 
-    // The variable does not exist, we can create it.
-    // TODO how do we get the type for the variable?
-    // How do we specify the descriptor.
-    //auto x0 = rt::api::create_object(nullptr);
+    // ι ∉ σ
+    //σ[ι↦(σ.frame.regions, τᵩ)]
+    Shared<Object> obj = make_shared<Object>();
+    obj->id = nextObjectId(); 
+    obj->type = node.type->name;
+    obj->obj = rt::api::create_object(nullptr); //TODO figure out the descriptor.
+    //TODO set up regions? All the regions then? 
+    state.addObject(obj->id, obj);
 
-    //state.addVar(id->name, x0);
-    // Missing a lookup and a release of x0.
+    // σ[ι↦(σ.frame.regions, τᵩ)][x↦(ι, x)]
+    Shared<ir::ObjectID> oid = make_shared<ir::ObjectID>();
+    oid->name = obj->id;
+    state.addInFrame(x, oid); 
+
+    // acquire x
+    //TODO
   }
 
+  // x ∉ σ
+  // ¬iso(σ, σ(y))
+  // --- [dup]
+  // σ, x = dup y; e* → σ[x↦σ(y)], acquire x; e*
   void Interpreter::evalDup(verona::ir::Dup& node)
   {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
     string y = node.y->name;
-    assert(!state.isObjectDefined(x) && "Name already defined");
-    assert(state.isObjectDefined(y) && "Object not defined");
 
+    // x ∉ σ
+    assert(!state.isDefinedInFrame(x) && "Name already defined");
+   
+    // ¬iso(σ, σ(y))
+    assert(state.isDefinedInFrame(y) && "Object not defined");
+    auto yvalue = state.frameLookup(y);
     Shared<Object> target = state.getObjectByName(y);
     assert(!target->obj->debug_is_iso());
+    
+    // σ[x↦σ(y)]
     state.addInFrame(x, state.getValueByName(y));
+
+    // acquire x
+    // TODO 
   }
 
+  // x ∉ σ
+  // f = σ(y)
+  // ¬iso(σ, σ(f))
+  // --- [load]
+  // σ, x = load y; e* → σ[x↦σ(f)], acquire x; e*
   void Interpreter::evalLoad(verona::ir::Load& node)
   {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
     string y = node.source->name;
 
-    assert(!state.isObjectDefined(x));
-    assert(state.isObjectDefined(y));
+    // x ∉ σ
+    assert(!state.isDefinedInFrame(x));
 
-    // TODO what is the difference with Dup? I see there is one, but I don't see
-    // how to express it using the API.
-    Shared<Object> target = state.getObjectByName(y);
-    assert(!target->obj->debug_is_iso());
-    // TODO how to get the storage location?
+    // f = σ(y)
+    // ¬iso(σ, σ(f))
+    assert(state.isDefinedInFrame(y));
+    auto f = state.frameLookup(y);
+    assert(f->kind() == ir::Kind::StorageLoc);
+
+    auto storage = dynamic_pointer_cast<ir::StorageLoc>(f);
+    ObjectId oid = storage->objectid->name;
+    Id id = storage->id->name;
+    assert(state.objects.contains(oid));
+    assert(state.fields.contains(oid) && state.fields[oid].contains(id));
+    
+    auto value = state.fields[oid][id]; 
+    // TODO check if this value corresponds to an iso object.
+
+    //  σ[x↦σ(f)]
+    state.addInFrame(x, value);
+
+    // acquire x
+    // TODO
   }
 
   // Load a StorageLoc and replace its content in a single step.
@@ -146,24 +192,30 @@ namespace interpreter
   //σ, x = store y z; e* → σ[f↦v][x↦σ(f)]\{z}, e*
   void Interpreter::evalStore(verona::ir::Store& node)
   {
-    // TODO read rules more carefully and figure that one out.
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
-    string y = node.y->name;
+    ir::Node<ir::StorageLoc> y = node.y;
     string z = node.z->name;
+    
+    //x ∉ σ
+    assert(!state.isDefinedInFrame(x) && "Name already defined");
+    // TODO norepeat(y; v)
+    //f = σ(y)
+    assert(state.fields.contains(y->objectid->name) && "The object ID does not exist");
+    assert(state.fields[y->objectid->name].contains(y->id->name) && "objectid does not have a field");
+    auto f = state.fields[y->objectid->name][y->id->name];
 
-    assert(!state.isObjectDefined(x));
-    assert(state.isObjectDefined(y));
-    assert(state.isObjectDefined(z));
+    //v = σ(z)
+    assert(state.isDefinedInFrame(z) && "Source of store not defined");
+    auto v = state.frameLookup(z);
+    
+    // σ[f↦v]
+    state.fields[y->objectid->name][y->id->name] = v;
 
-    // TODO figure out the storageloc thing.
-    auto value = state.getValueByName(z);
-    //TODO for y it is supposed to be a storageloc BUT how do you name a storageloc?
-    state.addInFrame(x, value);
-    Shared<Object> yobj = state.getObjectByName(y); 
-    // TODO is y supposed to be objid.id?
-    //Shared<StorageLoc> f = yobj->getStorageLoc(???);
-    //remove z from frame.
+    // [x↦σ(f)]
+    state.addInFrame(x, f);
+    
+    // σ\{z}
     state.removeFromFrame(z);
   }
 
@@ -184,8 +236,8 @@ namespace interpreter
     string y = node.y->name;
     string z = node.z->name;
 
-    assert(!state.isObjectDefined(x));
-    assert(state.isObjectDefined(y));
+    assert(!state.isDefinedInFrame(x));
+    assert(state.isDefinedInFrame(y));
     Shared<Object> yobj = state.getObjectByName(y);
 
     Shared<ir::Value> v = nullptr;
@@ -211,9 +263,9 @@ namespace interpreter
     string x = node.left[0]->name;
     string y = node.y->name;
     string tpe = node.type->name;
-    assert(!state.isObjectDefined(x));
+    assert(!state.isDefinedInFrame(x));
     assert(state.containsType(tpe));
-    assert(state.isObjectDefined(y));
+    assert(state.isDefinedInFrame(y));
 
     Shared<Object> yobj = state.getObjectByName(y);
     Shared<ir::Value> res = nullptr;
@@ -236,17 +288,25 @@ namespace interpreter
   {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
-    string tpe = node.type->name;
-    assert(!state.isObjectDefined(x));
-    assert(state.containsType(tpe));
+    string type = node.type->name;
 
-    //TypeObj* tpeObj = state.getTypeByName(tpe);
+    // x ∉ σ
+    assert(!state.isDefinedInFrame(x));
+    assert(state.containsType(type));
+    
+    // ι ∉ σ
+    // σ[ι↦(ρ, τ)]
+    Shared<Object> obj = make_shared<Object>();
+    obj->id = nextObjectId(); 
+    obj->type = node.type->name;
+    obj->obj = rt::api::create_object(nullptr); //TODO figure out the descriptor.
+    //TODO set up regions? 
+    state.addObject(obj->id, obj);
 
-    // TODO figure that out, how do I use the type?
-    // What is the difference with x = var?;
-    rt::Object* obj = rt::api::create_object(nullptr);
-
-    //state.addVar(x, obj);
+    // σ[ι↦(ρ, τ)][x↦ι]
+    Shared<ir::ObjectID> oid = make_shared<ir::ObjectID>();
+    oid->name = obj->id;
+    state.addInFrame(x, oid); 
   }
 
   void Interpreter::evalStackAlloc(verona::ir::StackAlloc& node)
@@ -254,7 +314,7 @@ namespace interpreter
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
     string tpe = node.type->name;
-    assert(!state.isObjectDefined(x));
+    assert(!state.isDefinedInFrame(x));
     assert(state.containsType(tpe));
 
     //TypeObj* tpeObj = state.getTypeByName(tpe);
@@ -270,15 +330,15 @@ namespace interpreter
     // Something like
     assert(node.left.size() > 0);
     for (auto x: node.left) {
-      assert(!state.isObjectDefined(x->name));
+      assert(!state.isDefinedInFrame(x->name));
     }
 
     // Check the function is defined.
-    assert(state.isObjectDefined(node.function->name));
+    assert(state.isDefinedInFrame(node.function->name));
     //TODO apparently the arguments are named variables for the moment.
     //Is that correct?
     for (auto arg: node.args) {
-      assert(state.isObjectDefined(arg->name));
+      assert(state.isDefinedInFrame(arg->name));
     }
     rt::api::RegionContext::push(nullptr, rt::api::RegionContext::get_region());
     //TODO remap variables to values in the state.
@@ -287,20 +347,20 @@ namespace interpreter
   }
   void Interpreter::evalTailcall(verona::ir::Tailcall& node) {
     //TODO reuses the same frame.
-    assert(state.isObjectDefined(node.function->name));
+    assert(state.isDefinedInFrame(node.function->name));
     for (auto arg: node.args) {
-      assert(state.isObjectDefined(arg->name));
+      assert(state.isDefinedInFrame(arg->name));
     }
     //TODO same as above.
   }
   void Interpreter::evalRegion(verona::ir::Region& node) {
     for (auto x: node.left) {
-      assert(!state.isObjectDefined(x->name));
+      assert(!state.isDefinedInFrame(x->name));
     }
-    assert(state.isObjectDefined(node.function->name));
+    assert(state.isDefinedInFrame(node.function->name));
     assert(node.args.size() > 0);
     for (auto arg: node.args) {
-      assert(state.isObjectDefined(arg->name));
+      assert(state.isDefinedInFrame(arg->name));
     }
     //TODO figure out what unpin is.
     //TODO need a new frame
@@ -309,7 +369,7 @@ namespace interpreter
   void Interpreter::evalCreate(verona::ir::Create& node) {
     //TODO how do you create a region?
     for (auto x: node.left) {
-      assert(!state.isObjectDefined(x->name));
+      assert(!state.isDefinedInFrame(x->name));
     }
   }
   void Interpreter::evalBranch(verona::ir::Branch& node) {}
@@ -323,9 +383,9 @@ namespace interpreter
   void Interpreter::evalFreeze(verona::ir::Freeze& node) {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
-    assert(!state.isObjectDefined(x));
+    assert(!state.isDefinedInFrame(x));
     string y = node.target->name;
-    assert(state.isObjectDefined(y));
+    assert(state.isDefinedInFrame(y));
     Shared<Object> target = state.getObjectByName(y);
     assert(target->obj->debug_is_iso());
     
@@ -336,9 +396,9 @@ namespace interpreter
   void Interpreter::evalMerge(verona::ir::Merge& node) {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
-    assert(!state.isObjectDefined(x));
+    assert(!state.isDefinedInFrame(x));
     string y = node.target->name;
-    assert(state.isObjectDefined(y));
+    assert(state.isDefinedInFrame(y));
     Shared<Object> target = state.getObjectByName(y);
     assert(target->obj->debug_is_iso());
     //TODO something with the frame.

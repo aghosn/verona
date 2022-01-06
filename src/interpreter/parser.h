@@ -26,6 +26,7 @@ namespace verona::ir
     AllocStrategy parseStrategy();
     Node<TypeId> parseTypeId();
     void dropExpected(mlexer::TokenKind k);
+    Node<StorageLoc> parseStorageLoc();
   };
 
 } // namespace verona::ir

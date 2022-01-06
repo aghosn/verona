@@ -16,6 +16,7 @@ namespace verona::ir
     ID,
     TypeID,
     ObjectID,
+    StorageLoc,
     Var,
     Dup,
     Load,
@@ -185,6 +186,7 @@ namespace verona::ir
   // x = var
   struct Var : Assign
   {
+    Node<TypeId> type;
     Kind kind() override
     {
       return Kind::Var;
@@ -213,9 +215,22 @@ namespace verona::ir
     }
   };
 
+  // f ∈ StorageLoc ::= ObjectId × Id
+  struct StorageLoc : Value
+  {
+    // TODO for convenience, can be either oid or name?
+    Node<ID> objectid;
+    Node<ID> id;
+
+    Kind kind() override
+    {
+      return Kind::StorageLoc;
+    }
+  };
+
   struct Store : Assign
   {
-    Node<ID> y;
+    Node<StorageLoc> y;
     Node<ID> z;
 
     Kind kind() override
@@ -526,19 +541,12 @@ namespace verona::ir
   struct ClassID : TypeId
   {};
 
-  struct ObjectId : Value, Identifier
+  struct ObjectID : Value, Identifier
   {
     Kind kind() override
     {
       return Kind::ObjectID;
     }
-  };
-
-  // f ∈ StorageLoc ::= ObjectId × Id
-  struct StorageLoc : Value
-  {
-    Node<ObjectId> objectid;
-    Node<ID> id;
   };
 
   struct Function : Value, Member

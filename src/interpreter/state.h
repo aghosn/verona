@@ -32,7 +32,7 @@ namespace interpreter
     List<Id> rets;
     List<Shared<ir::Expr>> continuations;
     
-    bool containsObject(Id name) {
+    bool containsName(Id name) {
       if (!lookup.contains(name)) {
         return false;
       }
@@ -40,7 +40,7 @@ namespace interpreter
       return (value->kind() == ir::Kind::Object); 
     }
 
-    Shared<ir::Value> getValueByName(Id name) {
+    Shared<ir::Value> frameLookup(Id name) {
       assert(lookup.contains(name));
       auto obj = lookup[name];
       assert(obj->kind() == ir::Kind::ObjectID);
@@ -60,7 +60,7 @@ namespace interpreter
     // This really needs to be an ObjectID
     Map<ObjectId, Shared<Object>> objects;
 
-    Map<Shared<ir::StorageLoc>, Shared<ir::Value>> fields;
+    Map<ObjectId, Map<Id, Shared<ir::Value>>> fields;
 
     Map<rt::Region*, rt::RegionType> regions; 
 
@@ -69,16 +69,25 @@ namespace interpreter
     Map<TypeId, Shared<Type>> types; 
     
     // Checks wheter a name is defined in the current scope.
-    bool isObjectDefined(string name) {
+    bool isDefinedInFrame(string name) {
       assert(frames.size() > 0);
-      return frames.back()->containsObject(name);
+      return frames.back()->containsName(name);
     }
+
+    void addObject(ObjectId oid, Shared<Object> obj) {
+      objects[oid] = obj;
+    } 
+
+    Shared<ir::Value> frameLookup(Id name) {
+      assert(frames.size() > 0);
+      return frames.back()->frameLookup(name);
+    } 
 
     Shared<Object> getObjectByName(string name) {
       assert(frames.size() > 0);
-      auto val = frames.back()->getValueByName(name);
+      auto val = frames.back()->frameLookup(name);
       assert(val->kind() == ir::Kind::ObjectID && "Value is not an ObjectID");
-      Shared<ir::ObjectId> objid = dynamic_pointer_cast<ir::ObjectId>(val);
+      Shared<ir::ObjectID> objid = dynamic_pointer_cast<ir::ObjectID>(val);
       
       assert(objects.contains(objid->name) && "Object does not exist");
       
@@ -87,7 +96,7 @@ namespace interpreter
 
     Shared<ir::Value> getValueByName(string name) {
       assert(frames.size() > 0);
-      return frames.back()->getValueByName(name);
+      return frames.back()->frameLookup(name);
     }
 
     void addInFrame(Id name, Shared<ir::Value> o) {
