@@ -348,6 +348,12 @@ end:
     state.addInFrame(x, oid); 
   }
 
+  // Create a new object in all open regions, i.e. a stack object.
+  // All fields are initially undefined.
+  // x ∉ σ
+  // ι ∉ σ
+  // --- [stack]
+  // σ, x = stack τ; e* → σ[ι↦(σ.frame.regions, τ)][x↦ι], e*
   void Interpreter::evalStackAlloc(verona::ir::StackAlloc& node)
   {
     assert(node.left.size() == 1);
@@ -356,11 +362,19 @@ end:
     assert(!state.isDefinedInFrame(x));
     assert(state.containsType(tpe));
 
-    //TypeObj* tpeObj = state.getTypeByName(tpe);
+    // ι ∉ σ
+    //σ[ι↦(σ.frame.regions, τᵩ)]
+    Shared<Object> obj = make_shared<Object>();
+    obj->id = nextObjectId(); 
+    obj->type = node.type->name;
+    obj->obj = rt::api::create_object(nullptr); //TODO figure out the descriptor.
+    //TODO set up regions? All the regions then? 
+    state.addObject(obj->id, obj);
 
-    // TODO Again figure that out;
-    rt::Object* obj = rt::api::create_object(nullptr);
-    //state.addVar(x, obj);
+    // σ[x↦ι]
+    Shared<ir::ObjectID> oid = make_shared<ir::ObjectID>();
+    oid->name = obj->id;
+    state.addInFrame(x, oid); 
   }
 
   void Interpreter::evalCall(verona::ir::Call& node)
