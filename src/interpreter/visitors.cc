@@ -1,6 +1,6 @@
-#include "visitors.h"
-
 #include "state.h"
+#include "notation.h"
+#include "visitors.h"
 
 #include <cassert>
 #include <iostream>
@@ -506,15 +506,135 @@ end:
     // TODO unpin
     // TODO continuation and ret? 
   } 
+
+  // Create a new heap region.
+  // x ∉ σ
+  // ρ ∉ σ
+  // σ₂, e₂* = newframe(σ₁[ρ↦Σ], ρ, x*, y, z*, (unpin(σ₁, z*); e₁*))
+  // --- [create]
+  // σ, x* = create Σ y(z*); e* → σ₂, e₂*
   void Interpreter::evalCreate(verona::ir::Create& node) {
-    //TODO how do you create a region?
+    // x ∉ σ
     for (auto x: node.left) {
       assert(!state.isDefinedInFrame(x->name));
     }
+
+    // get y
+    string y = node.function->name;
+    assert(state.isDefinedInFrame(y));
+    auto v = state.frameLookup(y);
+    assert(v->kind() == Kind::Function && "y is not a function");
+    auto yfunc = dynamic_pointer_cast<ir::Function>(v);
+  
+    // ρ ∉ σ
+    rt::Region* region = nullptr; //TODO
+
+    // σ₁[ρ↦Σ]
+    state.regions[region] = node.strategy;
+
+    Shared<Frame> frame = make_shared<Frame>();
+    // TODO regions 
+    // (ϕ*; ϕ₁\{y, z*}; ϕ₂)
+    // TODO
+    //(unpin(σ₁, z*)
+
+    // [λ.args↦σ(z*)]
+    for (int i = 0; i < node.args.size();i++) {
+      auto name = yfunc->args[i]->name;
+      auto value = state.frameLookup(node.args[i]->name);
+      frame->lookup[name] = value;
+    }
+    //TODO same as a call, change instruction and ret + cont
+    //TODO probably factor that part out once I am sure I do newframe correctly.
   }
-  void Interpreter::evalBranch(verona::ir::Branch& node) {}
-  void Interpreter::evalReturn(verona::ir::Return& node) {}
-  void Interpreter::evalError(verona::ir::Err& node) {}
+
+  // live(σ₁, x; y; z; y*)
+  // live(σ₁, x; y; z; z*)
+  // λ₁ = σ₁(y)
+  // λ₂ = σ₁(z)
+  // σ₂, e* = σ₁[λ₁.args↦σ₁(y*)], λ₁.expr if σ₁(x) = true
+  //          σ₁[λ₂.args↦σ₁(z*)], λ₂.expr if σ₁(x) = false
+  // --- [branch]
+  // σ₁, branch x y(y*) z(z*) → σ₂, e*
+  void Interpreter::evalBranch(verona::ir::Branch& node) {
+    // live(σ₁, x; y; z; y*)
+    // live(σ₁, x; y; z; z*)
+    // TODO
+    string x = node.condition->name;
+    assert(state.isDefinedInFrame(x));
+
+    //TODO is that correct? are they functions or should I introduce lambdas?
+    string y = node.branch1->function->name;
+    assert(state.isDefinedInFrame(y));
+    Node<ir::Function> yfunc = state.getFunction(y);
+    assert(yfunc->args.size() == node.branch1->args.size());
+    string z = node.branch2->function->name;
+    assert(state.isDefinedInFrame(z));
+    Node<ir::Function> zfunc = state.getFunction(z);
+    assert(zfunc->args.size() == node.branch2->args.size());
+    
+    //TODO factor check call is well formed.
+    ir::Node<ir::Value> xval = state.frameLookup(x);
+    bool condition = true;
+    switch (xval->kind()) {
+      case ir::Kind::True:
+        condition = true;
+        break;
+      case ir::Kind::False:
+        condition = false;
+        break;
+      default:
+        assert(0 && "Branch malformed, x is not a boolean"); 
+    }
+    if (condition) {
+      //TODO update state to continue on y;
+      return;
+    } 
+    //TODO update state to continue on z;
+  }
+
+  // Pop the current frame.
+  // Can only return iso or imm across a `using`.
+  // TODO: the isos being returned have to be disjoint
+  // live(σ₁, x*)
+  // σ₁.frames = (ϕ*; ϕ₁; ϕ₂)
+  // σ₂ = ((ϕ*; ϕ₁[ϕ₂.ret↦σ₁(x*)]), σ₁.objects, σ₁.fields, σ₁.except)
+  // (ϕ₁.regions ≠ ϕ₂.regions) ⇒ iso(σ₂, ϕ₂(x)) ∨ imm(σ₂, ϕ₂(x))
+  // ιs = σ₁.objects(ϕ₂.regions) if ϕ₁.regions ≠ ϕ₂.regions
+  //      ∅ otherwise
+  // --- [return]
+  // σ₁, return x* → σ₂\ιs, ϕ₂.cont
+  void Interpreter::evalReturn(verona::ir::Return& node) {
+    assert(live(state, node.returns)); 
+    // σ₁.frames = (ϕ*; ϕ₁; ϕ₂)
+    assert(state.frames.size() >= 2);
+    // σ₂ = ((ϕ*; ϕ₁[ϕ₂.ret↦σ₁(x*)]), σ₁.objects, σ₁.fields, σ₁.except)
+    auto phi1 = state.frames[state.frames.size() - 2];
+    auto phi2 = state.frames[state.frames.size() - 1];
+    
+    bool isoOrImm = !sameRegions(phi1->regions, phi2->regions);
+
+    assert(phi2->rets.size() == node.returns.size());
+    for (int i = 0; i < phi2->rets.size(); i++) {
+      auto x = node.returns[i]->name;
+      auto ret = phi2->rets[i];
+      assert(phi2->containsName(x) && "Return value undefined in phi2");
+      auto val = phi2->lookup[x];
+      assert((!isoOrImm || isIsoOrImm(state, val)) && "Value must be iso or immutable"); 
+      phi1->lookup[ret] = phi2->lookup[x];
+    }
+    
+    // Drop the last frame, i.e., phi2
+    state.frames.pop_back();
+
+  }
+
+  // Unset the success flag.
+  // --- [error]
+  // σ, error; e* → (σ.frames, σ.objects, σ.fields, σ.regions, false), e*
+  void Interpreter::evalError(verona::ir::Err& node) {
+    state.success = false;
+  }
   void Interpreter::evalCatch(verona::ir::Catch& node) {}
   void Interpreter::evalAcquire(verona::ir::Acquire& node) {}
   void Interpreter::evalRelease(verona::ir::Release& node) {}

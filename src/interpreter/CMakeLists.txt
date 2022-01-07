@@ -11,7 +11,8 @@ set(ALL_SOURCE_FILES
   parser.cc
   helpers.cc
   visitors.cc
-  object.cc)
+  object.cc
+  notation.cc)
 
 add_executable(verona-interpreter 
   ${ALL_SOURCE_FILES})
