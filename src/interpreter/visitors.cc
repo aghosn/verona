@@ -627,6 +627,11 @@ end:
     // Drop the last frame, i.e., phi2
     state.frames.pop_back();
 
+    // TODO COLLECT THE OBJECTS
+    // ιs = σ₁.objects(ϕ₂.regions) if ϕ₁.regions ≠ ϕ₂.regions
+    // ∅ otherwise
+    // σ₂\ιs
+    // TODO i don't get it, we remove the objects with the same regions as phi2?
   }
 
   // Unset the success flag.
@@ -635,11 +640,31 @@ end:
   void Interpreter::evalError(verona::ir::Err& node) {
     state.success = false;
   }
-  void Interpreter::evalCatch(verona::ir::Catch& node) {}
+
+  // Test and set the success flag.
+  // x ∉ σ₁
+  // σ₂ = (σ.frames, σ.objects, σ.fields, σ.regions, true)
+  // --- [catch]
+  // σ₁, x = catch; e* → σ₂[x↦σ₁.except], e*
+  void Interpreter::evalCatch(verona::ir::Catch& node) {
+    assert(node.left.size() == 1);
+    string x = node.left[0]->name;
+    assert(!state.isDefinedInFrame(x) && "Name already defined");
+    assert(state.except == true);
+    auto val = make_shared<ir::True>();
+    state.addInFrame(x, val); 
+    //TODO is dat it?
+  }
   void Interpreter::evalAcquire(verona::ir::Acquire& node) {}
   void Interpreter::evalRelease(verona::ir::Release& node) {}
   void Interpreter::evalFulfill(verona::ir::Fulfill& node) {}
 
+  // Destroy a region and freeze all objects that were in it.
+  // x ∉ σ
+  // ι = σ(y)
+  // iso(σ, ι)
+  // --- [freeze]
+  // σ, x = freeze y; e* → σ[σ(v).regions→∅]\{y}[x↦v], acquire x; e*
   void Interpreter::evalFreeze(verona::ir::Freeze& node) {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
@@ -650,8 +675,7 @@ end:
     assert(target->obj->debug_is_iso());
     
     //rt::Object* res = rt::api::freeze(target);
-    //TODO is that correct?
-    //state.addVar(x, res);
+    //TODO THE HELL IS V?
   }
   void Interpreter::evalMerge(verona::ir::Merge& node) {
     assert(node.left.size() == 1);

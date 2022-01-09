@@ -64,7 +64,9 @@ namespace interpreter
 
     Map<rt::Region*, rt::RegionType> regions; 
 
+    //TODO figure out they have both in the rules
     bool success; 
+    bool except;
 
     Map<TypeId, Shared<Type>> types; 
     
