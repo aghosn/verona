@@ -655,9 +655,40 @@ end:
     state.addInFrame(x, val); 
     //TODO is dat it?
   }
-  void Interpreter::evalAcquire(verona::ir::Acquire& node) {}
-  void Interpreter::evalRelease(verona::ir::Release& node) {}
-  void Interpreter::evalFulfill(verona::ir::Fulfill& node) {}
+
+  // TODO: rcinc
+  // address: ?
+  // object: ?
+  // ι = ϕ(x)
+  // ω = χ(ι) => ???
+  // --- [acquire]
+  // σ, acquire x; e* → σ, e*
+  void Interpreter::evalAcquire(verona::ir::Acquire& node) {
+    string x = node.target->name;
+    assert(state.isDefinedInFrame(x));
+    auto value = state.frameLookup(x);
+    assert(value->kind() == ir::Kind::ObjectID);
+    auto oid = dynamic_pointer_cast<ir::ObjectID>(value);
+    assert(state.objects.contains(oid->name));
+    // TODO ???
+  }
+
+  // TODO:
+  // if ι is on the stack, destroy it
+  // if ι is from an object, rcdec the object
+  // ι = ϕ(x)
+  // --- [release]
+  // σ, release x; e* → σ, e*
+  void Interpreter::evalRelease(verona::ir::Release& node) {
+    //TODO ???
+  }
+
+  // TODO: fulfill the promise
+  // --- [fulfill]
+  // σ, fulfill x → σ, ∅
+  void Interpreter::evalFulfill(verona::ir::Fulfill& node) {
+    //TODO ???
+  }
 
   // Destroy a region and freeze all objects that were in it.
   // x ∉ σ
