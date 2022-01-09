@@ -244,6 +244,19 @@ namespace sandbox
     }
   };
 
+  /**
+   * This class eases the interop work as clang more easily lets you 
+   * specialize a class template than a function template.
+   */
+  template<typename Ret, typename... Args>
+  class ClangExporter {
+    public:
+      static void export_function(Ret (*fn)(Args...))
+      {
+        ExportedLibrary::export_function(fn);
+      }
+  };
+
   extern "C" void sandbox_call(int idx, void* args)
   {
     ExportedLibrary::call(idx, args);

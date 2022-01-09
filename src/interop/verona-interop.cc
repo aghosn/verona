@@ -34,7 +34,14 @@ namespace
     cl::desc("Generate sandbox instrumentation. Expects --targets to be on."),
     cl::Optional,
     cl::init(false));
-
+  // Fully qualified name of the class that exports sandboxed library funcs.
+  // Must have a static function called 'export_function'.
+  cl::opt<string> sbexporter(
+      "sbexporter",
+      cl::desc("Fully qualified name of the class registering libray functions"),
+      cl::Optional,
+      cl::value_desc(sbexporter),
+      cl::init("sandbox::ClangExporter"));
   // Supply the list of target functions.
   cl::opt<string> targets(
     "targets",
@@ -132,6 +139,9 @@ namespace
         target_functions.push_back(line);
       }
     }
+
+    // Adding the exporter class
+    exporter_class_name = sbexporter;
 
     // Add the path to the config files to the include path
     for (auto path : paths)

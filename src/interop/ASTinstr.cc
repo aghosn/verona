@@ -10,9 +10,9 @@ namespace verona::interop
 {
   static const char* SANDBOX_INIT = "sandbox_init";
   static const char* METHOD_NAME = "export_function";
-  static const char* EXPORTER_CLASS_NAME = "myNameSpace::ExportedFunction";
 
   vector<string> target_functions;
+  string exporter_class_name;
 
   vector<clang::TemplateArgument>
   build_fn_template_type(clang::FunctionDecl* decl)
@@ -78,7 +78,7 @@ namespace verona::interop
 
     // Find the ExportedFunction class template.
     clang::ClassTemplateDecl* exporterClass =
-      query->getClassTemplate(EXPORTER_CLASS_NAME);
+      query->getClassTemplate(exporter_class_name);
     assert(exporterClass != nullptr);
     assert(exporterClass->isTemplated());
 
