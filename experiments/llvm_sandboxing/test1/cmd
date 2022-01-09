@@ -1,0 +1,1 @@
+../../../build/dist/verona-interop --dump --sandbox --sbexporter="myNameSpace::ExportedFunction" --targets="targets.txt" --includes="includes.txt" test.cc
