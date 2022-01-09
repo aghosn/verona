@@ -45,9 +45,15 @@ namespace
   // Supply the list of target functions.
   cl::opt<string> targets(
     "targets",
-    cl::desc("<targets file> A list of the library functions to expose"),
+    cl::desc("<targets file> A file with a list of library functions to expose"),
     cl::Optional,
     cl::value_desc(targets));
+  // Supply a list of includes
+  cl::opt<string> includes(
+    "includes",
+    cl::desc("<includes file> A file with a list of include directories"),
+    cl::Optional,
+    cl::value_desc(includes));
 
   // For help's sake, will never be parsed, as we intercept
   cl::opt<string> config(
@@ -123,7 +129,7 @@ namespace
     }
 
     // Parsing targets
-    if (!config.empty())
+    if (!targets.empty())
     {
       std::ifstream file(targets);
       if (!file.good())
@@ -137,6 +143,23 @@ namespace
       while (std::getline(file, line))
       {
         target_functions.push_back(line);
+      }
+    }
+
+    // Parsing includes
+    if (!includes.empty()) {
+      std::ifstream file(includes);
+      if (!file.good())
+      {
+        cerr << "Error opening includes file " << includes << endl;
+        exit(1);
+      }
+
+      // Read the file and add all of functions (one per line) to the targets.
+      std::string line;
+      while (std::getline(file, line))
+      {
+        includePath.push_back(line);
       }
     }
 
