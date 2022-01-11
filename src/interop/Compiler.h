@@ -94,7 +94,8 @@ namespace verona::interop
               "-I",
               "/usr/include/",
               "-I",
-              "/usr/local/include/"};
+              "/usr/local/include/",
+              "-std=gnu++17"};
       // Add user include paths
       for (auto& dir : includePath)
       {
