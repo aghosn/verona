@@ -48,6 +48,20 @@ namespace interpreter
     }
   };
 
+  struct ExecState {
+    ir::List<ir::Expr> exprs;
+    uint32_t offset;
+
+    ir::List<ir::Expr> getContinuation() {
+      assert(offset < exprs.size()-1);
+      ir::List<ir::Expr> cont;
+      for (int i = offset+1; i < exprs.size(); i++) {
+        cont.push_back(exprs[i]);
+      }
+      return cont;
+    }
+  };
+
   //σ ∈ State ::= Frame*
   //          × (ObjectId → Object)
   //          × (StorageLoc → Value)
@@ -67,6 +81,9 @@ namespace interpreter
     //TODO figure out they have both in the rules
     bool success; 
     bool except;
+
+    // Execution state
+    ExecState exec_state;
 
     Map<TypeId, Shared<Type>> types; 
     

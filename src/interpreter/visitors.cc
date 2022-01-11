@@ -1,12 +1,13 @@
 #include "state.h"
 #include "notation.h"
 #include "visitors.h"
+#include "utils.h"
 
 #include <cassert>
 #include <iostream>
 #include <verona.h>
 
-using namespace verona::ir;
+namespace ir = verona::ir;
 namespace rt = verona::rt;
 
 namespace interpreter
@@ -14,76 +15,76 @@ namespace interpreter
   // TODO move this and pass it as an argument I guess.
   thread_local State state;
 
-  void SimplePrinter::visit(NodeDef* node)
+  void SimplePrinter::visit(ir::NodeDef* node)
   {
     std::cout << "The type " << verona::ir::kindname(node->kind()) << std::endl;
   }
 
-  void Interpreter::visit(NodeDef* node)
+  void Interpreter::visit(ir::NodeDef* node)
   {
     switch (node->kind())
     {
-      case Kind::Var:
-        evalVar(node->as<Var>());
+      case ir::Kind::Var:
+        evalVar(node->as<ir::Var>());
         break;
-      case Kind::Dup:
-        evalDup(node->as<Dup>());
+      case ir::Kind::Dup:
+        evalDup(node->as<ir::Dup>());
         break;
-      case Kind::Load:
-        evalLoad(node->as<Load>());
+      case ir::Kind::Load:
+        evalLoad(node->as<ir::Load>());
         break;
-      case Kind::Store:
-        evalStore(node->as<Store>());
+      case ir::Kind::Store:
+        evalStore(node->as<ir::Store>());
         break;
-      case Kind::Lookup:
-        evalLookup(node->as<Lookup>());
+      case ir::Kind::Lookup:
+        evalLookup(node->as<ir::Lookup>());
         break;
-      case Kind::Typetest:
-        evalTypetest(node->as<Typetest>());
+      case ir::Kind::Typetest:
+        evalTypetest(node->as<ir::Typetest>());
         break;
-      case Kind::NewAlloc:
-        evalNewAlloc(node->as<NewAlloc>());
+      case ir::Kind::NewAlloc:
+        evalNewAlloc(node->as<ir::NewAlloc>());
         break;
-      case Kind::StackAlloc:
-        evalStackAlloc(node->as<StackAlloc>());
+      case ir::Kind::StackAlloc:
+        evalStackAlloc(node->as<ir::StackAlloc>());
         break;
-      case Kind::Call:
-        evalCall(node->as<Call>());
+      case ir::Kind::Call:
+        evalCall(node->as<ir::Call>());
         break;
-      case Kind::Tailcall:
-        evalTailcall(node->as<Tailcall>());
+      case ir::Kind::Tailcall:
+        evalTailcall(node->as<ir::Tailcall>());
         break;
-      case Kind::Region:
-        evalRegion(node->as<Region>());
+      case ir::Kind::Region:
+        evalRegion(node->as<ir::Region>());
         break;
-      case Kind::Create:
-        evalCreate(node->as<Create>());
+      case ir::Kind::Create:
+        evalCreate(node->as<ir::Create>());
         break;
-      case Kind::Branch:
-        evalBranch(node->as<Branch>());
+      case ir::Kind::Branch:
+        evalBranch(node->as<ir::Branch>());
         break;
-      case Kind::Return:
-        evalReturn(node->as<Return>());
+      case ir::Kind::Return:
+        evalReturn(node->as<ir::Return>());
         break;
-      case Kind::Error:
-        evalError(node->as<Err>());
+      case ir::Kind::Error:
+        evalError(node->as<ir::Err>());
         break;
-      case Kind::Catch:
-        evalCatch(node->as<Catch>());
+      case ir::Kind::Catch:
+        evalCatch(node->as<ir::Catch>());
         break;
-      case Kind::Acquire:
-        evalAcquire(node->as<Acquire>());
+      case ir::Kind::Acquire:
+        evalAcquire(node->as<ir::Acquire>());
         break;
-      case Kind::Release:
-        evalRelease(node->as<Release>());
+      case ir::Kind::Release:
+        evalRelease(node->as<ir::Release>());
         break;
-      case Kind::Fulfill:
-        evalFulfill(node->as<Fulfill>());
+      case ir::Kind::Fulfill:
+        evalFulfill(node->as<ir::Fulfill>());
         break;
-      case Kind::Freeze:
-        evalFreeze(node->as<Freeze>());
-      case Kind::Merge:
-        evalMerge(node->as<Merge>());
+      case ir::Kind::Freeze:
+        evalFreeze(node->as<ir::Freeze>());
+      case ir::Kind::Merge:
+        evalMerge(node->as<ir::Merge>());
       default:
         assert(0);
     }
@@ -242,7 +243,7 @@ namespace interpreter
     //ι = σ(y)
     assert(state.isDefinedInFrame(y));
     auto _l = state.getValueByName(y);
-    assert(_l->kind() == Kind::ObjectID);
+    assert(_l->kind() == ir::Kind::ObjectID);
     auto l = dynamic_pointer_cast<ir::ObjectID>(_l);
     
     // m = σ(ι)(z)
@@ -256,12 +257,12 @@ namespace interpreter
     // v ∈ StorageLoc ⇒ ¬iso(σ, ι)
     Shared<ir::Value> v = nullptr;
     switch(m->kind()) {
-      case Kind::Function:
+      case ir::Kind::Function:
         v = m;
         break;
-      case Kind::StorageLoc:
+      case ir::Kind::StorageLoc:
         assert(state.objects[l->name]->obj->debug_is_iso() && "Lookup with an iso storageloc");
-      case Kind::ObjectID:
+      case ir::Kind::ObjectID:
        v = m; 
        break;
       default:
@@ -299,7 +300,7 @@ namespace interpreter
     Shared<Object> yobj = nullptr;
     Shared<ir::ObjectID> oid = nullptr;
     auto l = state.frameLookup(y);
-    if (l->kind() != Kind::ObjectID) {
+    if (l->kind() != ir::Kind::ObjectID) {
       goto end;
     }
     oid = dynamic_pointer_cast<ir::ObjectID>(l);
@@ -390,34 +391,11 @@ end:
     for (auto x: node.left) {
       assert(!state.isDefinedInFrame(x->name));
     }
-    
-    // σ₂, e₂* = newframe(σ₁, (), x*, y, z*, e₁*)
-    string y = node.function->name; 
-    assert(state.isFunction(y) && "Undefined Function");
-    auto yfunc = state.getFunction(y);
-    for (auto z: node.args) 
-    {
-      assert(state.isDefinedInFrame(z->name));
-    }
-
-    Shared<Frame> frame = make_shared<Frame>();
-    // TODO regions
-    // TODO ret
-    // TODO continuations
-    // TODO what does () means in terms of region? -> I think I saw it in the rules
-    // TODO why is frame 1 removing y and z*?
-    assert(yfunc->args.size() == node.args.size() && "Wrong number of arguments");
-    for (int i = 0; i < node.args.size(); i++) {
-      auto name = yfunc->args[i]->name;
-      auto value = state.frameLookup(node.args[i]->name);
-      frame->lookup[name] = value;
-    }
-
-    // (ϕ*; ϕ₁\{y, z*}; ϕ₂)
-    state.frames.push_back(frame);
-
-    // TODO change next instruction + call rt functions 
-    // e₁* → σ₂, e₂*
+    auto conts = state.exec_state.getContinuation();
+    List<rt::Region*> p;
+    auto expr2 = newframe(state, p, node.left, 
+        node.function, node.args, conts);
+    state.exec_state = {expr2, 0};
   }
 
   // Reuse the current frame.
@@ -430,7 +408,7 @@ end:
     auto x = node.function->name; 
     assert(state.isDefinedInFrame(x));
     auto _f = state.frameLookup(x);
-    assert(_f->kind() == Kind::Function);
+    assert(_f->kind() == ir::Kind::Function);
     auto lambda = dynamic_pointer_cast<ir::Function>(_f);
 
     // live(σ, y*)
@@ -470,7 +448,7 @@ end:
     string y = node.function->name;
     assert(state.isDefinedInFrame(y));
     auto v = state.frameLookup(y);
-    assert(v->kind() == Kind::Function && "y is not a function");
+    assert(v->kind() == ir::Kind::Function && "y is not a function");
     auto yfunc = dynamic_pointer_cast<ir::Function>(v);
 
     assert(node.args.size() > 0);
@@ -482,7 +460,7 @@ end:
     // ι = σ(z)
     string z = node.args[0]->name;
     auto _l = state.frameLookup(z);
-    assert(_l->kind() == Kind::ObjectID && "Argument is not an object id");
+    assert(_l->kind() == ir::Kind::ObjectID && "Argument is not an object id");
     auto l = state.getObjectByName(z);
 
     // ρ = σ(ι).regions
@@ -523,7 +501,7 @@ end:
     string y = node.function->name;
     assert(state.isDefinedInFrame(y));
     auto v = state.frameLookup(y);
-    assert(v->kind() == Kind::Function && "y is not a function");
+    assert(v->kind() == ir::Kind::Function && "y is not a function");
     auto yfunc = dynamic_pointer_cast<ir::Function>(v);
   
     // ρ ∉ σ
@@ -566,11 +544,11 @@ end:
     //TODO is that correct? are they functions or should I introduce lambdas?
     string y = node.branch1->function->name;
     assert(state.isDefinedInFrame(y));
-    Node<ir::Function> yfunc = state.getFunction(y);
+    ir::Node<ir::Function> yfunc = state.getFunction(y);
     assert(yfunc->args.size() == node.branch1->args.size());
     string z = node.branch2->function->name;
     assert(state.isDefinedInFrame(z));
-    Node<ir::Function> zfunc = state.getFunction(z);
+    ir::Node<ir::Function> zfunc = state.getFunction(z);
     assert(zfunc->args.size() == node.branch2->args.size());
     
     //TODO factor check call is well formed.

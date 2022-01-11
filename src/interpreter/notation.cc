@@ -13,13 +13,17 @@ namespace interpreter {
   //   λ = σ(y),
   //   σ.frames = (ϕ*; ϕ₁),
   //   ϕ₂ = ((ϕ₁.regions; ρ*), [λ.args↦σ(z*)], x*, e*)
-  void newframe(State& state, List<rt::Region*>& p, ir::List<ir::ID>& xs, 
-      Id y, ir::List<ir::ID>& zs,
-      List<Shared<ir::Expr>>& es)
+  ir::List<ir::Expr> newframe(
+      State& state,
+      List<rt::Region*>& p,
+      ir::List<ir::ID>& xs, 
+      ir::Node<ir::ID> y, 
+      ir::List<ir::ID>& zs,
+      ir::List<ir::Expr>& es)
   {
     // λ = σ(y)
-    assert(state.isFunction(y) && "Undefined function id"); 
-    auto yfunc = state.getFunction(y);
+    assert(state.isFunction(y->name) && "Undefined function id"); 
+    auto yfunc = state.getFunction(y->name);
     assert(yfunc->args.size() == zs.size() && "Wrong number of arguments");
     // σ.frames = (ϕ*; ϕ₁),
     assert(state.frames.size() > 0 && "There are no frames");
@@ -43,6 +47,15 @@ namespace interpreter {
       frame2->rets.push_back(x->name);
     }
     frame2->continuations.insert(frame2->continuations.end(), es.begin(), es.end());
+    
+    // Use is consume.
+    frame1->lookup.erase(y->name);
+    for (auto z: zs)
+    {
+      frame1->lookup.erase(z->name);
+    }
+    state.frames.push_back(frame2);
+    return yfunc->exprs;
   }
 
   //live(σ, x*) = norepeat(x*) ∧ (dom(σ.frame) = dom(x*))

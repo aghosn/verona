@@ -2,6 +2,18 @@
 
 namespace interpreter {
 
+// newframe(σ, ρ*, x*, y, z*, e*) =
+// ((ϕ*; ϕ₁\{y, z*}; ϕ₂), σ.objects, σ.fields, σ.regions, σ.except), λ.expr
+// if λ ∈ Function
+// where
+//   λ = σ(y),
+//   σ.frames = (ϕ*; ϕ₁),
+//   ϕ₂ = ((ϕ₁.regions; ρ*), [λ.args↦σ(z*)], x*, e*)
+ir::List<ir::Expr> newframe(State& state, List<rt::Region*>& p,
+     ir::List<ir::ID>& xs, 
+     ir::Node<ir::ID> y, ir::List<ir::ID>& zs,
+     ir::List<ir::Expr>& es);
+
 //live(σ, x*) = norepeat(x*) ∧ (dom(σ.frame) = dom(x*))
 bool live(State& state, ir::List<ir::ID> args);
 
