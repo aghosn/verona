@@ -361,6 +361,7 @@ int main(int argc, char** argv)
   // Emit whatever is left on the main file
   // This is silent, just to make sure nothing breaks here
   auto mod = interface.emitLLVM();
+  assert(mod != nullptr);
 
   // Dump LLVM IR for debugging purposes
   // NOTE: Output is not stable, don't use it for tests
