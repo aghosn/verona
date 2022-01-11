@@ -108,7 +108,7 @@ namespace interpreter
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
     obj->obj = rt::api::create_object(nullptr); //TODO figure out the descriptor.
-    //TODO set up regions? All the regions then? 
+    //TODO allocate in all the regions? 
     state.addObject(obj->id, obj);
 
     // σ[ι↦(σ.frame.regions, τᵩ)][x↦(ι, x)]
@@ -404,7 +404,7 @@ end:
     // TODO regions
     // TODO ret
     // TODO continuations
-    // TODO what does () means in terms of region?
+    // TODO what does () means in terms of region? -> I think I saw it in the rules
     // TODO why is frame 1 removing y and z*?
     assert(yfunc->args.size() == node.args.size() && "Wrong number of arguments");
     for (int i = 0; i < node.args.size(); i++) {
