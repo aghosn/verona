@@ -5,5 +5,5 @@ char func3(char a, int b, bool c) {return 'c';}
 
 
 int main(void) {
-  sandbox::ClangExporter::export_function(func1); 
+  //sandbox::ClangExporter::export_function(func1); 
 }
