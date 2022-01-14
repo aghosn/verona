@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cstdarg>
 
 #include "state.h"
 #include "utils.h"
@@ -83,6 +84,30 @@ namespace interpreter {
     return true;
   }
 
+
+  // norepeat(x*) = (|x*| = |dom(x*)|)
+  // Also supports norepeat(x; y; z*);
+  bool norepeat2(ir::List<ir::ID> first, ir::Node<ir::ID> extras...)
+  {
+    ir::List<ir::ID> args; 
+    va_list varargs;
+    va_start(varargs, extras);
+    args.push_back(extras);
+    va_end(varargs);
+    args.insert(args.end(), first.begin(), first.end()); 
+
+    for (int i = 0; i < args.size() -1; i++) {
+      auto curr = args[i];
+      for (int j = i + 1; j < args.size(); j++) {
+        auto next = args[j];
+        if (curr->name == next->name) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   bool sameRegions(List<rt::Region*> r1, List<rt::Region*> r2) {
     if (r1.size() != r2.size()) {
       return false;
@@ -94,6 +119,16 @@ namespace interpreter {
     }
     return true;
   }
+
+  List<ObjectId> getObjectsInRegions(State& state, List<rt::Region*> regions) {
+    List<ObjectId> result;
+    for (auto const& x: state.objects) {
+      if (sameRegions(regions, x.second->regions)) {
+        result.push_back(x.first);
+      } 
+    } 
+    return result;
+  } 
 
   bool isIsoOrImm(State& state, Shared<ir::Value> value) {
     Shared<ir::ObjectID> oid = nullptr;

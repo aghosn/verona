@@ -200,7 +200,7 @@ namespace interpreter
     
     //x ∉ σ
     assert(!state.isDefinedInFrame(x) && "Name already defined");
-    // TODO norepeat(y; v)
+    // TODO norepeat(y; z)
     //f = σ(y)
     assert(state.fields.contains(y->objectid->name) && "The object ID does not exist");
     assert(state.fields[y->objectid->name].contains(y->id->name) && "objectid does not have a field");
@@ -386,6 +386,8 @@ end:
   // σ₁, x* = call y(z*); e₁* → σ₂, e₂*
   void Interpreter::evalCall(verona::ir::Call& node)
   {
+    // norepeat(y; z*)
+    norepeat2(node.args, node.function);
     // x ∉ σ
     assert(node.left.size() > 0);
     for (auto x: node.left) {
@@ -425,7 +427,7 @@ end:
     } 
 
     // λ.expr
-    // TODO
+    state.exec_state = {lambda->exprs, 0}; 
   }
 
   // Push a new frame with the specified heap region.
@@ -438,8 +440,8 @@ end:
   // --- [region]
   // σ₁, x* = region y(z, z*); e₁* → σ₂, e₂*
   void Interpreter::evalRegion(verona::ir::Region& node) {
-    // TODO
     // norepeat(y; z; z*)
+    norepeat2(node.args, node.function);
     // x ∉ σ
     for (auto x: node.left) {
       assert(!state.isDefinedInFrame(x->name));
@@ -518,13 +520,8 @@ end:
   // --- [branch]
   // σ₁, branch x y(y*) z(z*) → σ₂, e*
   void Interpreter::evalBranch(verona::ir::Branch& node) {
-    // live(σ₁, x; y; z; y*)
-    // live(σ₁, x; y; z; z*)
-    // TODO
     string x = node.condition->name;
     assert(state.isDefinedInFrame(x));
-
-    //TODO is that correct? are they functions or should I introduce lambdas?
     string y = node.branch1->function->name;
     assert(state.isDefinedInFrame(y));
     ir::Node<ir::Function> yfunc = state.getFunction(y);
@@ -533,6 +530,16 @@ end:
     assert(state.isDefinedInFrame(z));
     ir::Node<ir::Function> zfunc = state.getFunction(z);
     assert(zfunc->args.size() == node.branch2->args.size());
+
+    // live(σ₁, x; y; z; y*)
+    ir::List<ir::ID> namesY {node.condition, node.branch1->function, node.branch2->function};
+    namesY.insert(namesY.end(), node.branch1->args.begin(), node.branch1->args.end());
+    live(state, namesY);
+    // live(σ₁, x; y; z; z*)
+    ir::List<ir::ID> namesZ {node.condition, node.branch1->function, node.branch2->function};
+    namesZ.insert(namesZ.end(), node.branch2->args.begin(), node.branch2->args.end());
+    live(state, namesZ);
+    
     
     //TODO factor check call is well formed.
     ir::Node<ir::Value> xval = state.frameLookup(x);
@@ -548,10 +555,12 @@ end:
         assert(0 && "Branch malformed, x is not a boolean"); 
     }
     if (condition) {
-      //TODO update state to continue on y;
+      // TODO how do you get back to previous continuation?
+      // i.e., if there is code after the branch
+      state.exec_state = {yfunc->exprs, 0};
       return;
     } 
-    //TODO update state to continue on z;
+    state.exec_state = {zfunc->exprs, 0};
   }
 
   // Pop the current frame.
@@ -573,7 +582,7 @@ end:
     auto phi1 = state.frames[state.frames.size() - 2];
     auto phi2 = state.frames[state.frames.size() - 1];
     
-    bool isoOrImm = !sameRegions(phi1->regions, phi2->regions);
+    bool samereg = sameRegions(phi1->regions, phi2->regions);
 
     assert(phi2->rets.size() == node.returns.size());
     for (int i = 0; i < phi2->rets.size(); i++) {
@@ -581,18 +590,23 @@ end:
       auto ret = phi2->rets[i];
       assert(phi2->containsName(x) && "Return value undefined in phi2");
       auto val = phi2->lookup[x];
-      assert((!isoOrImm || isIsoOrImm(state, val)) && "Value must be iso or immutable"); 
+      assert((samereg || isIsoOrImm(state, val)) && "Value must be iso or immutable"); 
       phi1->lookup[ret] = phi2->lookup[x];
     }
     
     // Drop the last frame, i.e., phi2
     state.frames.pop_back();
 
-    // TODO COLLECT THE OBJECTS
     // ιs = σ₁.objects(ϕ₂.regions) if ϕ₁.regions ≠ ϕ₂.regions
     // ∅ otherwise
     // σ₂\ιs
-    // TODO i don't get it, we remove the objects with the same regions as phi2?
+    if (!samereg) {
+      List<ObjectId> ls = getObjectsInRegions(state, phi2->regions);
+      for (auto l: ls) {
+        state.objects.erase(l);
+      }
+    }
+    state.exec_state = {phi2->continuations, 0};
   }
 
   // Unset the success flag.
@@ -642,6 +656,7 @@ end:
   // σ, release x; e* → σ, e*
   void Interpreter::evalRelease(verona::ir::Release& node) {
     //TODO ???
+    //It's a decref basically
   }
 
   // TODO: fulfill the promise
@@ -649,6 +664,7 @@ end:
   // σ, fulfill x → σ, ∅
   void Interpreter::evalFulfill(verona::ir::Fulfill& node) {
     //TODO ???
+    //It's an incref basically
   }
 
   // Destroy a region and freeze all objects that were in it.
@@ -667,7 +683,7 @@ end:
     assert(target->obj->debug_is_iso());
     
     //rt::Object* res = rt::api::freeze(target);
-    //TODO THE HELL IS V?
+    //TODO THE HELL IS V? Should be l
   }
   void Interpreter::evalMerge(verona::ir::Merge& node) {
     assert(node.left.size() == 1);

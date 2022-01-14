@@ -19,8 +19,10 @@ bool live(State& state, ir::List<ir::ID> args);
 
 // norepeat(x*) = (|x*| = |dom(x*)|)
 bool norepeat(ir::List<ir::ID> args);
+bool norepeat2(ir::List<ir::ID> first, ir::Node<ir::ID> extras...);
 
 bool sameRegions(List<rt::Region*> r1, List<rt::Region*> r2);
+List<ObjectId> getObjectsInRegions(State& state, List<rt::Region*> regions);
 
 bool isIsoOrImm(State& state, Shared<ir::Value> value);
 
