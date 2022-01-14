@@ -95,7 +95,8 @@ namespace verona::interop
               "/usr/include/",
               "-I",
               "/usr/local/include/",
-              "-std=gnu++17"};
+              "-Wno-invalid-constexpr",
+              "-v"};
       // Add user include paths
       for (auto& dir : includePath)
       {
@@ -151,6 +152,9 @@ namespace verona::interop
         false);
       Clang->setPreprocessor(PreprocessorPtr);
       Clang->getPreprocessor().enableIncrementalProcessing();
+
+      // Process the diagnostic options.
+      clang::ProcessWarningOptions(Clang->getDiagnostics(), Clang->getDiagnosticOpts(), true);
     }
 
     /**

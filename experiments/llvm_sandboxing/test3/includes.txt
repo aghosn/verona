@@ -1,3 +1,6 @@
-/usr/lib/clang/11/include/
-
+/home/aghosn/Documents/Programs/MSR/LLVM/llvm_dbg_install/lib/clang/13.0.0/include
+/../lib/gcc/x86_64-linux-gnu/10/../../../../include/c++/10
+/../lib/gcc/x86_64-linux-gnu/10/../../../../include/x86_64-linux-gnu/c++/10
+/../lib/gcc/x86_64-linux-gnu/10/../../../../include/c++/10/backward
+/usr/include/x86_64-linux-gnu
 
