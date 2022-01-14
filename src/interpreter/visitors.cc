@@ -469,20 +469,11 @@ end:
     // iso(σ, ι)
     assert(l->obj->debug_is_iso() && "z must reference an iso object");
 
-    // σ₂, e₂* = newframe(σ₁, ρ, x*, y, (z; z*), (unpin(σ₁, z*); e₁*))
-    Shared<Frame> frame = make_shared<Frame>();
-    // TODO regions 
-    // Is it all from the last frame + all from l?
-
-    // [λ.args↦σ(z*)]
-    for (int i = 0; i < node.args.size();i++) {
-      auto name = yfunc->args[i]->name;
-      auto value = state.frameLookup(node.args[i]->name);
-      frame->lookup[name] = value;
-    }
-    
-    // TODO unpin
-    // TODO continuation and ret? 
+    // TODO (unpin(σ₁, z*))
+    auto conts = state.exec_state.getContinuation();
+    auto expr2 = newframe(state, regions, node.left,
+        node.function, node.args, conts);
+    state.exec_state = {expr2, 0};
   } 
 
   // Create a new heap region.
@@ -510,20 +501,12 @@ end:
     // σ₁[ρ↦Σ]
     state.regions[region] = node.strategy;
 
-    Shared<Frame> frame = make_shared<Frame>();
-    // TODO regions 
-    // (ϕ*; ϕ₁\{y, z*}; ϕ₂)
-    // TODO
-    //(unpin(σ₁, z*)
-
-    // [λ.args↦σ(z*)]
-    for (int i = 0; i < node.args.size();i++) {
-      auto name = yfunc->args[i]->name;
-      auto value = state.frameLookup(node.args[i]->name);
-      frame->lookup[name] = value;
-    }
-    //TODO same as a call, change instruction and ret + cont
-    //TODO probably factor that part out once I am sure I do newframe correctly.
+    auto conts = state.exec_state.getContinuation();
+    List<rt::Region*> p;
+    p.push_back(region);
+    //TODO do: unpin(σ₁, z*) 
+    auto expr2 = newframe(state, p, node.left, node.function, node.args, conts);
+    state.exec_state = {expr2, 0};
   }
 
   // live(σ₁, x; y; z; y*)
