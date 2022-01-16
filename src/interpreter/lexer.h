@@ -39,6 +39,7 @@ namespace mlexer
     Fulfill,
     Freeze,
     Merge,
+    Function,
 
     // Builtin symbols
     Dot,
@@ -47,6 +48,8 @@ namespace mlexer
     RParen,
     Equals,
     SemiColon,
+    LBracket,
+    RBracket,
 
     // Special End symbol
     Eof,

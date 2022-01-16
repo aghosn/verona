@@ -117,6 +117,16 @@ namespace verona::ir
         return fulfill;
       }
         assert(0);
+      case TokenKind::Function:
+      {
+        auto function = make_shared<Function>();
+        auto apply = parseApply();
+        function->function = apply.first;
+        function->args = apply.second;
+        function->exprs = parseBlock();
+        return function;
+      }
+      assert(0);
       default:
         // No match
         assert(0);
@@ -376,12 +386,30 @@ namespace verona::ir
     return id;
   }
 
+  List<Expr> Parser::parseBlock() {
+    List<Expr> body;
+    dropExpected(TokenKind::LBracket); 
+    parseEOL();
+    while(lexer.peek().kind != TokenKind::RBracket) {
+      body.push_back(parseStatement());
+    }
+    assert(lexer.peek().kind == TokenKind::RBracket);
+    dropExpected(TokenKind::RBracket);
+    parseEOL();
+    return body;
+  }
+
   bool Parser::parse()
   {
     while (lexer.hasNext())
     {
       auto statement = parseStatement();
-      program.push_back(statement);
+      if (statement.kind() == Kind::Function) {
+        functions.push_back(statement);
+      } else {
+        //TODO not even sure this should be possible.
+        program.push_back(statement);
+      }
     }
 
     return true;

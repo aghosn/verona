@@ -549,9 +549,8 @@ namespace verona::ir
     }
   };
 
-  struct Function : Value, Member
+  struct Function : Value, Apply, Member 
   {
-    List<ID> args;
     List<Expr> exprs;
 
     Kind kind() override

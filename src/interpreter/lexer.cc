@@ -50,6 +50,7 @@ namespace mlexer
     {std::string("fulfill"), TokenKind::Fulfill},
     {std::string("freeze"), TokenKind::Freeze},
     {std::string("merge"), TokenKind::Merge},
+    {std::string("fn"), TokenKind::Function},
   };
 
   std::map<std::string, TokenKind> builtins = {
@@ -59,6 +60,8 @@ namespace mlexer
     {std::string(")"), RParen},
     {std::string("="), Equals},
     {std::string(";"), SemiColon},
+    {std::string("{"), LBracket},
+    {std::string("}"), RBracket},
   };
 
   Lexer::Lexer(std::string path) : file(path), la(0), pos(0)
@@ -266,6 +269,8 @@ namespace mlexer
         return "freeze";
       case TokenKind::Merge:
         return "merge";
+      case TokenKind::Function:
+        return "fn";
       case TokenKind::Dot:
         return ".";
       case TokenKind::Comma:
@@ -278,6 +283,10 @@ namespace mlexer
         return "=";
       case TokenKind::SemiColon:
         return ";\n";
+      case TokenKind::LBracket:
+        return "{";
+      case TokenKind::RBracket:
+        return "}";
       default:
         assert(0);
     }
