@@ -127,6 +127,11 @@ namespace verona::ir
         return function;
       }
       assert(0);
+      case TokenKind::Class:
+      {
+        auto classdecl = make_shared<Class>();
+      }
+      assert(0);
       default:
         // No match
         assert(0);
@@ -404,8 +409,9 @@ namespace verona::ir
     while (lexer.hasNext())
     {
       auto statement = parseStatement();
-      if (statement.kind() == Kind::Function) {
-        functions.push_back(statement);
+      if (statement->kind() == Kind::Function) {
+        auto func = dynamic_pointer_cast<Function>(statement);
+        functions.push_back(func);
       } else {
         //TODO not even sure this should be possible.
         program.push_back(statement);

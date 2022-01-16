@@ -525,14 +525,6 @@ namespace verona::ir
     }
   };
 
-  struct Class : Interface
-  {
-    Kind kind() override
-    {
-      return Kind::Class;
-    }
-  };
-
   // store T
   struct StoreType : Type
   {};
@@ -540,6 +532,14 @@ namespace verona::ir
   // ClassID
   struct ClassID : TypeId
   {};
+
+  struct Class : Interface, ClassID
+  {
+    Kind kind() override
+    {
+      return Kind::Class;
+    }
+  };
 
   struct ObjectID : Value, Identifier
   {

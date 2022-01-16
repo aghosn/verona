@@ -40,6 +40,7 @@ namespace mlexer
     Freeze,
     Merge,
     Function,
+    Class,
 
     // Builtin symbols
     Dot,

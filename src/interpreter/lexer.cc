@@ -51,6 +51,7 @@ namespace mlexer
     {std::string("freeze"), TokenKind::Freeze},
     {std::string("merge"), TokenKind::Merge},
     {std::string("fn"), TokenKind::Function},
+    {std::string("class"), TokenKind::Class},
   };
 
   std::map<std::string, TokenKind> builtins = {
@@ -271,6 +272,8 @@ namespace mlexer
         return "merge";
       case TokenKind::Function:
         return "fn";
+      case TokenKind::Class:
+        return "class";
       case TokenKind::Dot:
         return ".";
       case TokenKind::Comma:
