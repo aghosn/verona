@@ -49,6 +49,7 @@ namespace verona::ir
     UnionType,
     IsectType,
     TupleType,
+    StoreMod,
     Class,
 
     // Members
@@ -493,7 +494,8 @@ namespace verona::ir
 
   struct TypeOp: TypeRef
   {
-    List<TypeRef> types;
+    Node<TypeRef> left;
+    Node<TypeRef> right;
   };
 
   struct UnionType : TypeOp
@@ -520,7 +522,13 @@ namespace verona::ir
 
   // store T
   struct StoreType : TypeRef
-  {};
+  {
+    Node<TypeRef> type;
+    Kind kind() override
+    {
+      return Kind::StoreMod;
+    }
+  };
 
   struct ClassID: TypeId
   {};

@@ -25,7 +25,8 @@ namespace verona::ir
     List<Expr> parseBlock();
     Map<Id, Member> parseMembers(); 
     Node<Field> parseField();
-    Node<Type> parseType();
+    Node<TypeRef> parseTypeRef();
+    Node<TypeRef> parseTypeOp();
     List<ID> parseListUntil(mlexer::TokenKind k);
     Node<Assign> parseRight(List<ID> left);
     std::pair<Node<ID>, List<ID>> parseApply();

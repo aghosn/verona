@@ -64,6 +64,8 @@ namespace mlexer
     {std::string(";"), SemiColon},
     {std::string("{"), LBracket},
     {std::string("}"), RBracket},
+    {std::string("|"), Pipe},
+    {std::string("&"), And},
   };
 
   Lexer::Lexer(std::string path) : file(path), la(0), pos(0)
@@ -293,6 +295,10 @@ namespace mlexer
         return "{";
       case TokenKind::RBracket:
         return "}";
+      case TokenKind::Pipe:
+        return "|";
+      case TokenKind::And:
+        return "&";
       default:
         assert(0);
     }

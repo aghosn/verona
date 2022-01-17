@@ -126,13 +126,15 @@ namespace verona::ir
       {
         auto classdecl = make_shared<Class>();
         classdecl->id = dynamic_pointer_cast<ClassID>(parseIdentifier());
-        //TODO parse type
         classdecl->members = parseMembers();
+        dropExpected(TokenKind::RBracket);
+        parseEOL();
         return classdecl;
       }
       assert(0);
       default:
         // No match
+        std::cerr << "Unrecognized kind " << t.kind << std::endl; 
         assert(0);
     }
     return nullptr;
@@ -428,6 +430,7 @@ namespace verona::ir
           assert(0);
         case TokenKind::Function:
           {
+            dropExpected(TokenKind::Function);
             auto function = parseFunction();
             members[function->function->name] = function;
             break;
@@ -446,12 +449,12 @@ namespace verona::ir
     auto field = make_shared<Field>();
     field->id = parseIdentifier();
     dropExpected(TokenKind::Colon);
-    field->type = parseType();
+    field->type = parseTypeRef();
     parseEOL();
     return field;
   }
 
-  Node<Type> Parser::parseType()
+  Node<TypeRef> Parser::parseTypeRef()
   {
     auto t = lexer.peek();
     switch(t.kind)
@@ -469,10 +472,84 @@ namespace verona::ir
       case TokenKind::Identifier:
         return dynamic_pointer_cast<ClassID>(parseIdentifier());
       case TokenKind::LParen:
-      defautl:
+        return parseTypeOp();
+      case TokenKind::RParen:
+        return nullptr;
+      // The left side has been parsed.
+      case TokenKind::Comma:
+        {
+          auto tuple = make_shared<TupleType>();
+          dropExpected(TokenKind::Comma);
+          tuple->right = parseTypeRef();
+          return tuple;
+        }
         assert(0);
+      case TokenKind::Pipe:
+        {
+          auto pipe = make_shared<UnionType>();
+          dropExpected(TokenKind::Pipe);
+          pipe->right = parseTypeRef();
+          return pipe;
+        }
+        assert(0);
+      case TokenKind::And:
+        {
+          auto uni = make_shared<IsectType>();
+          dropExpected(TokenKind::And);
+          uni->right = parseTypeRef();
+          return uni;
+        }
+        assert(0);
+      case TokenKind::Store:
+        {
+          auto store = make_shared<StoreType>();
+          dropExpected(TokenKind::Store);
+          store->type = parseTypeRef();
+          return store; 
+        }
+        assert(0);
+      default:
+        assert(0 && "Unknown type construct");
     }
     return nullptr;
+  }
+
+  Node<TypeRef> Parser::parseTypeOp() {
+    auto t = lexer.peek();
+    assert(t.kind == TokenKind::LParen);
+    dropExpected(TokenKind::LParen);
+    Node<TypeRef> left = nullptr;
+    while(lexer.peek().kind != TokenKind::RParen)
+    {
+      auto type = parseTypeRef();
+      assert(type != nullptr); 
+
+      if (left == nullptr) {
+        left = type;
+        continue;
+      }
+
+      assert(left != nullptr);
+      switch(type->kind())
+      {
+        case Kind::TupleType:
+        case Kind::UnionType:
+        case Kind::IsectType:
+          { 
+            auto typeop = dynamic_pointer_cast<TypeOp>(type);
+            assert(typeop->left = nullptr);
+            typeop->left = left;
+            left = type;
+            break;
+          }
+          assert(0);
+        default:
+          assert(0 && "This should not happen");
+      }
+    }
+    assert(lexer.peek().kind == TokenKind::RParen);
+    dropExpected(TokenKind::RParen);
+    return left;
   }
 
 

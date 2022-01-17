@@ -52,6 +52,8 @@ namespace mlexer
     SemiColon,
     LBracket,
     RBracket,
+    Pipe,
+    And,
 
     // Special End symbol
     Eof,

@@ -18,6 +18,11 @@ namespace mlexer::helpers
     '(',
     ')',
     '=',
+    ':',
+    '{',
+    '}',
+    '|',
+    '&',
   };
 
   bool isDelimiter(char c)
