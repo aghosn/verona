@@ -59,7 +59,7 @@ namespace verona::ir
       case TokenKind::Branch:
       {
         auto branch = make_shared<Branch>();
-        branch->condition = parseIdentifier();
+        branch->condition = parseIdentifier<ID>();
 
         // First branch
         branch->branch1 = make_shared<Apply>();
@@ -95,7 +95,7 @@ namespace verona::ir
       case TokenKind::Acquire:
       {
         auto acquire = make_shared<Acquire>();
-        acquire->target = parseIdentifier();
+        acquire->target = parseIdentifier<ID>();
         parseEOL();
         return acquire;
       }
@@ -104,7 +104,7 @@ namespace verona::ir
       {
         auto release = make_shared<Release>();
         // TODO handle the value case
-        release->target = parseIdentifier();
+        release->target = parseIdentifier<ID>();
         parseEOL();
         return release;
       }
@@ -112,7 +112,7 @@ namespace verona::ir
       case TokenKind::Fulfill:
       {
         auto fulfill = make_shared<Fulfill>();
-        fulfill->target = parseIdentifier();
+        fulfill->target = parseIdentifier<ID>();
         parseEOL();
         return fulfill;
       }
@@ -125,7 +125,7 @@ namespace verona::ir
       case TokenKind::Class:
       {
         auto classdecl = make_shared<Class>();
-        classdecl->id = dynamic_pointer_cast<ClassID>(parseIdentifier());
+        classdecl->id = parseIdentifier<ClassID>();
         classdecl->members = parseMembers();
         dropExpected(TokenKind::RBracket);
         parseEOL();
@@ -167,18 +167,19 @@ namespace verona::ir
         continue;
       }
       id = false;
-      result.push_back(parseIdentifier());
+      result.push_back(parseIdentifier<ID>());
     }
     return result;
   }
 
-  Node<ID> Parser::parseIdentifier()
+  template<typename T>
+  Node<T> Parser::parseIdentifier()
   {
     assert(lexer.hasNext());
     Token t = lexer.peek();
     assert(t.kind == TokenKind::Identifier);
     lexer.next();
-    auto id = make_shared<ID>();
+    auto id = make_shared<T>();
     id->name = t.text;
     return id;
   }
@@ -186,14 +187,14 @@ namespace verona::ir
   Node<StorageLoc> Parser::parseStorageLoc()
   {
     assert(lexer.hasNext());
-    auto oid = parseIdentifier();
+    auto oid = parseIdentifier<ID>();
     
     // parse the dot
     assert(lexer.hasNext());
     Token t = lexer.peek();
     assert(t.kind == TokenKind::Dot);
     lexer.next();
-    auto id = parseIdentifier();
+    auto id = parseIdentifier<ID>();
     auto storage = make_shared<StorageLoc>();
     storage->objectid = oid;
     storage->id = id;
@@ -214,7 +215,7 @@ namespace verona::ir
 
   std::pair<Node<ID>, List<ID>> Parser::parseApply()
   {
-    auto function = parseIdentifier();
+    auto function = parseIdentifier<ID>();
     // TODO something for parentheses less ugly then that.
     auto t = lexer.next();
     assert(t.kind == TokenKind::LParen);
@@ -276,7 +277,7 @@ namespace verona::ir
       case TokenKind::Dup:
       {
         auto dup = make_shared<Dup>();
-        dup->y = parseIdentifier();
+        dup->y = parseIdentifier<ID>();
         dup->left = v;
         return dup;
       }
@@ -285,7 +286,7 @@ namespace verona::ir
       {
         auto load = make_shared<Load>();
         load->left = v;
-        load->source = parseIdentifier();
+        load->source = parseIdentifier<ID>();
         return load;
       }
         assert(0);
@@ -294,7 +295,7 @@ namespace verona::ir
         auto store = make_shared<Store>();
         store->left = v;
         store->y = parseStorageLoc();
-        store->z = parseIdentifier();
+        store->z = parseIdentifier<ID>();
         return store;
       }
         assert(0);
@@ -302,8 +303,8 @@ namespace verona::ir
       {
         auto lookup = make_shared<Lookup>();
         lookup->left = v;
-        lookup->y = parseIdentifier();
-        lookup->z = parseIdentifier();
+        lookup->y = parseIdentifier<ID>();
+        lookup->z = parseIdentifier<ID>();
         return lookup;
       }
         assert(0);
@@ -311,7 +312,7 @@ namespace verona::ir
       {
         auto tpetest = make_shared<Typetest>();
         tpetest->left = v;
-        tpetest->y = parseIdentifier();
+        tpetest->y = parseIdentifier<ID>();
         tpetest->type = parseTypeId();
         return tpetest;
       }
@@ -368,7 +369,7 @@ namespace verona::ir
       {
         auto freeze = make_shared<Freeze>();
         freeze->left = v;
-        freeze->target = parseIdentifier();
+        freeze->target = parseIdentifier<ID>();
         return freeze;
       }
         assert(0);
@@ -376,7 +377,7 @@ namespace verona::ir
       {
         auto merge = make_shared<Merge>();
         merge->left = v;
-        merge->target = parseIdentifier();
+        merge->target = parseIdentifier<ID>();
         return merge;
       }
         assert(0);
@@ -447,7 +448,7 @@ namespace verona::ir
   Node<Field> Parser::parseField()
   {
     auto field = make_shared<Field>();
-    field->id = parseIdentifier();
+    field->id = parseIdentifier<ID>();
     dropExpected(TokenKind::Colon);
     field->type = parseTypeRef();
     parseEOL();
@@ -457,31 +458,44 @@ namespace verona::ir
   Node<TypeRef> Parser::parseTypeRef()
   {
     auto t = lexer.peek();
+    Node<TypeRef> result = nullptr;
     switch(t.kind)
     {
       case TokenKind::Iso:
-        return make_shared<Iso>();
+        result = make_shared<Iso>();
+        break;
       case TokenKind::Mut:
-        return make_shared<Mut>();
+        result = make_shared<Mut>();
+        break;
       case TokenKind::Imm:
-        return make_shared<Imm>();
+        result = make_shared<Imm>();
+        break;
       case TokenKind::Paused:
-        return make_shared<Paused>();
+        result = make_shared<Paused>();
+        break;
       case TokenKind::Stack:
-        return make_shared<Stack>();
+        result = make_shared<Stack>();
+        break;
       case TokenKind::Identifier:
-        return dynamic_pointer_cast<ClassID>(parseIdentifier());
+        {
+          result = parseIdentifier<TypeId>();
+          assert(result != nullptr);
+          break;
+        }
       case TokenKind::LParen:
-        return parseTypeOp();
+        result = parseTypeOp();
+        break;
       case TokenKind::RParen:
-        return nullptr;
+        assert(0 && "We hit that");
+        break;
       // The left side has been parsed.
       case TokenKind::Comma:
         {
           auto tuple = make_shared<TupleType>();
           dropExpected(TokenKind::Comma);
           tuple->right = parseTypeRef();
-          return tuple;
+          result = tuple;
+          break;
         }
         assert(0);
       case TokenKind::Pipe:
@@ -489,7 +503,8 @@ namespace verona::ir
           auto pipe = make_shared<UnionType>();
           dropExpected(TokenKind::Pipe);
           pipe->right = parseTypeRef();
-          return pipe;
+          result = pipe;
+          break;
         }
         assert(0);
       case TokenKind::And:
@@ -497,7 +512,8 @@ namespace verona::ir
           auto uni = make_shared<IsectType>();
           dropExpected(TokenKind::And);
           uni->right = parseTypeRef();
-          return uni;
+          result = uni;
+          break;
         }
         assert(0);
       case TokenKind::Store:
@@ -505,13 +521,15 @@ namespace verona::ir
           auto store = make_shared<StoreType>();
           dropExpected(TokenKind::Store);
           store->type = parseTypeRef();
-          return store; 
+          result = store;
+          break;
         }
         assert(0);
       default:
         assert(0 && "Unknown type construct");
     }
-    return nullptr;
+    assert(result != nullptr);
+    return result;
   }
 
   Node<TypeRef> Parser::parseTypeOp() {
@@ -537,7 +555,7 @@ namespace verona::ir
         case Kind::IsectType:
           { 
             auto typeop = dynamic_pointer_cast<TypeOp>(type);
-            assert(typeop->left = nullptr);
+            assert(typeop->left == nullptr);
             typeop->left = left;
             left = type;
             break;
