@@ -48,6 +48,7 @@ namespace mlexer
     LParen,
     RParen,
     Equals,
+    Colon,
     SemiColon,
     LBracket,
     RBracket,

@@ -49,8 +49,10 @@ namespace verona::ir
     UnionType,
     IsectType,
     TupleType,
-    Interface,
     Class,
+
+    // Members
+    Field,
 
     // Constant
     True,
@@ -76,10 +78,11 @@ namespace verona::ir
   using List = std::vector<Node<T>>;
 
   template<typename T, typename Y>
-  using Map = std::map<Node<T>, Node<Y>>;
+  using Map = std::map<T, Node<Y>>;
 
   using Ast = Node<NodeDef>;
   using AstPath = List<NodeDef>;
+  using Id = std::string;
 
   /**
    * A visitor for Nodes
@@ -155,7 +158,12 @@ namespace verona::ir
     }
   };
 
-  struct TypeId : Identifier
+  struct Type
+  {};
+  struct TypeRef : NodeDef, Type
+  {};
+
+  struct TypeId : Identifier, TypeRef 
   {
     Kind kind() override
     {
@@ -274,7 +282,7 @@ namespace verona::ir
     }
   };
 
-  // stack Type
+  // stack allocation 
   struct StackAlloc : Assign
   {
     Node<TypeId> type;
@@ -308,14 +316,6 @@ namespace verona::ir
     {
       return Kind::Tailcall;
     }
-  };
-
-  /**
-   * Scope, several lines of Expression
-   */
-  struct Scope : Expr
-  {
-    List<Expr> code;
   };
 
   // region y(z, z*) TODO(aghosn) not sure I understand this.
@@ -445,41 +445,39 @@ namespace verona::ir
    * Types
    */
 
-  struct Type : NodeDef
-  {
-    List<TypeId> typeids;
-    Map<ID, Member> members;
-  };
-
-  struct Iso : Type
+  struct Iso : TypeRef
   {
     Kind kind() override
     {
       return Kind::Iso;
     }
   };
-  struct Mut : Type
+
+  struct Mut : TypeRef
   {
     Kind kind() override
     {
       return Kind::Mut;
     }
   };
-  struct Imm : Type
+
+  struct Imm : TypeRef
   {
     Kind kind() override
     {
       return Kind::Imm;
     }
   };
-  struct Paused : Type
+
+  struct Paused : TypeRef
   {
     Kind kind() override
     {
       return Kind::Paused;
     }
   };
-  struct Stack : Type
+
+  struct Stack : TypeRef
   {
     Kind kind() override
     {
@@ -487,9 +485,15 @@ namespace verona::ir
     }
   };
 
-  struct TypeOp : Type
+  struct TypeDecl : NodeDef, Type
   {
-    List<Type> types;
+    List<TypeId> typeids;
+    Map<Id, Member> members;
+  };
+
+  struct TypeOp: TypeRef
+  {
+    List<TypeRef> types;
   };
 
   struct UnionType : TypeOp
@@ -514,30 +518,30 @@ namespace verona::ir
     }
   };
 
-  //{f: T}-> structural interface, f has member of type T
-  struct Interface : Type
-  {
-    List<Member> members;
-
-    Kind kind() override
-    {
-      return Kind::Interface;
-    }
-  };
-
   // store T
-  struct StoreType : Type
+  struct StoreType : TypeRef
   {};
 
-  // ClassID
-  struct ClassID : TypeId
+  struct ClassID: TypeId
   {};
 
-  struct Class : Interface, ClassID
+  struct Class : TypeDecl, Expr
   {
+    Node<ClassID> id;
     Kind kind() override
     {
       return Kind::Class;
+    }
+  };
+  // Class member field
+  struct Field: Member
+  {
+    Node<ID> id;
+    Node<Type> type;
+    
+    Kind kind() override
+    {
+      return Kind::Field;
     }
   };
 

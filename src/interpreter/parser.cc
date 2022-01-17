@@ -119,17 +119,16 @@ namespace verona::ir
         assert(0);
       case TokenKind::Function:
       {
-        auto function = make_shared<Function>();
-        auto apply = parseApply();
-        function->function = apply.first;
-        function->args = apply.second;
-        function->exprs = parseBlock();
-        return function;
+        return parseFunction();
       }
       assert(0);
       case TokenKind::Class:
       {
         auto classdecl = make_shared<Class>();
+        classdecl->id = dynamic_pointer_cast<ClassID>(parseIdentifier());
+        //TODO parse type
+        classdecl->members = parseMembers();
+        return classdecl;
       }
       assert(0);
       default:
@@ -137,6 +136,15 @@ namespace verona::ir
         assert(0);
     }
     return nullptr;
+  } 
+
+  Node<Function> Parser::parseFunction() {
+    auto function = make_shared<Function>();
+    auto apply = parseApply();
+    function->function = apply.first;
+    function->args = apply.second;
+    function->exprs = parseBlock();
+    return function;
   }
 
   List<ID> Parser::parseListUntil(TokenKind k)
@@ -403,6 +411,70 @@ namespace verona::ir
     parseEOL();
     return body;
   }
+
+  Map<Id, Member> Parser::parseMembers() {
+    Map<Id, Member> members;
+    dropExpected(TokenKind::LBracket);
+    parseEOL();
+    while(lexer.peek().kind != TokenKind::RBracket) {
+      auto t = lexer.peek();
+      switch(t.kind) {
+        case TokenKind::Identifier:
+          {
+            auto field = parseField();
+            members[field->id->name]= field;
+            break;
+          }
+          assert(0);
+        case TokenKind::Function:
+          {
+            auto function = parseFunction();
+            members[function->function->name] = function;
+            break;
+          }
+          assert(0);
+        default:
+          assert(0 && "Invalid token in members");
+      }
+    }
+    return members;
+  }
+
+  //TODO correct this, it should be {f: T}
+  Node<Field> Parser::parseField()
+  {
+    auto field = make_shared<Field>();
+    field->id = parseIdentifier();
+    dropExpected(TokenKind::Colon);
+    field->type = parseType();
+    parseEOL();
+    return field;
+  }
+
+  Node<Type> Parser::parseType()
+  {
+    auto t = lexer.peek();
+    switch(t.kind)
+    {
+      case TokenKind::Iso:
+        return make_shared<Iso>();
+      case TokenKind::Mut:
+        return make_shared<Mut>();
+      case TokenKind::Imm:
+        return make_shared<Imm>();
+      case TokenKind::Paused:
+        return make_shared<Paused>();
+      case TokenKind::Stack:
+        return make_shared<Stack>();
+      case TokenKind::Identifier:
+        return dynamic_pointer_cast<ClassID>(parseIdentifier());
+      case TokenKind::LParen:
+      defautl:
+        assert(0);
+    }
+    return nullptr;
+  }
+
 
   bool Parser::parse()
   {

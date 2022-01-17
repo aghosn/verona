@@ -60,6 +60,7 @@ namespace mlexer
     {std::string("("), LParen},
     {std::string(")"), RParen},
     {std::string("="), Equals},
+    {std::string(":"), Colon},
     {std::string(";"), SemiColon},
     {std::string("{"), LBracket},
     {std::string("}"), RBracket},
@@ -284,6 +285,8 @@ namespace mlexer
         return ")";
       case TokenKind::Equals:
         return "=";
+      case TokenKind::Colon:
+        return ":";
       case TokenKind::SemiColon:
         return ";\n";
       case TokenKind::LBracket:

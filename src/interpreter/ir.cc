@@ -76,8 +76,8 @@ namespace verona::ir
         return "IsectType";
       case Kind::TupleType:
         return "TupleType";
-      case Kind::Interface:
-        return "Interface";
+      case Kind::Field:
+        return "Field";
       case Kind::Class:
         return "Class";
       case Kind::True:
