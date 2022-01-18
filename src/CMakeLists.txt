@@ -70,7 +70,7 @@ add_subdirectory(parser)
 add_subdirectory(deprecated)
 add_subdirectory(mlir)
 add_subdirectory(interop)
-add_subdirectory(interpreter)
+add_subdirectory(opsem-interpreter)
 
 install(CODE [[
   file(REMOVE_RECURSE ${CMAKE_INSTALL_PREFIX})
