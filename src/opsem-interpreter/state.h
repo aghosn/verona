@@ -53,10 +53,12 @@ namespace interpreter
     }
   };
 
+  // ExecState represents the current program pointer.
+  // We use an int so that we can encode special values as negative numbers.
   struct ExecState
   {
     ir::List<ir::Expr> exprs;
-    uint32_t offset;
+    int64_t offset;
 
     ir::List<ir::Expr> getContinuation()
     {

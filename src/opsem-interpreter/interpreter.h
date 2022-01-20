@@ -12,6 +12,8 @@ namespace interpreter {
   class Interpreter: public ir::Visitor {
     public:
       Interpreter(ir::Parser parser);
+      void evalOneStep();
+      void eval();
       void visit(ir::NodeDef* node);
     private:
       State state;

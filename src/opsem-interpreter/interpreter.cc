@@ -11,15 +11,36 @@
 namespace interpreter {
 
   static const char* ENTRY_POINT = "main";
+  static const int64_t _PC_RESET = -1;
+  static const int64_t _PC_START = 0;
 
 Interpreter::Interpreter(ir::Parser parser) {
   state.init(parser.classes, parser.functions);
   //TODO set up the entry point?
   if (state.isFunction(ENTRY_POINT)) {
     auto entry = state.getFunction(ENTRY_POINT);
-    state.exec_state = {entry->exprs, 0};
+    state.exec_state = {entry->exprs, _PC_START};
   }
 }
+
+  void Interpreter::evalOneStep() {
+    // TODO Safety checks, we'll see if we keep or replace them. 
+    assert(state.exec_state.exprs.size() > 0 && "No expressions"); 
+    assert(state.exec_state.offset >= 0 && "Invalid PC offset");
+    assert(state.exec_state.offset < state.exec_state.exprs.size());
+
+    auto pc = state.exec_state.offset;
+    auto instr = state.exec_state.exprs[pc];
+    // TODO register some debugging information with the above.
+    instr->accept(this);
+
+    // increase pc 
+    state.exec_state.offset++;
+  }
+
+  void Interpreter::eval() {
+
+  }
 
   void Interpreter::visit(ir::NodeDef* node)
   {
@@ -398,7 +419,7 @@ end:
     List<rt::Region*> p;
     auto expr2 = newframe(state, p, node.left, 
         node.function, node.args, conts);
-    state.exec_state = {expr2, 0};
+    state.exec_state = {expr2, _PC_RESET};
   }
 
   // Reuse the current frame.
@@ -425,7 +446,7 @@ end:
     } 
 
     // λ.expr
-    state.exec_state = {lambda->exprs, 0}; 
+    state.exec_state = {lambda->exprs, _PC_RESET}; 
   }
 
   // Push a new frame with the specified heap region.
@@ -470,7 +491,7 @@ end:
     auto conts = state.exec_state.getContinuation();
     auto expr2 = newframe(state, regions, node.left,
         node.function, node.args, conts);
-    state.exec_state = {expr2, 0};
+    state.exec_state = {expr2, _PC_RESET};
   } 
 
   // Create a new heap region.
@@ -500,7 +521,7 @@ end:
     p.push_back(region);
     //TODO do: unpin(σ₁, z*) 
     auto expr2 = newframe(state, p, node.left, node.function, node.args, conts);
-    state.exec_state = {expr2, 0};
+    state.exec_state = {expr2, _PC_RESET};
   }
 
   // live(σ₁, x; y; z; y*)
@@ -547,10 +568,10 @@ end:
     if (condition) {
       // TODO how do you get back to previous continuation?
       // i.e., if there is code after the branch
-      state.exec_state = {yfunc->exprs, 0};
+      state.exec_state = {yfunc->exprs, _PC_RESET};
       return;
     } 
-    state.exec_state = {zfunc->exprs, 0};
+    state.exec_state = {zfunc->exprs, _PC_RESET};
   }
 
   // Pop the current frame.
@@ -596,7 +617,7 @@ end:
         state.objects.erase(l);
       }
     }
-    state.exec_state = {phi2->continuations, 0};
+    state.exec_state = {phi2->continuations, _PC_RESET};
   }
 
   // Unset the success flag.
