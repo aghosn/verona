@@ -12,7 +12,8 @@ set(ALL_SOURCE_FILES
   helpers.cc
   visitors.cc
   object.cc
-  notation.cc)
+  notation.cc
+  interpreter.cc)
 
 add_executable(opsem-interpreter 
   ${ALL_SOURCE_FILES})

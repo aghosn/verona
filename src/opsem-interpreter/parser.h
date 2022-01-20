@@ -17,8 +17,11 @@ namespace verona::ir
 
     Parser(mlexer::Lexer& lexer);
     ~Parser();
-
+    
+    // Parses the entire program.
     bool parse();
+
+    // Helpful functions called within the parser.
     void parseEOL();
     template<typename T>
     Node<T> parseIdentifier();

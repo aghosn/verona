@@ -89,10 +89,17 @@ namespace interpreter
 
     // TODO: figure out where to put the functions?
     // Constructor
-    void Init(ir::List<ir::Class> classes) {
+    void Init(ir::List<ir::Class> classes, ir::List<ir::Function> functions) {
       // Initialize the types.
       for (auto c: classes) {
         types[c->id->name] = c;
+      }
+      // Initial frame
+      Shared<Frame> frame = make_shared<Frame>();
+      // TODO what do we do with the initial region/frame?
+      frames.push_back(frame);
+      for (auto f: functions) {
+        frame->lookup[f->function->name] = f;
       }
     }
     
