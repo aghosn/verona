@@ -1,6 +1,6 @@
 #pragma once
-#include "utils.h"
 #include "state.h"
+#include "utils.h"
 
 namespace interpreter
 {

@@ -4,8 +4,8 @@
 #include "type.h"
 #include "utils.h"
 
-#include <map>
 #include <cassert>
+#include <map>
 #include <utility>
 #include <vector>
 #include <verona.h>
@@ -100,10 +100,12 @@ namespace interpreter
     // Constructor
     void init(ir::List<ir::Class> classes, ir::List<ir::Function> functions)
     {
-      for (auto c: classes) {
+      for (auto c : classes)
+      {
         program.types[c->id->name] = c;
       }
-      for (auto f: functions) {
+      for (auto f : functions)
+      {
         program.functions[f->function->name] = f;
       }
     }
