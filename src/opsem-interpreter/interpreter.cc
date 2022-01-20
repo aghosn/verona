@@ -10,8 +10,13 @@
 
 namespace interpreter {
 
-Interpreter::Interpreter(ir::Parser parser) {}
+  static const char* ENTRY_POINT = "main";
 
+Interpreter::Interpreter(ir::Parser parser) {
+  state.init(parser.classes, parser.functions);
+  //TODO set up the entry point?
+  assert(state.getFunction(ENTRY_POINT) != nullptr);
+}
 
   void Interpreter::visit(ir::NodeDef* node)
   {

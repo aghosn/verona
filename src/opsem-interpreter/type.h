@@ -4,6 +4,7 @@
 
 using TypeId = std::string;
 
-namespace interpreter {
+namespace interpreter
+{
   using Type = ir::TypeDecl;
-} //namespace interpreter
+} // namespace interpreter

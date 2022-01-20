@@ -164,7 +164,7 @@ namespace verona::ir
   struct TypeRef : NodeDef, Type
   {};
 
-  struct TypeId : Identifier, TypeRef 
+  struct TypeId : Identifier, TypeRef
   {
     Kind kind() override
     {
@@ -283,7 +283,7 @@ namespace verona::ir
     }
   };
 
-  // stack allocation 
+  // stack allocation
   struct StackAlloc : Assign
   {
     Node<TypeId> type;
@@ -492,7 +492,7 @@ namespace verona::ir
     Map<Id, Member> members;
   };
 
-  struct TypeOp: TypeRef
+  struct TypeOp : TypeRef
   {
     Node<TypeRef> left;
     Node<TypeRef> right;
@@ -530,7 +530,7 @@ namespace verona::ir
     }
   };
 
-  struct ClassID: TypeId
+  struct ClassID : TypeId
   {};
 
   struct Class : TypeDecl, Expr
@@ -542,11 +542,11 @@ namespace verona::ir
     }
   };
   // Class member field
-  struct Field: Member
+  struct Field : Member
   {
     Node<ID> id;
     Node<Type> type;
-    
+
     Kind kind() override
     {
       return Kind::Field;
@@ -561,7 +561,7 @@ namespace verona::ir
     }
   };
 
-  struct Function : Value, Apply, Member 
+  struct Function : Value, Apply, Member
   {
     List<Expr> exprs;
 
@@ -595,10 +595,10 @@ namespace verona::ir
     }
   };
 
-  //TODO add expressions for program, function, and type fields and methods.
-  //Program ::= x(y*): e*
+  // TODO add expressions for program, function, and type fields and methods.
+  // Program ::= x(y*): e*
   //        | type x: y* {(Method|Field)*}
-  //Method ::= fun x: y
-  //Field :: = x
+  // Method ::= fun x: y
+  // Field :: = x
 
 } // namespace verona::ir

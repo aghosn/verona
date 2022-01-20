@@ -17,7 +17,7 @@ namespace verona::ir
 
     Parser(mlexer::Lexer& lexer);
     ~Parser();
-    
+
     // Parses the entire program.
     bool parse();
 
@@ -28,7 +28,7 @@ namespace verona::ir
     Node<Expr> parseStatement();
     Node<Function> parseFunction();
     List<Expr> parseBlock();
-    Map<Id, Member> parseMembers(); 
+    Map<Id, Member> parseMembers();
     Node<Field> parseField();
     Node<TypeRef> parseTypeRef();
     Node<TypeRef> parseTypeOp();

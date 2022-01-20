@@ -1,13 +1,13 @@
 #pragma once
-#include <map>
-#include <vector>
-#include <utility>
-#include <verona.h>
-
 #include "ir.h"
-#include "type.h"
-#include "utils.h" 
 #include "object.h"
+#include "type.h"
+#include "utils.h"
+
+#include <map>
+#include <utility>
+#include <vector>
+#include <verona.h>
 
 using namespace std;
 
@@ -15,32 +15,36 @@ using ObjectId = string;
 
 namespace interpreter
 {
-
-  //TODO fix once I know how types are represented.
+  // TODO fix once I know how types are represented.
   typedef rt::Object TypeObj;
 
   // P ∈ Program ::= (Id → Function) × (TypeId → Type)
-  struct Program {
+  struct Program
+  {
     Map<Id, ir::Node<ir::Function>> functions;
     Map<TypeId, ir::Type> types;
   };
 
   // ϕ ∈ Frame ::= Region* × (Id → Value) × Id* × Expression*
-  struct Frame {
-    List<rt::Region*> regions; 
+  struct Frame
+  {
+    List<rt::Region*> regions;
     Map<Id, Shared<ir::Value>> lookup;
     List<Id> rets;
     List<Shared<ir::Expr>> continuations;
-    
-    bool containsName(Id name) {
-      if (!lookup.contains(name)) {
+
+    bool containsName(Id name)
+    {
+      if (!lookup.contains(name))
+      {
         return false;
       }
       auto value = lookup[name];
-      return (value->kind() == ir::Kind::Object); 
+      return (value->kind() == ir::Kind::Object);
     }
 
-    Shared<ir::Value> frameLookup(Id name) {
+    Shared<ir::Value> frameLookup(Id name)
+    {
       assert(lookup.contains(name));
       auto obj = lookup[name];
       assert(obj->kind() == ir::Kind::ObjectID);
@@ -48,14 +52,17 @@ namespace interpreter
     }
   };
 
-  struct ExecState {
+  struct ExecState
+  {
     ir::List<ir::Expr> exprs;
     uint32_t offset;
 
-    ir::List<ir::Expr> getContinuation() {
-      assert(offset < exprs.size()-1);
+    ir::List<ir::Expr> getContinuation()
+    {
+      assert(offset < exprs.size() - 1);
       ir::List<ir::Expr> cont;
-      for (int i = offset+1; i < exprs.size(); i++) {
+      for (int i = offset + 1; i < exprs.size(); i++)
+      {
         cont.push_back(exprs[i]);
       }
       return cont;
@@ -67,98 +74,113 @@ namespace interpreter
   //          × (StorageLoc → Value)
   //          × (Region → Strategy)
   //          × Bool
-  struct State {
+  struct State
+  {
     List<Shared<Frame>> frames;
-    
+
     // TODO not sure why this is needed.
     // This really needs to be an ObjectID
     Map<ObjectId, Shared<Object>> objects;
 
     Map<ObjectId, Map<Id, Shared<ir::Value>>> fields;
 
-    Map<rt::Region*, rt::RegionType> regions; 
+    Map<rt::Region*, rt::RegionType> regions;
 
-    //TODO figure out they have both in the rules
-    bool success; 
+    // TODO figure out they have both in the rules
+    bool success;
     bool except;
 
     // Execution state
     ExecState exec_state;
 
-    Map<TypeId, Shared<Type>> types; 
+    Map<TypeId, Shared<Type>> types;
 
     // TODO: figure out where to put the functions?
     // Constructor
-    void Init(ir::List<ir::Class> classes, ir::List<ir::Function> functions) {
+    void init(ir::List<ir::Class> classes, ir::List<ir::Function> functions)
+    {
       // Initialize the types.
-      for (auto c: classes) {
+      for (auto c : classes)
+      {
         types[c->id->name] = c;
       }
       // Initial frame
       Shared<Frame> frame = make_shared<Frame>();
       // TODO what do we do with the initial region/frame?
       frames.push_back(frame);
-      for (auto f: functions) {
+      for (auto f : functions)
+      {
         frame->lookup[f->function->name] = f;
       }
     }
-    
+
     // Checks wheter a name is defined in the current scope.
-    bool isDefinedInFrame(string name) {
+    bool isDefinedInFrame(string name)
+    {
       assert(frames.size() > 0);
       return frames.back()->containsName(name);
     }
 
-    void addObject(ObjectId oid, Shared<Object> obj) {
+    void addObject(ObjectId oid, Shared<Object> obj)
+    {
       objects[oid] = obj;
-    } 
+    }
 
-    Shared<ir::Value> frameLookup(Id name) {
+    Shared<ir::Value> frameLookup(Id name)
+    {
       assert(frames.size() > 0);
       return frames.back()->frameLookup(name);
-    } 
+    }
 
-    Shared<Object> getObjectByName(string name) {
+    Shared<Object> getObjectByName(string name)
+    {
       assert(frames.size() > 0);
       auto val = frames.back()->frameLookup(name);
       assert(val->kind() == ir::Kind::ObjectID && "Value is not an ObjectID");
       Shared<ir::ObjectID> objid = dynamic_pointer_cast<ir::ObjectID>(val);
-      
+
       assert(objects.contains(objid->name) && "Object does not exist");
-      
+
       return objects[objid->name];
     }
 
-    Shared<ir::Value> getValueByName(string name) {
+    Shared<ir::Value> getValueByName(string name)
+    {
       assert(frames.size() > 0);
       return frames.back()->frameLookup(name);
     }
 
-    void addInFrame(Id name, Shared<ir::Value> o) {
+    void addInFrame(Id name, Shared<ir::Value> o)
+    {
       assert(frames.size() > 0);
-      //TODO should we check if the name already exists?
-      frames.back()->lookup[name] = o; 
+      // TODO should we check if the name already exists?
+      frames.back()->lookup[name] = o;
     }
 
-    void removeFromFrame(Id name) {
+    void removeFromFrame(Id name)
+    {
       assert(frames.size() > 0);
       frames.back()->lookup.erase(name);
     }
 
-    bool containsType(TypeId name) {
+    bool containsType(TypeId name)
+    {
       return types.contains(name);
     }
 
-    Shared<Type> getTypeByName(TypeId name) {
+    Shared<Type> getTypeByName(TypeId name)
+    {
       return types[name];
     }
 
-    bool isFunction(Id name) {
+    bool isFunction(Id name)
+    {
       // TODO Implement
       return true;
     }
 
-    ir::Node<ir::Function> getFunction(Id name) {
+    ir::Node<ir::Function> getFunction(Id name)
+    {
       return nullptr;
     }
   };

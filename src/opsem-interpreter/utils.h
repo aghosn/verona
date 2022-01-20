@@ -1,11 +1,11 @@
 #pragma once
 
+#include "ir.h"
+
 #include <map>
 #include <memory>
 #include <vector>
 #include <verona.h>
-
-#include "ir.h"
 
 namespace rt = verona::rt;
 

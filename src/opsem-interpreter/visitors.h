@@ -12,5 +12,5 @@ namespace interpreter
   {
   public:
     void visit(verona::ir::NodeDef* node);
-  }; 
+  };
 } // namespace interpreter

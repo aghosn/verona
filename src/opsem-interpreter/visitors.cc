@@ -1,14 +1,12 @@
-#include "state.h"
-#include "notation.h"
 #include "visitors.h"
+
+#include "notation.h"
+#include "state.h"
 #include "utils.h"
 
 #include <cassert>
 #include <iostream>
 #include <verona.h>
-
-namespace ir = verona::ir;
-namespace rt = verona::rt;
 
 namespace interpreter
 {

@@ -121,7 +121,7 @@ namespace verona::ir
       {
         return parseFunction();
       }
-      assert(0);
+        assert(0);
       case TokenKind::Class:
       {
         auto classdecl = make_shared<Class>();
@@ -131,16 +131,17 @@ namespace verona::ir
         parseEOL();
         return classdecl;
       }
-      assert(0);
+        assert(0);
       default:
         // No match
-        std::cerr << "Unrecognized kind " << t.kind << std::endl; 
+        std::cerr << "Unrecognized kind " << t.kind << std::endl;
         assert(0);
     }
     return nullptr;
-  } 
+  }
 
-  Node<Function> Parser::parseFunction() {
+  Node<Function> Parser::parseFunction()
+  {
     auto function = make_shared<Function>();
     auto apply = parseApply();
     function->function = apply.first;
@@ -188,7 +189,7 @@ namespace verona::ir
   {
     assert(lexer.hasNext());
     auto oid = parseIdentifier<ID>();
-    
+
     // parse the dot
     assert(lexer.hasNext());
     Token t = lexer.peek();
@@ -402,11 +403,13 @@ namespace verona::ir
     return id;
   }
 
-  List<Expr> Parser::parseBlock() {
+  List<Expr> Parser::parseBlock()
+  {
     List<Expr> body;
-    dropExpected(TokenKind::LBracket); 
+    dropExpected(TokenKind::LBracket);
     parseEOL();
-    while(lexer.peek().kind != TokenKind::RBracket) {
+    while (lexer.peek().kind != TokenKind::RBracket)
+    {
       body.push_back(parseStatement());
     }
     assert(lexer.peek().kind == TokenKind::RBracket);
@@ -415,27 +418,30 @@ namespace verona::ir
     return body;
   }
 
-  Map<Id, Member> Parser::parseMembers() {
+  Map<Id, Member> Parser::parseMembers()
+  {
     Map<Id, Member> members;
     dropExpected(TokenKind::LBracket);
     parseEOL();
-    while(lexer.peek().kind != TokenKind::RBracket) {
+    while (lexer.peek().kind != TokenKind::RBracket)
+    {
       auto t = lexer.peek();
-      switch(t.kind) {
+      switch (t.kind)
+      {
         case TokenKind::Identifier:
-          {
-            auto field = parseField();
-            members[field->id->name]= field;
-            break;
-          }
+        {
+          auto field = parseField();
+          members[field->id->name] = field;
+          break;
+        }
           assert(0);
         case TokenKind::Function:
-          {
-            dropExpected(TokenKind::Function);
-            auto function = parseFunction();
-            members[function->function->name] = function;
-            break;
-          }
+        {
+          dropExpected(TokenKind::Function);
+          auto function = parseFunction();
+          members[function->function->name] = function;
+          break;
+        }
           assert(0);
         default:
           assert(0 && "Invalid token in members");
@@ -444,7 +450,7 @@ namespace verona::ir
     return members;
   }
 
-  //TODO correct this, it should be {f: T}
+  // TODO correct this, it should be {f: T}
   Node<Field> Parser::parseField()
   {
     auto field = make_shared<Field>();
@@ -459,7 +465,7 @@ namespace verona::ir
   {
     auto t = lexer.peek();
     Node<TypeRef> result = nullptr;
-    switch(t.kind)
+    switch (t.kind)
     {
       case TokenKind::Iso:
         result = make_shared<Iso>();
@@ -477,11 +483,11 @@ namespace verona::ir
         result = make_shared<Stack>();
         break;
       case TokenKind::Identifier:
-        {
-          result = parseIdentifier<TypeId>();
-          assert(result != nullptr);
-          break;
-        }
+      {
+        result = parseIdentifier<TypeId>();
+        assert(result != nullptr);
+        break;
+      }
       case TokenKind::LParen:
         result = parseTypeOp();
         break;
@@ -490,40 +496,40 @@ namespace verona::ir
         break;
       // The left side has been parsed.
       case TokenKind::Comma:
-        {
-          auto tuple = make_shared<TupleType>();
-          dropExpected(TokenKind::Comma);
-          tuple->right = parseTypeRef();
-          result = tuple;
-          break;
-        }
+      {
+        auto tuple = make_shared<TupleType>();
+        dropExpected(TokenKind::Comma);
+        tuple->right = parseTypeRef();
+        result = tuple;
+        break;
+      }
         assert(0);
       case TokenKind::Pipe:
-        {
-          auto pipe = make_shared<UnionType>();
-          dropExpected(TokenKind::Pipe);
-          pipe->right = parseTypeRef();
-          result = pipe;
-          break;
-        }
+      {
+        auto pipe = make_shared<UnionType>();
+        dropExpected(TokenKind::Pipe);
+        pipe->right = parseTypeRef();
+        result = pipe;
+        break;
+      }
         assert(0);
       case TokenKind::And:
-        {
-          auto uni = make_shared<IsectType>();
-          dropExpected(TokenKind::And);
-          uni->right = parseTypeRef();
-          result = uni;
-          break;
-        }
+      {
+        auto uni = make_shared<IsectType>();
+        dropExpected(TokenKind::And);
+        uni->right = parseTypeRef();
+        result = uni;
+        break;
+      }
         assert(0);
       case TokenKind::Store:
-        {
-          auto store = make_shared<StoreType>();
-          dropExpected(TokenKind::Store);
-          store->type = parseTypeRef();
-          result = store;
-          break;
-        }
+      {
+        auto store = make_shared<StoreType>();
+        dropExpected(TokenKind::Store);
+        store->type = parseTypeRef();
+        result = store;
+        break;
+      }
         assert(0);
       default:
         assert(0 && "Unknown type construct");
@@ -532,34 +538,36 @@ namespace verona::ir
     return result;
   }
 
-  Node<TypeRef> Parser::parseTypeOp() {
+  Node<TypeRef> Parser::parseTypeOp()
+  {
     auto t = lexer.peek();
     assert(t.kind == TokenKind::LParen);
     dropExpected(TokenKind::LParen);
     Node<TypeRef> left = nullptr;
-    while(lexer.peek().kind != TokenKind::RParen)
+    while (lexer.peek().kind != TokenKind::RParen)
     {
       auto type = parseTypeRef();
-      assert(type != nullptr); 
+      assert(type != nullptr);
 
-      if (left == nullptr) {
+      if (left == nullptr)
+      {
         left = type;
         continue;
       }
 
       assert(left != nullptr);
-      switch(type->kind())
+      switch (type->kind())
       {
         case Kind::TupleType:
         case Kind::UnionType:
         case Kind::IsectType:
-          { 
-            auto typeop = dynamic_pointer_cast<TypeOp>(type);
-            assert(typeop->left == nullptr);
-            typeop->left = left;
-            left = type;
-            break;
-          }
+        {
+          auto typeop = dynamic_pointer_cast<TypeOp>(type);
+          assert(typeop->left == nullptr);
+          typeop->left = left;
+          left = type;
+          break;
+        }
           assert(0);
         default:
           assert(0 && "This should not happen");
@@ -570,20 +578,24 @@ namespace verona::ir
     return left;
   }
 
-
   bool Parser::parse()
   {
     while (lexer.hasNext())
     {
       auto statement = parseStatement();
-      if (statement->kind() == Kind::Function) {
+      if (statement->kind() == Kind::Function)
+      {
         auto func = dynamic_pointer_cast<Function>(statement);
         functions.push_back(func);
-      } else if (statement->kind() == Kind::Class) {
+      }
+      else if (statement->kind() == Kind::Class)
+      {
         auto classdecl = dynamic_pointer_cast<Class>(statement);
         classes.push_back(classdecl);
-      } else {
-        //TODO not even sure this should be possible.
+      }
+      else
+      {
+        // TODO not even sure this should be possible.
         program.push_back(statement);
       }
     }

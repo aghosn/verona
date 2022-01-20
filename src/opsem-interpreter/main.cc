@@ -1,9 +1,8 @@
+#include "interpreter.h"
 #include "ir.h"
 #include "lexer.h"
 #include "parser.h"
 #include "visitors.h"
-
-#include "interpreter.h"
 
 #include <iostream>
 #include <string>
@@ -41,6 +40,5 @@ int main(int argc, const char** argv)
   }
 
   Interpreter interp(parser);
-
   return 0;
 }
