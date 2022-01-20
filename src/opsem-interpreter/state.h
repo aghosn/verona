@@ -22,7 +22,7 @@ namespace interpreter
   struct Program
   {
     Map<Id, ir::Node<ir::Function>> functions;
-    Map<TypeId, ir::Type> types;
+    Map<TypeId, Shared<Type>> types;
   };
 
   // ϕ ∈ Frame ::= Region* × (Id → Value) × Id* × Expression*
@@ -93,25 +93,13 @@ namespace interpreter
     // Execution state
     ExecState exec_state;
 
-    Map<TypeId, Shared<Type>> types;
+    // Program
+    Program program;
 
-    // TODO: figure out where to put the functions?
     // Constructor
     void init(ir::List<ir::Class> classes, ir::List<ir::Function> functions)
     {
-      // Initialize the types.
-      for (auto c : classes)
-      {
-        types[c->id->name] = c;
-      }
-      // Initial frame
-      Shared<Frame> frame = make_shared<Frame>();
-      // TODO what do we do with the initial region/frame?
-      frames.push_back(frame);
-      for (auto f : functions)
-      {
-        frame->lookup[f->function->name] = f;
-      }
+      assert(0 && "TODO");
     }
 
     // Checks wheter a name is defined in the current scope.
@@ -165,23 +153,22 @@ namespace interpreter
 
     bool containsType(TypeId name)
     {
-      return types.contains(name);
+      return program.types.contains(name);
     }
 
     Shared<Type> getTypeByName(TypeId name)
     {
-      return types[name];
+      return program.types[name];
     }
 
     bool isFunction(Id name)
     {
-      // TODO Implement
-      return true;
+      return program.functions.contains(name);
     }
 
     ir::Node<ir::Function> getFunction(Id name)
     {
-      return nullptr;
+      return program.functions[name];
     }
   };
 
