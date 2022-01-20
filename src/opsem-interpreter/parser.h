@@ -12,6 +12,7 @@ namespace verona::ir
   public:
     AstPath program;
     List<Function> functions;
+    List<Class> classes;
     mlexer::Lexer& lexer;
 
     Parser(mlexer::Lexer& lexer);

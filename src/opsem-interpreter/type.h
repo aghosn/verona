@@ -5,9 +5,5 @@
 using TypeId = std::string;
 
 namespace interpreter {
-  // Type ::= TypeId* × (Id → Member)
-  struct Type {
-    TypeId name;
-    Map<Id, Shared<ir::Member>> members;
-  };
+  using Type = ir::TypeDecl;
 } //namespace interpreter

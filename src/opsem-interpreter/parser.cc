@@ -579,6 +579,9 @@ namespace verona::ir
       if (statement->kind() == Kind::Function) {
         auto func = dynamic_pointer_cast<Function>(statement);
         functions.push_back(func);
+      } else if (statement->kind() == Kind::Class) {
+        auto classdecl = dynamic_pointer_cast<Class>(statement);
+        classes.push_back(classdecl);
       } else {
         //TODO not even sure this should be possible.
         program.push_back(statement);

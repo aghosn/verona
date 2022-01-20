@@ -86,6 +86,15 @@ namespace interpreter
     ExecState exec_state;
 
     Map<TypeId, Shared<Type>> types; 
+
+    // TODO: figure out where to put the functions?
+    // Constructor
+    void Init(ir::List<ir::Class> classes) {
+      // Initialize the types.
+      for (auto c: classes) {
+        types[c->id->name] = c;
+      }
+    }
     
     // Checks wheter a name is defined in the current scope.
     bool isDefinedInFrame(string name) {

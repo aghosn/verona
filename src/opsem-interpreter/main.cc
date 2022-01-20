@@ -38,5 +38,15 @@ int main(int argc, const char** argv)
     l->accept(&printer);
   }
 
+  //Let's look at the functions first:
+  //cout << "THE FUNCTIONS" << endl;
+  //for (auto f: parser.functions) {
+  //  cout << f->function->name << endl;
+  //}
+  //cout << "THE CLASSES" << endl;
+  //for (auto c: parser.classes) {
+  //  cout << c->id->name << endl;
+  //}
+
   return 0;
 }

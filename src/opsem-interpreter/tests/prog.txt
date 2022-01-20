@@ -1,0 +1,6 @@
+class Int {
+}
+
+fn main(a, b) {
+
+}
