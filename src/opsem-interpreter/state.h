@@ -5,6 +5,7 @@
 #include "utils.h"
 
 #include <map>
+#include <cassert>
 #include <utility>
 #include <vector>
 #include <verona.h>
@@ -99,7 +100,12 @@ namespace interpreter
     // Constructor
     void init(ir::List<ir::Class> classes, ir::List<ir::Function> functions)
     {
-      assert(0 && "TODO");
+      for (auto c: classes) {
+        program.types[c->id->name] = c;
+      }
+      for (auto f: functions) {
+        program.functions[f->function->name] = f;
+      }
     }
 
     // Checks wheter a name is defined in the current scope.
@@ -168,6 +174,7 @@ namespace interpreter
 
     ir::Node<ir::Function> getFunction(Id name)
     {
+      assert(isFunction(name) && "Function is not defined");
       return program.functions[name];
     }
   };

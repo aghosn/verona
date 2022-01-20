@@ -15,7 +15,10 @@ namespace interpreter {
 Interpreter::Interpreter(ir::Parser parser) {
   state.init(parser.classes, parser.functions);
   //TODO set up the entry point?
-  assert(state.getFunction(ENTRY_POINT) != nullptr);
+  if (state.isFunction(ENTRY_POINT)) {
+    auto entry = state.getFunction(ENTRY_POINT);
+    state.exec_state = {entry->exprs, 0};
+  }
 }
 
   void Interpreter::visit(ir::NodeDef* node)
@@ -406,10 +409,7 @@ end:
   void Interpreter::evalTailcall(verona::ir::Tailcall& node) {
     // live(σ, x) && λ = σ(x)
     auto x = node.function->name; 
-    assert(state.isDefinedInFrame(x));
-    auto _f = state.frameLookup(x);
-    assert(_f->kind() == ir::Kind::Function);
-    auto lambda = dynamic_pointer_cast<ir::Function>(_f);
+    auto lambda = state.getFunction(x);
 
     // live(σ, y*)
     assert(node.args.size() == lambda->args.size());
@@ -446,10 +446,7 @@ end:
     }
     
     string y = node.function->name;
-    assert(state.isDefinedInFrame(y));
-    auto v = state.frameLookup(y);
-    assert(v->kind() == ir::Kind::Function && "y is not a function");
-    auto yfunc = dynamic_pointer_cast<ir::Function>(v);
+    auto yfunc = state.getFunction(y);
 
     assert(node.args.size() > 0);
     assert(node.args.size() == yfunc->args.size());
@@ -490,10 +487,7 @@ end:
 
     // get y
     string y = node.function->name;
-    assert(state.isDefinedInFrame(y));
-    auto v = state.frameLookup(y);
-    assert(v->kind() == ir::Kind::Function && "y is not a function");
-    auto yfunc = dynamic_pointer_cast<ir::Function>(v);
+    auto yfunc = state.getFunction(y);
   
     // ρ ∉ σ
     rt::Region* region = nullptr; //TODO
@@ -521,11 +515,9 @@ end:
     string x = node.condition->name;
     assert(state.isDefinedInFrame(x));
     string y = node.branch1->function->name;
-    assert(state.isDefinedInFrame(y));
     ir::Node<ir::Function> yfunc = state.getFunction(y);
     assert(yfunc->args.size() == node.branch1->args.size());
     string z = node.branch2->function->name;
-    assert(state.isDefinedInFrame(z));
     ir::Node<ir::Function> zfunc = state.getFunction(z);
     assert(zfunc->args.size() == node.branch2->args.size());
 
