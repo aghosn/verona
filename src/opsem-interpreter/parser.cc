@@ -9,13 +9,6 @@ using namespace std;
 
 namespace verona::ir
 {
-  enum Result
-  {
-    Skip,
-    Sucess,
-    Error,
-  };
-
   Parser::Parser(mlexer::Lexer& lexer) : lexer(lexer) {}
 
   Parser::~Parser(){};
