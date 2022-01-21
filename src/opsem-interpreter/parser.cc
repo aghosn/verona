@@ -132,6 +132,17 @@ namespace verona::ir
         return classdecl;
       }
         assert(0);
+      case TokenKind::Call:
+      {
+        // A call without return values
+        auto call = make_shared<Call>();
+        auto apply = parseApply();
+        call->function = apply.first;
+        call->args = apply.second;
+        parseEOL();
+        return call;
+      }
+        assert(0);
       default:
         // No match
         std::cerr << "Unrecognized kind " << t.kind << std::endl;
@@ -152,7 +163,6 @@ namespace verona::ir
 
   List<ID> Parser::parseListUntil(TokenKind k)
   {
-    assert(lexer.peek().kind == TokenKind::Identifier);
     List<ID> result;
     bool id = true;
     while (lexer.peek().kind != k)

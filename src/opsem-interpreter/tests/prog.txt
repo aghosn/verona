@@ -1,6 +1,18 @@
 class Int {
 }
 
-fn main(a, b) {
+fn foo() {
+  x = new Int
+  return x
+}
 
+fn bar() {
+  y = call foo() 
+  return
+}
+
+
+fn main(a, b) {
+  call bar()
+  return
 }

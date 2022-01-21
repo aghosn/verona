@@ -79,7 +79,11 @@ namespace interpreter
   // norepeat(x*) = (|x*| = |dom(x*)|)
   bool norepeat(ir::List<ir::ID> args)
   {
-    for (int i = 0; i < args.size() - 1; i++)
+    if (args.size() == 0)
+    {
+      return true;
+    }
+    for (int i = 0; i < (args.size() - 1); i++)
     {
       auto curr = args[i];
       for (int j = i + 1; j < args.size(); j++)

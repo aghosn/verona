@@ -12,7 +12,10 @@ namespace interpreter {
   class Interpreter: public ir::Visitor {
     public:
       Interpreter(ir::Parser parser);
-      void evalOneStep();
+      /**
+       * Returns false if we have more instructions, true if we are done.
+       */
+      bool evalOneStep();
       void eval();
       void visit(ir::NodeDef* node);
     private:

@@ -8,6 +8,8 @@
 #include <iostream>
 #include <verona.h>
 
+using namespace std;
+
 namespace interpreter {
 
   static const char* ENTRY_POINT = "main";
@@ -21,25 +23,51 @@ Interpreter::Interpreter(ir::Parser parser) {
     auto entry = state.getFunction(ENTRY_POINT);
     state.exec_state = {entry->exprs, _PC_START};
   }
+  // Setup the fake first frame and the main frame.
+  // TODO: figure out whether we need more info in there.
+  auto fakeframe = make_shared<Frame>();
+  auto mainframe = make_shared<Frame>();
+  state.frames.push_back(fakeframe);
+  state.frames.push_back(mainframe);
 }
 
-  void Interpreter::evalOneStep() {
+  bool Interpreter::evalOneStep() {
+    static int counter = 0;
     // TODO Safety checks, we'll see if we keep or replace them. 
-    assert(state.exec_state.exprs.size() > 0 && "No expressions"); 
     assert(state.exec_state.offset >= 0 && "Invalid PC offset");
-    assert(state.exec_state.offset < state.exec_state.exprs.size());
+    assert((state.exec_state.offset == 0 || 
+        state.exec_state.offset < state.exec_state.exprs.size())
+        && "PC incompatible with the set of expressions available");
+
+    // Stopping condition.
+    if (state.exec_state.exprs.size() == 0)
+    {
+      // Check that the only frame available is the fake one.
+      assert(state.frames.size() == 1);
+      return true;
+    }
 
     auto pc = state.exec_state.offset;
     auto instr = state.exec_state.exprs[pc];
     // TODO register some debugging information with the above.
+    cout << "[EVAL]: nb_instr: " << counter << " offset: " << pc << endl;
     instr->accept(this);
 
     // increase pc 
     state.exec_state.offset++;
+
+    counter++;
+    return false;
   }
 
   void Interpreter::eval() {
-
+    // TODO is that the correct condition?
+    bool done = false;
+    while((!state.except) && !done)
+    {
+      done = evalOneStep();
+    }
+    cout << "[EVAL]: done" << endl;
   }
 
   void Interpreter::visit(ir::NodeDef* node)
@@ -411,7 +439,6 @@ end:
     // norepeat(y; z*)
     norepeat2(node.args, node.function);
     // x ∉ σ
-    assert(node.left.size() > 0);
     for (auto x: node.left) {
       assert(!state.isDefinedInFrame(x->name));
     }

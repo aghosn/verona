@@ -40,5 +40,6 @@ int main(int argc, const char** argv)
   }
 
   Interpreter interp(parser);
+  interp.eval();
   return 0;
 }

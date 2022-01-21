@@ -110,6 +110,11 @@ namespace interpreter
       {
         program.functions[f->function->name] = f;
       }
+
+      // TODO figure that out, should keep only one
+      // and we should know when we are done
+      except = false;
+      success = true;
     }
 
     // Checks wheter a name is defined in the current scope.
