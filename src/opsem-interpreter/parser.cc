@@ -158,6 +158,9 @@ namespace verona::ir
     function->function = apply.first;
     function->args = apply.second;
     function->exprs = parseBlock();
+    assert(function->exprs.size() > 0 
+        && function->exprs.back()->kind() == Kind::Return 
+        && "Every function definition must end with a return");
     return function;
   }
 
