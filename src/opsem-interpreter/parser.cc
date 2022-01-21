@@ -158,8 +158,13 @@ namespace verona::ir
     function->function = apply.first;
     function->args = apply.second;
     function->exprs = parseBlock();
+    //TODO Is that correct? Is it really the last expr that needs to be:
+    // return, tailcall, or branch?
     assert(function->exprs.size() > 0 
-        && function->exprs.back()->kind() == Kind::Return 
+        && 
+        (function->exprs.back()->kind() == Kind::Return   ||
+         function->exprs.back()->kind() == Kind::Tailcall ||
+         function->exprs.back()->kind() == Kind::Branch)
         && "Every function definition must end with a return");
     return function;
   }
