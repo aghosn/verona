@@ -29,6 +29,13 @@ Interpreter::Interpreter(ir::Parser parser) {
   auto mainframe = make_shared<Frame>();
   state.frames.push_back(fakeframe);
   state.frames.push_back(mainframe);
+
+  // Create original region
+  auto mainRegion = rt::api::create_fresh_region(rt::RegionType::Arena,
+      new rt::Descriptor());
+  state.regions[mainRegion] = rt::RegionType::Arena;
+  mainframe->regions.push_back(mainRegion);
+  rt::api::open_region(mainRegion);
 }
 
   bool Interpreter::evalOneStep() {
@@ -158,7 +165,8 @@ Interpreter::Interpreter(ir::Parser parser) {
     Shared<Object> obj = make_shared<Object>();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
-    obj->obj = rt::api::create_object(nullptr); //TODO figure out the descriptor.
+    //TODO figure out what to do with the descriptor.
+    obj->obj = rt::api::create_object(new rt::Descriptor()); 
     //TODO allocate in all the regions? 
     state.addObject(obj->id, obj);
 
@@ -389,7 +397,8 @@ end:
     Shared<Object> obj = make_shared<Object>();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
-    obj->obj = rt::api::create_object(nullptr); //TODO figure out the descriptor.
+    //TODO figure out the descriptor.
+    obj->obj = rt::api::create_object(new rt::Descriptor()); 
     //TODO set up regions? 
     state.addObject(obj->id, obj);
 
@@ -418,7 +427,8 @@ end:
     Shared<Object> obj = make_shared<Object>();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
-    obj->obj = rt::api::create_object(nullptr); //TODO figure out the descriptor.
+    //TODO figure out the descriptor.
+    obj->obj = rt::api::create_object(new rt::Descriptor()); 
     //TODO set up regions? All the regions then? 
     state.addObject(obj->id, obj);
 
@@ -443,7 +453,7 @@ end:
       assert(!state.isDefinedInFrame(x->name));
     }
     auto conts = state.exec_state.getContinuation();
-    List<rt::Region*> p;
+    List<Region*> p;
     auto expr2 = newframe(state, p, node.left, 
         node.function, node.args, conts);
     state.exec_state = {expr2, _PC_RESET};
@@ -538,13 +548,14 @@ end:
     auto yfunc = state.getFunction(y);
   
     // ρ ∉ σ
-    rt::Region* region = nullptr; //TODO
-
+    //TODO I have to find out what to do here, typecast to my own type?
+    Region* region = rt::api::create_fresh_region(node.strategy, new rt::Descriptor()); 
+    
     // σ₁[ρ↦Σ]
     state.regions[region] = node.strategy;
 
     auto conts = state.exec_state.getContinuation();
-    List<rt::Region*> p;
+    List<Region*> p;
     p.push_back(region);
     //TODO do: unpin(σ₁, z*) 
     auto expr2 = newframe(state, p, node.left, node.function, node.args, conts);

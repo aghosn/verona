@@ -9,10 +9,13 @@ using ObjectId = std::string;
 
 namespace interpreter
 {
+  // TODO fix once I know how to represent regions.
+  typedef rt::Object Region;
+
   // ω ∈ Object ::= Region* × TypeId
   struct Object
   {
-    List<rt::Region*> regions;
+    List<Region*> regions;
     TypeId type;
 
     // TODO figure out whether this is correct

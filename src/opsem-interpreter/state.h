@@ -16,9 +16,6 @@ using ObjectId = string;
 
 namespace interpreter
 {
-  // TODO fix once I know how types are represented.
-  typedef rt::Object TypeObj;
-
   // P ∈ Program ::= (Id → Function) × (TypeId → Type)
   struct Program
   {
@@ -29,7 +26,7 @@ namespace interpreter
   // ϕ ∈ Frame ::= Region* × (Id → Value) × Id* × Expression*
   struct Frame
   {
-    List<rt::Region*> regions;
+    List<Region*> regions;
     Map<Id, Shared<ir::Value>> lookup;
     List<Id> rets;
     List<Shared<ir::Expr>> continuations;
@@ -87,7 +84,7 @@ namespace interpreter
 
     Map<ObjectId, Map<Id, Shared<ir::Value>>> fields;
 
-    Map<rt::Region*, rt::RegionType> regions;
+    Map<Region*, rt::RegionType> regions;
 
     // TODO figure out they have both in the rules
     bool success;

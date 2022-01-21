@@ -17,7 +17,7 @@ namespace interpreter
   //   ϕ₂ = ((ϕ₁.regions; ρ*), [λ.args↦σ(z*)], x*, e*)
   ir::List<ir::Expr> newframe(
     State& state,
-    List<rt::Region*>& p,
+    List<Region*>& p,
     ir::List<ir::ID>& xs,
     ir::Node<ir::ID> y,
     ir::List<ir::ID>& zs,
@@ -124,7 +124,7 @@ namespace interpreter
     return true;
   }
 
-  bool sameRegions(List<rt::Region*> r1, List<rt::Region*> r2)
+  bool sameRegions(List<Region*> r1, List<Region*> r2)
   {
     if (r1.size() != r2.size())
     {
@@ -140,7 +140,7 @@ namespace interpreter
     return true;
   }
 
-  List<ObjectId> getObjectsInRegions(State& state, List<rt::Region*> regions)
+  List<ObjectId> getObjectsInRegions(State& state, List<Region*> regions)
   {
     List<ObjectId> result;
     for (auto const& x : state.objects)

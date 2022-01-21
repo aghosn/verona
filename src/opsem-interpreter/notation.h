@@ -13,7 +13,7 @@ namespace interpreter
   //   ϕ₂ = ((ϕ₁.regions; ρ*), [λ.args↦σ(z*)], x*, e*)
   ir::List<ir::Expr> newframe(
     State& state,
-    List<rt::Region*>& p,
+    List<Region*>& p,
     ir::List<ir::ID>& xs,
     ir::Node<ir::ID> y,
     ir::List<ir::ID>& zs,
@@ -26,8 +26,8 @@ namespace interpreter
   bool norepeat(ir::List<ir::ID> args);
   bool norepeat2(ir::List<ir::ID> first, ir::Node<ir::ID> extras...);
 
-  bool sameRegions(List<rt::Region*> r1, List<rt::Region*> r2);
-  List<ObjectId> getObjectsInRegions(State& state, List<rt::Region*> regions);
+  bool sameRegions(List<Region*> r1, List<Region*> r2);
+  List<ObjectId> getObjectsInRegions(State& state, List<Region*> regions);
 
   bool isIsoOrImm(State& state, Shared<ir::Value> value);
 
