@@ -4,6 +4,7 @@
 #include "utils.h"
 
 #include <cassert>
+#include <verona.h>
 
 using ObjectId = std::string;
 
@@ -32,6 +33,9 @@ namespace interpreter
       return fields[name];
     }
   };
+
+  // TODO Probably not correct
+  using VObject = rt::V<Object>;
 
   std::string nextObjectId();
 } // namespace interpreter

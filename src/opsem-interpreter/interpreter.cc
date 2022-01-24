@@ -167,7 +167,10 @@ Interpreter::Interpreter(ir::Parser parser) {
     obj->type = node.type->name;
     //TODO figure out what to do with the descriptor.
     obj->obj = rt::api::create_object(new rt::Descriptor()); 
-    //TODO allocate in all the regions? 
+    // Setting the object's regions
+    for (auto r: state.frames.back()->regions) {
+      obj->regions.push_back(r);
+    } 
     state.addObject(obj->id, obj);
 
     // σ[ι↦(σ.frame.regions, τᵩ)][x↦(ι, x)]
@@ -258,7 +261,7 @@ Interpreter::Interpreter(ir::Parser parser) {
     
     //x ∉ σ
     assert(!state.isDefinedInFrame(x) && "Name already defined");
-    // TODO norepeat(y; z)
+    // TODO norepeat
     //f = σ(y)
     assert(state.fields.contains(y->objectid->name) && "The object ID does not exist");
     assert(state.fields[y->objectid->name].contains(y->id->name) && "objectid does not have a field");
@@ -399,7 +402,10 @@ end:
     obj->type = node.type->name;
     //TODO figure out the descriptor.
     obj->obj = rt::api::create_object(new rt::Descriptor()); 
-    //TODO set up regions? 
+    // Set up regions
+    for (auto r: state.frames.back()->regions) {
+      obj->regions.push_back(r);
+    }
     state.addObject(obj->id, obj);
 
     // σ[ι↦(ρ, τ)][x↦ι]
@@ -429,7 +435,10 @@ end:
     obj->type = node.type->name;
     //TODO figure out the descriptor.
     obj->obj = rt::api::create_object(new rt::Descriptor()); 
-    //TODO set up regions? All the regions then? 
+    // Set up regions
+    for (auto r: state.frames.back()->regions) {
+      obj->regions.push_back(r);
+    }
     state.addObject(obj->id, obj);
 
     // σ[x↦ι]
