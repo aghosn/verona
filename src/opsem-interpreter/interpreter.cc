@@ -31,8 +31,7 @@ Interpreter::Interpreter(ir::Parser parser) {
   state.frames.push_back(mainframe);
 
   // Create original region
-  auto mainRegion = rt::api::create_fresh_region(rt::RegionType::Arena,
-      new rt::Descriptor());
+  auto mainRegion = new (rt::RegionType::Arena) Region;
   state.regions[mainRegion] = rt::RegionType::Arena;
   mainframe->regions.push_back(mainRegion);
   rt::api::open_region(mainRegion);
@@ -165,8 +164,7 @@ Interpreter::Interpreter(ir::Parser parser) {
     Shared<Object> obj = make_shared<Object>();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
-    //TODO figure out what to do with the descriptor.
-    obj->obj = rt::api::create_object(new rt::Descriptor()); 
+    obj->obj = new VObject(); 
     // Setting the object's regions
     for (auto r: state.frames.back()->regions) {
       obj->regions.push_back(r);
@@ -401,7 +399,7 @@ end:
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
     //TODO figure out the descriptor.
-    obj->obj = rt::api::create_object(new rt::Descriptor()); 
+    obj->obj = new VObject(); 
     // Set up regions
     for (auto r: state.frames.back()->regions) {
       obj->regions.push_back(r);
@@ -433,8 +431,7 @@ end:
     Shared<Object> obj = make_shared<Object>();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
-    //TODO figure out the descriptor.
-    obj->obj = rt::api::create_object(new rt::Descriptor()); 
+    obj->obj = new VObject(); 
     // Set up regions
     for (auto r: state.frames.back()->regions) {
       obj->regions.push_back(r);
@@ -558,7 +555,7 @@ end:
   
     // ρ ∉ σ
     //TODO I have to find out what to do here, typecast to my own type?
-    Region* region = rt::api::create_fresh_region(node.strategy, new rt::Descriptor()); 
+    Region* region = new (node.strategy) Region; 
     
     // σ₁[ρ↦Σ]
     state.regions[region] = node.strategy;
@@ -642,6 +639,7 @@ end:
     
     bool samereg = sameRegions(phi1->regions, phi2->regions);
 
+    // Discard return values or assign them.
     assert(phi2->rets.size() == node.returns.size());
     for (int i = 0; i < phi2->rets.size(); i++) {
       auto x = node.returns[i]->name;
@@ -713,8 +711,10 @@ end:
   // --- [release]
   // σ, release x; e* → σ, e*
   void Interpreter::evalRelease(verona::ir::Release& node) {
-    //TODO ???
-    //It's a decref basically
+    string x = node.target->name;
+    assert(state.isDefinedInFrame(x));
+    //TODO how do we release it?
+    state.removeFromFrame(x);
   }
 
   // TODO: fulfill the promise

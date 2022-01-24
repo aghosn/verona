@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 #include <verona.h>
+#include <iostream>
 
 using namespace std;
 
@@ -38,7 +39,10 @@ namespace interpreter
         return false;
       }
       auto value = lookup[name];
-      return (value->kind() == ir::Kind::Object);
+      if (!(value->kind() == ir::Kind::ObjectID)) {
+        cout << "The name " << name << " is not an object" << endl;
+      }
+      return (value->kind() == ir::Kind::ObjectID);
     }
 
     Shared<ir::Value> frameLookup(Id name)

@@ -68,7 +68,9 @@ namespace interpreter
   {
     assert(state.frames.size() > 0 && "State has no frame!");
     bool repeat = norepeat(args);
+    //TODO asked Sylvan, we need to check
     bool doms = state.frames.back()->lookup.size() == args.size();
+    assert(doms);
     for (auto x : args)
     {
       doms = doms && state.isDefinedInFrame(x->name);

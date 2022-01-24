@@ -8,11 +8,12 @@ fn foo() {
 
 fn bar() {
   y = call foo() 
-  return
+  return y
 }
 
 
 fn main(a, b) {
-  call bar()
+  z = call bar()
+  release z
   return
 }

@@ -10,8 +10,23 @@ using ObjectId = std::string;
 
 namespace interpreter
 {
-  // TODO fix once I know how to represent regions.
-  typedef rt::Object Region;
+  /**
+   * TODO Figure out if we do want to wrap the complete structures
+   * in verona allocations, or if we just leave them in our memory
+   * and rely on verona just for the data-holding memory.
+   */
+
+  // An object
+  struct VObject : rt::V<VObject> 
+  {
+    void trace(rt::ObjectStack& st) const
+    {
+    }
+  };
+
+  
+  // A Region is just a verona object.
+  using Region = VObject;
 
   // ω ∈ Object ::= Region* × TypeId
   struct Object
@@ -22,8 +37,7 @@ namespace interpreter
     // TODO figure out whether this is correct
     Map<Id, Shared<ir::StorageLoc>> fields;
 
-    // TODO figure out if we need this.
-    rt::Object* obj;
+    VObject* obj;
 
     // For convenience, we store the ObjectId here as well.
     ObjectId id;
@@ -33,9 +47,6 @@ namespace interpreter
       return fields[name];
     }
   };
-
-  // TODO Probably not correct
-  using VObject = rt::V<Object>;
 
   std::string nextObjectId();
 } // namespace interpreter
