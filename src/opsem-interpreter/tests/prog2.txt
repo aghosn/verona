@@ -6,7 +6,15 @@ class Obj {
   a: Int
 }
 
-fn foo() {
+fn withStack() {
+  x = stack Obj
+  y = stack Int
+  z = store x.a y
+  release z
+  return x
+}
+
+fn withNew() {
   x = new Obj
   y = new Int
   z = store x.a y
@@ -15,7 +23,9 @@ fn foo() {
 }
 
 fn main(a, b) {
-  x = call foo()
+  x = call withNew()
+  release x
+  x = call withStack()
   release x
   return
 }

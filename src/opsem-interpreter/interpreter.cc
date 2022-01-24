@@ -256,6 +256,8 @@ Interpreter::Interpreter(ir::Parser parser) {
     string x = node.left[0]->name;
     ir::Node<ir::StorageLoc> y = node.y;
     string z = node.z->name;
+
+    // TODO Should we check if the field is storable? 
     
     //x ∉ σ
     assert(!state.isDefinedInFrame(x) && "Name already defined");
