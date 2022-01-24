@@ -34,7 +34,10 @@ namespace interpreter
 
     bool containsName(Id name)
     {
-      if (!lookup.contains(name))
+      return lookup.contains(name);
+      // TODO check if we need to perform a check or not.
+      // Probably will have to fix that.
+      /*if (!lookup.contains(name))
       {
         return false;
       }
@@ -42,7 +45,7 @@ namespace interpreter
       if (!(value->kind() == ir::Kind::ObjectID)) {
         cout << "The name " << name << " is not an object" << endl;
       }
-      return (value->kind() == ir::Kind::ObjectID);
+      return (value->kind() == ir::Kind::ObjectID);*/
     }
 
     Shared<ir::Value> frameLookup(Id name)

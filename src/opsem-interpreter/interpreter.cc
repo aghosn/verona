@@ -261,9 +261,11 @@ Interpreter::Interpreter(ir::Parser parser) {
     assert(!state.isDefinedInFrame(x) && "Name already defined");
     // TODO norepeat
     //f = σ(y)
-    assert(state.fields.contains(y->objectid->name) && "The object ID does not exist");
-    assert(state.fields[y->objectid->name].contains(y->id->name) && "objectid does not have a field");
-    auto f = state.fields[y->objectid->name][y->id->name];
+    assert(state.isDefinedInFrame(y->objectid->name) && "The object is not defined");
+    auto yoid = dynamic_pointer_cast<ir::ObjectID>(state.getValueByName(y->objectid->name)); 
+    assert(state.fields.contains(yoid->name) && "The object ID does not exist");
+    assert(state.fields[yoid->name].contains(y->id->name) && "objectid does not have a field");
+    auto f = state.fields[yoid->name][y->id->name];
 
     //v = σ(z)
     assert(state.isDefinedInFrame(z) && "Source of store not defined");
@@ -410,6 +412,12 @@ end:
     Shared<ir::ObjectID> oid = make_shared<ir::ObjectID>();
     oid->name = obj->id;
     state.addInFrame(x, oid); 
+
+    // All fields are initially undefined.
+    auto tpe = state.getTypeByName(type);
+    for (auto f: tpe->members) {
+      state.fields[oid->name][f.first] = make_shared<ir::Undef>();
+    }
   }
 
   // Create a new object in all open regions, i.e. a stack object.
@@ -422,9 +430,9 @@ end:
   {
     assert(node.left.size() == 1);
     string x = node.left[0]->name;
-    string tpe = node.type->name;
+    string type = node.type->name;
     assert(!state.isDefinedInFrame(x));
-    assert(state.containsType(tpe));
+    assert(state.containsType(type));
 
     // ι ∉ σ
     //σ[ι↦(σ.frame.regions, τᵩ)]
@@ -442,6 +450,12 @@ end:
     Shared<ir::ObjectID> oid = make_shared<ir::ObjectID>();
     oid->name = obj->id;
     state.addInFrame(x, oid); 
+
+    // All fields are initially undefined.
+    auto tpe = state.getTypeByName(type);
+    for (auto f: tpe->members) {
+      state.fields[oid->name][f.first] = make_shared<ir::Undef>();
+    }
   }
 
   // Push a new frame.
@@ -713,8 +727,9 @@ end:
   void Interpreter::evalRelease(verona::ir::Release& node) {
     string x = node.target->name;
     assert(state.isDefinedInFrame(x));
-    //TODO how do we release it?
+    // TODO how do we release it?
     state.removeFromFrame(x);
+    // TODO Should remove from objects??
   }
 
   // TODO: fulfill the promise
