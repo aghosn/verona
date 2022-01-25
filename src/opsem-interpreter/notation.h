@@ -30,5 +30,6 @@ namespace interpreter
   List<ObjectId> getObjectsInRegions(State& state, List<Region*> regions);
 
   bool isIsoOrImm(State& state, Shared<ir::Value> value);
+  ir::List<ir::ID> removeDuplicates(ir::List<ir::ID> args);
 
 } // namespace interpreter

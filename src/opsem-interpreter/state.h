@@ -51,9 +51,8 @@ namespace interpreter
     Shared<ir::Value> frameLookup(Id name)
     {
       assert(lookup.contains(name));
-      auto obj = lookup[name];
-      assert(obj->kind() == ir::Kind::ObjectID);
-      return obj;
+      auto value = lookup[name];
+      return value;
     }
   };
 
@@ -110,6 +109,12 @@ namespace interpreter
       {
         program.types[c->id->name] = c;
       }
+      // Create the artifical type Bool
+      auto boolClass = make_shared<ir::Class>();
+      boolClass->id = make_shared<ir::ClassID>();
+      boolClass->id->name = "Bool";
+      program.types["Bool"] = boolClass;
+
       for (auto f : functions)
       {
         program.functions[f->function->name] = f;

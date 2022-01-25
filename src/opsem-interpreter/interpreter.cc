@@ -56,7 +56,8 @@ Interpreter::Interpreter(ir::Parser parser) {
     auto pc = state.exec_state.offset;
     auto instr = state.exec_state.exprs[pc];
     // TODO register some debugging information with the above.
-    cout << "[EVAL]: nb_instr: " << counter << " offset: " << pc << endl;
+    cout << "[EVAL]: nb_instr: " << counter << " offset: " << pc;
+    cout << " instr: " << ir::kindname(instr->kind()) << endl;
     instr->accept(this);
 
     // increase pc 
@@ -613,13 +614,14 @@ end:
     assert(zfunc->args.size() == node.branch2->args.size());
 
     // live(σ₁, x; y; z; y*)
-    ir::List<ir::ID> namesY {node.condition, node.branch1->function, node.branch2->function};
+    // TODO check that with sylvan
+    ir::List<ir::ID> namesY {node.condition/*, node.branch1->function, node.branch2->function*/};
     namesY.insert(namesY.end(), node.branch1->args.begin(), node.branch1->args.end());
-    live(state, namesY);
+    live(state, removeDuplicates(namesY));
     // live(σ₁, x; y; z; z*)
-    ir::List<ir::ID> namesZ {node.condition, node.branch1->function, node.branch2->function};
+    ir::List<ir::ID> namesZ {node.condition/*, node.branch1->function, node.branch2->function*/};
     namesZ.insert(namesZ.end(), node.branch2->args.begin(), node.branch2->args.end());
-    live(state, namesZ);
+    live(state, removeDuplicates(namesZ));
     
     
     //TODO factor check call is well formed.
@@ -636,8 +638,6 @@ end:
         assert(0 && "Branch malformed, x is not a boolean"); 
     }
     if (condition) {
-      // TODO how do you get back to previous continuation?
-      // i.e., if there is code after the branch
       state.exec_state = {yfunc->exprs, _PC_RESET};
       return;
     } 

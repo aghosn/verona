@@ -100,6 +100,29 @@ namespace interpreter
     return true;
   }
 
+  ir::List<ir::ID> removeDuplicates(ir::List<ir::ID> args) {
+    if (args.size() <= 1) {
+      return args;
+    }
+    ir::List<ir::ID> result;
+    for (auto i = 0; i < args.size(); i++)
+    {
+      bool unique = true;
+      for (int j = i+1; j < args.size(); j++) 
+      {
+        if (args[i]->name == args[j]->name)
+        {
+          unique = false;
+          break;
+        }
+      }
+      if (unique) {
+        result.push_back(args[i]);
+      }
+    }
+    return result;
+  } 
+
   // norepeat(x*) = (|x*| = |dom(x*)|)
   // Also supports norepeat(x; y; z*);
   bool norepeat2(ir::List<ir::ID> first, ir::Node<ir::ID> extras...)
