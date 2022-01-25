@@ -257,8 +257,6 @@ Interpreter::Interpreter(ir::Parser parser) {
     ir::Node<ir::StorageLoc> y = node.y;
     string z = node.z->name;
 
-    // TODO Should we check if the field is storable? 
-    
     //x ∉ σ
     assert(!state.isDefinedInFrame(x) && "Name already defined");
     // TODO norepeat
@@ -268,6 +266,16 @@ Interpreter::Interpreter(ir::Parser parser) {
     assert(state.fields.contains(yoid->name) && "The object ID does not exist");
     assert(state.fields[yoid->name].contains(y->id->name) && "objectid does not have a field");
     auto f = state.fields[yoid->name][y->id->name];
+
+    // Check the field is storable
+    // TODO find a better way to implement that.
+    auto ytypeName = state.getObjectByName(y->objectid->name)->type; 
+    auto ytypeDecl = state.getTypeByName(ytypeName);
+    assert(ytypeDecl->members.contains(y->id->name) && "Field is unknown in the type");
+    auto _field = ytypeDecl->members[y->id->name];
+    assert(_field->kind() == ir::Kind::Field && "Member is not a field");
+    auto field = dynamic_pointer_cast<ir::Field>(_field);
+    assert(field->type->isStorable() && "The field is not storable");
 
     //v = σ(z)
     assert(state.isDefinedInFrame(z) && "Source of store not defined");
@@ -418,6 +426,8 @@ end:
     // All fields are initially undefined.
     auto tpe = state.getTypeByName(type);
     for (auto f: tpe->members) {
+      //TODO correct this, it can have functions.
+      //Filter only the fields.
       state.fields[oid->name][f.first] = make_shared<ir::Undef>();
     }
   }

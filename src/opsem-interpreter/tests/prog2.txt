@@ -3,7 +3,7 @@ class Int {
 }
 
 class Obj {
-  a: Int
+  a: store Int
 }
 
 fn withStack() {

@@ -160,7 +160,12 @@ namespace verona::ir
   };
 
   struct Type
-  {};
+  {
+    virtual bool isStorable()
+    {
+      return false;
+    }
+  };
   struct TypeRef : NodeDef, Type
   {};
 
@@ -527,6 +532,10 @@ namespace verona::ir
     Kind kind() override
     {
       return Kind::StoreMod;
+    }
+
+    bool isStorable() override {
+      return true;
     }
   };
 

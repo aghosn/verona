@@ -537,6 +537,7 @@ namespace verona::ir
       {
         auto store = make_shared<StoreType>();
         dropExpected(TokenKind::Store);
+        // TODO should avoid recursive store.
         store->type = parseTypeRef();
         result = store;
         break;
