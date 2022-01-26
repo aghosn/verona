@@ -1,3 +1,4 @@
+#include <string>
 #include <vector>
 #include <llvm/Demangle/Demangle.h>
 
@@ -9,14 +10,35 @@ namespace verona::interop
 {
   static const char* DISPATCHER_NAME = "interop_dispacth_function"; 
 
-  static Function* find_exporters(Module& mod)
+  static vector<Function*> find_exporters(Module& mod)
   {
     vector<Function*> result;
-    auto name = exporter_class_name + METHOD_NAME;
-
     for (auto& f: mod)
     {
-      cout << "The name of the function: " << demangle(f.getName().str()) << endl;
+      auto fname = demangle(f.getName().str());
+      // TODO try to figure out a better way
+      if (fname.find(exporter_class_name) != string::npos &&
+          fname.find(METHOD_NAME) != string::npos) {
+        result.push_back(&f);
+        cout << fname << endl;
+      }
+    }
+    return result;
+  }
+
+  static Function* find_function(Module& mod, string name)
+  {
+    for (auto& f: mod)
+    {
+      auto fname = demangle(f.getName().str());
+      auto idx = fname.find('(');
+      if (idx != string::npos)
+      {
+        fname = fname.substr(0, idx);
+      }
+      if (fname == name) {
+        return &f;
+      }
     }
     return nullptr;
   }
@@ -24,6 +46,9 @@ namespace verona::interop
   void generate_dispatch_function(Module& mod) 
   {
     IRBuilder<> builder(mod.getContext());
+
+    // Find the exporter functions
+    auto exporters = find_exporters(mod);
     
     vector<Type*> types {
       Type::getInt64Ty(mod.getContext()),
@@ -47,11 +72,11 @@ namespace verona::interop
     {
       BasicBlock *BC = BasicBlock::Create(mod.getContext(), "C", proto);
       SI->addCase(ConstantInt::get(mod.getContext(), APInt(64, i, true)), BC);
+      auto *f = find_function(mod, target_functions[i]); 
+      assert(f != nullptr);
     }
 
-    find_exporters(mod);
-    cout << "------------\n\n" << endl;
-    
+     
     proto->dump();
   }
 

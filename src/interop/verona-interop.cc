@@ -371,7 +371,7 @@ int main(int argc, char** argv)
   assert(mod != nullptr);
 
   // LLVM IR instrumentation
-  if (gendispatch)
+  if (sandbox && gendispatch)
   {
     generate_dispatch_function(*mod);    
   }
