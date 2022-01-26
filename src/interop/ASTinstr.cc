@@ -9,7 +9,7 @@ using namespace std;
 namespace verona::interop
 {
   static const char* SANDBOX_INIT = "sandbox_init";
-  static const char* METHOD_NAME = "export_function";
+  const char* METHOD_NAME = "export_function";
 
   vector<string> target_functions;
   string exporter_class_name;

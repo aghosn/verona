@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "ASTinstr.h"
+#include "IRinstr.h"
 #include "CXXInterface.h"
 #include "FS.h"
 #include "config.h"
@@ -54,6 +55,12 @@ namespace
     cl::desc("<includes file> A file with a list of include directories"),
     cl::Optional,
     cl::value_desc(includes));
+  // Generate the dispatch_function
+  cl::opt<bool> gendispatch(
+    "gendispatch",
+    cl::desc("Generate the dispatcher with llvm IR"),
+    cl::Optional,
+    cl::init(false));
 
   // For help's sake, will never be parsed, as we intercept
   cl::opt<string> config(
@@ -362,6 +369,12 @@ int main(int argc, char** argv)
   // This is silent, just to make sure nothing breaks here
   auto mod = interface.emitLLVM();
   assert(mod != nullptr);
+
+  // LLVM IR instrumentation
+  if (gendispatch)
+  {
+    generate_dispatch_function(*mod);    
+  }
 
   // Dump LLVM IR for debugging purposes
   // NOTE: Output is not stable, don't use it for tests

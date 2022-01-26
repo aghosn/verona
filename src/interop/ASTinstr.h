@@ -17,6 +17,10 @@ namespace verona::interop
   // It must have an 'export_function' static method.
   extern string exporter_class_name; 
 
+  // The name of the exporter_class_name's method responsible for exports.
+  // It must be a template class that depends on the ret and arg types.
+  extern const char* METHOD_NAME;
+
   void specialize_export_function(CXXInterface& interface);
 
 } // namespace verona::interop;
