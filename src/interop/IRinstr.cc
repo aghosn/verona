@@ -20,7 +20,6 @@ namespace verona::interop
       if (fname.find(exporter_class_name) != string::npos &&
           fname.find(METHOD_NAME) != string::npos) {
         result.push_back(&f);
-        cout << fname << endl;
       }
     }
     return result;
@@ -48,8 +47,11 @@ namespace verona::interop
     assert(target != nullptr);
     for (auto f: exporters)
     {
-      assert(f->args.size() == 1)
-      
+      assert(f->arg_size() == 1);
+      auto arg = f->getArg(0);
+      if (arg->getType() == target->getType()) {
+        return f;
+      }
     }
     return nullptr;
   }
@@ -74,10 +76,13 @@ namespace verona::interop
     // Create the function body: a switch on the first argument.
     auto index = proto->getArg(0);
     
-    // Default case.
+    // Body.
     BasicBlock *body = BasicBlock::Create(mod.getContext(), "body", proto);
     builder.SetInsertPoint(body);
-    
+
+    // End.
+    BasicBlock *end = BasicBlock::Create(mod.getContext(), "end", proto);
+
     SwitchInst *SI = builder.CreateSwitch(index, body, target_functions.size());
     for (int i = 0; i < target_functions.size(); i++) 
     {
@@ -85,11 +90,16 @@ namespace verona::interop
       SI->addCase(ConstantInt::get(mod.getContext(), APInt(64, i, true)), BC);
       auto *f = find_function(mod, target_functions[i]); 
       assert(f != nullptr);
-      cout << "The function type " << f->getType() << endl;
+      auto *e = find_exporter(exporters, f);
+      assert(e != nullptr);
+      vector<Value*> args {f};
+      builder.SetInsertPoint(BC);
+      auto call = builder.CreateCall(e, args);
+      BranchInst* BI = BranchInst::Create(end);
+      BI->insertAfter(call);
     }
-
-     
-    proto->dump();
+    builder.SetInsertPoint(end);
+    builder.CreateRet(nullptr);
   }
 
 } // namespace verona::interop
