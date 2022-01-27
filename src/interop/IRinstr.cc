@@ -9,19 +9,25 @@
 namespace verona::interop
 {
   static const char* DISPATCHER_NAME = "interop_dispacth_function"; 
+  static const char* DISPATCH_METHOD_NAME = "call_function";
 
   static vector<Function*> find_exporters(Module& mod)
   {
     vector<Function*> result;
+    cout << "Program Functions" << endl;
+    cout << "-----------------" << endl;
     for (auto& f: mod)
     {
       auto fname = demangle(f.getName().str());
+      cout << fname << endl;
       // TODO try to figure out a better way
       if (fname.find(exporter_class_name) != string::npos &&
-          fname.find(METHOD_NAME) != string::npos) {
+          fname.find(DISPATCH_METHOD_NAME) != string::npos) {
+        cout << "Found it!" << endl;
         result.push_back(&f);
       }
     }
+    cout << "-----------------" << endl;
     return result;
   }
 
@@ -62,6 +68,7 @@ namespace verona::interop
     vector<Type*> types {
       Type::getInt64Ty(mod.getContext()),
       Type::getInt8PtrTy(mod.getContext())};
+    auto exporters = find_exporters(mod);
     
     // Declare the function.
     FunctionType* FT = 

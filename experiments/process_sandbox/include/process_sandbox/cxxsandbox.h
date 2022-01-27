@@ -251,9 +251,24 @@ namespace sandbox
   template<typename Ret, typename... Args>
   class ClangExporter {
     public:
+      using CallFrame = argframe<Ret, Args...>;
       static void export_function(Ret (*fn)(Args...))
       {
         ExportedLibrary::export_function(fn);
+      }
+
+      static void call_function(Ret (*fn)(Args...), void* callframe)
+      {
+        assert(callframe != nullptr);
+        auto frame = (static_cast<CallFrame*>(callframe)); 
+        if constexpr(!std::is_void_v<Ret>)
+        {
+          frame->ret = std::apply(fn, frame->args);
+        }
+        else 
+        {
+          std::apply(fn, frame->args);
+        }
       }
   };
 
