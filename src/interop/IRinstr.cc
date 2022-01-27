@@ -59,10 +59,6 @@ namespace verona::interop
   void generate_dispatch_function(Module& mod) 
   {
     IRBuilder<> builder(mod.getContext());
-
-    // Find the exporter functions
-    auto exporters = find_exporters(mod);
-    
     vector<Type*> types {
       Type::getInt64Ty(mod.getContext()),
       Type::getInt8PtrTy(mod.getContext())};
@@ -90,11 +86,9 @@ namespace verona::interop
       SI->addCase(ConstantInt::get(mod.getContext(), APInt(64, i, true)), BC);
       auto *f = find_function(mod, target_functions[i]); 
       assert(f != nullptr);
-      auto *e = find_exporter(exporters, f);
-      assert(e != nullptr);
-      vector<Value*> args {f};
+      vector<Value*> args {proto->getArg(1)};
       builder.SetInsertPoint(BC);
-      auto call = builder.CreateCall(e, args);
+      auto call = builder.CreateCall(f, args);
       BranchInst* BI = BranchInst::Create(end);
       BI->insertAfter(call);
     }
