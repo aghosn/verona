@@ -43,6 +43,17 @@ namespace verona::interop
     return nullptr;
   }
 
+  static Function* find_exporter(vector<Function*> exporters, Function* target)
+  {
+    assert(target != nullptr);
+    for (auto f: exporters)
+    {
+      assert(f->args.size() == 1)
+      
+    }
+    return nullptr;
+  }
+
   void generate_dispatch_function(Module& mod) 
   {
     IRBuilder<> builder(mod.getContext());
@@ -74,6 +85,7 @@ namespace verona::interop
       SI->addCase(ConstantInt::get(mod.getContext(), APInt(64, i, true)), BC);
       auto *f = find_function(mod, target_functions[i]); 
       assert(f != nullptr);
+      cout << "The function type " << f->getType() << endl;
     }
 
      
