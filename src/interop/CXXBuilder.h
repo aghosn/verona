@@ -8,6 +8,7 @@
 #include "Compiler.h"
 
 #include <iostream>
+#include <string>
 
 namespace verona::interop
 {
@@ -374,6 +375,178 @@ namespace verona::interop
       // Update the body and return
       caller->setBody(compStmt);
       return callStmt;
+    }
+
+    void findStructDef(clang::FunctionDecl* target) const
+    {
+      clang::CompoundStmt* body = llvm::dyn_cast<clang::CompoundStmt>(target->getBody());
+      auto *stmt = llvm::dyn_cast<clang::MemberExpr>(body->body_back()); 
+      auto *member = stmt->getMemberDecl();
+      member->dump();
+    }
+
+    clang::CXXRecordDecl* createStruct(clang::FunctionDecl* target) const
+    {
+      // TODO add void  to the query thing 
+      clang::QualType voidQual = ast->VoidTy; 
+      auto voidStar = ast->getPointerType(voidQual);
+      llvm::SmallVector<clang::QualType, 0> args{voidStar};
+      auto proxy = buildFunction(/*TODO name*/ "proxy_name", args, target->getReturnType());
+      
+      // Generate a struct that corresponds to target arguments.
+      auto loc = proxy->getLocation(); 
+      //auto group = clang::DeclGroup::Create(*ast, nullptr, 0);  
+      //auto decl = new clang::DeclStmt(group, loc, loc);
+      clang::IdentifierInfo& structName = ast->Idents.get("tmp_struct");
+      //auto record = clang::CXXRecordDecl::Create(*ast, clang::TTK_Struct, proxy/*ast->getTranslationUnitDecl()*/, loc, loc, &structName);
+      auto record = ast->buildImplicitRecord("tmp_struct");
+      record->startDefinition();
+      std::vector<clang::FieldDecl*> fields;
+      int counter = 0;
+      for (auto p: target->parameters())
+      {
+        auto type = p->getType();
+        clang::IdentifierInfo& fieldName = ast->Idents.get("a"+std::to_string(counter));
+        auto field = clang::FieldDecl::Create(*ast, record, loc, loc, &fieldName, type, ast->getTrivialTypeSourceInfo(type), nullptr, true, clang::ICIS_NoInit); 
+        field->setAccess(clang::AS_public);
+        record->addDecl(field);
+        fields.push_back(field);
+        counter++;
+      }
+      record->completeDefinition();
+
+      // Create a local variable and cast void ptr to the struct type.
+      clang::ParmVarDecl* voidptr = proxy->getParamDecl(0);
+      clang::IdentifierInfo& castId = ast->Idents.get("_a_");
+      auto qualType = ast->getRecordType(record);
+      auto ptrQualType = ast->getPointerType(qualType);
+      auto strct = clang::VarDecl::Create(
+          *ast,
+          proxy,
+          loc,
+          loc,
+          &castId,
+          ptrQualType,
+          ast->getTrivialTypeSourceInfo(ptrQualType),
+          clang::StorageClass::SC_None);
+      clang::NestedNameSpecifierLoc spec1;
+      auto declRef = clang::DeclRefExpr::Create(
+          *ast,
+          spec1,
+          loc,
+          voidptr,
+          false,
+          loc,
+          voidptr->getOriginalType(),
+          clang::VK_LValue);
+      auto castExpr = clang::ImplicitCastExpr::Create(
+          *ast,
+          ast->getPointerType(qualType),
+          clang::CK_LValueToRValue,
+          declRef,
+          nullptr,
+          clang::VK_LValue,
+          clang::FPOptionsOverride());
+      auto cCast = clang::CStyleCastExpr::Create(
+          *ast,
+          ptrQualType,
+          clang::VK_LValue,
+          clang::CK_BitCast,
+          castExpr,
+          nullptr,
+          clang::FPOptionsOverride(),
+          ast->getTrivialTypeSourceInfo(ptrQualType),
+          strct->getLocation(),
+          loc);
+      strct->setInit(cCast);
+      // Create arguments and type cast.
+      std::vector<clang::Expr*> memberArgs;
+      int i = 0;
+      for (auto p: target->parameters())
+      {
+        clang::NestedNameSpecifierLoc spec;
+        // Reference to the local variable.
+        auto declRef = clang::DeclRefExpr::Create(
+            *ast,
+            spec,
+            loc,
+            strct,
+            false,
+            loc,
+            ptrQualType,
+            clang::VK_LValue);
+        auto implicit = clang::ImplicitCastExpr::Create(
+            *ast,
+            ptrQualType,
+            clang::CK_LValueToRValue,
+            declRef,
+            nullptr,
+            clang::VK_LValue,
+            clang::FPOptionsOverride());
+        auto member = clang::MemberExpr::CreateImplicit(
+            *ast,
+            implicit,
+            true,
+            fields[i]/*member??*/,
+            p->getOriginalType(),
+            clang::VK_LValue,
+            clang::OK_BitField);
+        auto arg = clang::ImplicitCastExpr::Create(
+            *ast,
+            p->getOriginalType(),
+            clang::CK_LValueToRValue,
+            member,
+            nullptr,
+            clang::VK_LValue,
+            clang::FPOptionsOverride());
+        // Add the argument.
+        memberArgs.push_back(arg);
+        i++;
+      }
+
+      // Create the function call.
+      clang::DeclarationNameInfo info;
+      clang::NestedNameSpecifierLoc spec;
+      auto funcTy = target->getFunctionType();
+      auto funcQualTy = clang::QualType(funcTy, 0);
+      auto expr = clang::DeclRefExpr::Create(
+          *ast,
+          spec,
+          loc,
+          target,
+          false,
+          info,
+          funcQualTy,
+          clang::VK_LValue);
+
+      // Implicit cast to function pointer.
+      auto implCast = clang::ImplicitCastExpr::Create(
+          *ast,
+          ast->getPointerType(funcQualTy),
+          clang::CK_FunctionToPointerDecay,
+          expr,
+          nullptr,
+          clang::VK_PRValue,
+          clang::FPOptionsOverride());
+
+      auto call = clang::CallExpr::Create(
+          *ast,
+          implCast,
+          memberArgs,
+          target->getReturnType(),
+          clang::VK_PRValue,
+          loc,
+          clang::FPOptionsOverride());
+          
+      std::vector<clang::Stmt*>lines;
+      //lines.push_back(record);
+      lines.push_back(call);  
+      
+      auto compStmt = clang::CompoundStmt::Create(*ast, lines, loc, loc);
+      proxy->setBody(compStmt);
+      proxy->dump();
+
+      return nullptr;
     }
 
     /**

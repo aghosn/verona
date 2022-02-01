@@ -105,28 +105,11 @@ namespace verona::interop
       clang::CXXMethodDecl* exportFunction = nullptr;
       for (auto* c : classSpecialization->methods())
       {
-        //builder->markAsUsed(c);
         if (exportFunction == nullptr && c->isStatic() && c->getName() == METHOD_NAME)
         {
           exportFunction = c;
-          //break;
+          break;
         } 
-        else
-        {
-          //builder->markAsUsed(c);
-          c->setIsUsed();
-          c->markUsed(*builder->getASTContext());
-          c->setReferenced();
-          if (c->getName() == "call_function")
-          {
-            cout << "Found some function " << c->getName().str() << endl;
-            //auto type = c->parameters()[1]->getType();
-            cout << "--------------------" << endl;
-            c->dump();
-            //type->dump();
-            cout << "--------------------" << endl;
-          }
-        }
       }
       assert(exportFunction != nullptr);
       std::vector<clang::ValueDecl*> args;
@@ -134,6 +117,10 @@ namespace verona::interop
       auto call = builder->createMemberCallFunctionArg(
         exportFunction, args, intTy, sbInit);
       calls.push_back(call);
+     /* if (target == "foo") {
+        builder->findStructDef(decl);
+      }*/
+      builder->createStruct(decl);
     }
     clang::SourceLocation loc = sbInit->getLocation();
     // Return statement

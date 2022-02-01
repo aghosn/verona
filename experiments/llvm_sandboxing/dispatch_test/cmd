@@ -1,0 +1,3 @@
+#!/bin/bash
+
+../../../build/dist/verona-interop --sandbox --includes="includes.txt" --targets="targets.txt" --gendispatch main.cc
