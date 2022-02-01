@@ -414,6 +414,11 @@ namespace verona::interop
         counter++;
       }
       record->completeDefinition();
+     
+      auto &sema = Clang->getSema();
+      auto groupPtr = sema.ConvertDeclToDeclGroup(record);
+      //auto recDecl = new (clang::DeclStmt)(groupPtr.get(), loc, loc);
+      auto recDecl = sema.ActOnDeclStmt(groupPtr, loc, loc);
 
       // Create a local variable and cast void ptr to the struct type.
       clang::ParmVarDecl* voidptr = proxy->getParamDecl(0);
@@ -459,6 +464,10 @@ namespace verona::interop
           strct->getLocation(),
           loc);
       strct->setInit(cCast);
+
+      groupPtr = sema.ConvertDeclToDeclGroup(strct);
+      auto varDecl = sema.ActOnDeclStmt(groupPtr, loc, loc); //clang::DeclStmt(groupPtr.get(), loc, loc);
+      
       // Create arguments and type cast.
       std::vector<clang::Expr*> memberArgs;
       int i = 0;
@@ -540,6 +549,8 @@ namespace verona::interop
           
       std::vector<clang::Stmt*>lines;
       //lines.push_back(record);
+      lines.push_back(recDecl.get());
+      lines.push_back(varDecl.get());
       lines.push_back(call);  
       
       auto compStmt = clang::CompoundStmt::Create(*ast, lines, loc, loc);
