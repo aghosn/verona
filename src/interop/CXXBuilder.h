@@ -556,6 +556,7 @@ namespace verona::interop
       auto compStmt = clang::CompoundStmt::Create(*ast, lines, loc, loc);
       proxy->setBody(compStmt);
       proxy->dump();
+      std::cout << "-------------------------" << std::endl;
 
       return nullptr;
     }
