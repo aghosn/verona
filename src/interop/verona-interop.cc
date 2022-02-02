@@ -354,8 +354,10 @@ int main(int argc, char** argv)
   //  Generate the sandbox instrumentation.
   if (sandbox)
   {
-    // Check that we have the list of targets.
-    specialize_export_function(interface);
+    //TODO Check that we have the list of targets.
+    //TODO remove this eventually, we don't need it
+    //specialize_export_function(interface);
+    generate_dispatchers(interface);
   }
 
   // Dumps the AST before trying to emit LLVM for debugging purposes

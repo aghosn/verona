@@ -12,6 +12,8 @@
 
 namespace verona::interop
 {
+
+  static const char* DISP_PREFIX = "_verona_proxy_";
   /**
    * C++ Builder Interface.
    *
@@ -377,28 +379,19 @@ namespace verona::interop
       return callStmt;
     }
 
-    void findStructDef(clang::FunctionDecl* target) const
-    {
-      clang::CompoundStmt* body = llvm::dyn_cast<clang::CompoundStmt>(target->getBody());
-      auto *stmt = llvm::dyn_cast<clang::MemberExpr>(body->body_back()); 
-      auto *member = stmt->getMemberDecl();
-      member->dump();
-    }
-
-    clang::CXXRecordDecl* createStruct(clang::FunctionDecl* target) const
+    // TODO For the moment we do not have a return value ...
+    void generateDispatcher(clang::FunctionDecl* target) const
     {
       // TODO add void  to the query thing 
       clang::QualType voidQual = ast->VoidTy; 
       auto voidStar = ast->getPointerType(voidQual);
       llvm::SmallVector<clang::QualType, 0> args{voidStar};
-      auto proxy = buildFunction(/*TODO name*/ "proxy_name", args, target->getReturnType());
+      std::string name = DISP_PREFIX + target->getName().str();
+      auto proxy = buildFunction(name, args, target->getReturnType());
       
       // Generate a struct that corresponds to target arguments.
       auto loc = proxy->getLocation(); 
-      //auto group = clang::DeclGroup::Create(*ast, nullptr, 0);  
-      //auto decl = new clang::DeclStmt(group, loc, loc);
       clang::IdentifierInfo& structName = ast->Idents.get("tmp_struct");
-      //auto record = clang::CXXRecordDecl::Create(*ast, clang::TTK_Struct, proxy/*ast->getTranslationUnitDecl()*/, loc, loc, &structName);
       auto record = ast->buildImplicitRecord("tmp_struct");
       record->startDefinition();
       std::vector<clang::FieldDecl*> fields;
@@ -422,6 +415,9 @@ namespace verona::interop
 
       // Create a local variable and cast void ptr to the struct type.
       clang::ParmVarDecl* voidptr = proxy->getParamDecl(0);
+      // Necessary, otherwise it fails in codegen.
+      markAsUsed(voidptr);
+      voidptr->markUsed(*ast);
       clang::IdentifierInfo& castId = ast->Idents.get("_a_");
       auto qualType = ast->getRecordType(record);
       auto ptrQualType = ast->getPointerType(qualType);
@@ -434,6 +430,9 @@ namespace verona::interop
           ptrQualType,
           ast->getTrivialTypeSourceInfo(ptrQualType),
           clang::StorageClass::SC_None);
+      // Necessary, otherwise fails in codegen
+      markAsUsed(strct);
+      strct->markUsed(*ast);
       clang::NestedNameSpecifierLoc spec1;
       auto declRef = clang::DeclRefExpr::Create(
           *ast,
@@ -446,12 +445,14 @@ namespace verona::interop
           clang::VK_LValue);
       auto castExpr = clang::ImplicitCastExpr::Create(
           *ast,
-          ast->getPointerType(qualType),
+          voidptr->getOriginalType(),
           clang::CK_LValueToRValue,
           declRef,
           nullptr,
           clang::VK_LValue,
           clang::FPOptionsOverride());
+      // This might be required to avoid failing at codegen.
+      castExpr->setIsPartOfExplicitCast(true);
       auto cCast = clang::CStyleCastExpr::Create(
           *ast,
           ptrQualType,
@@ -490,7 +491,7 @@ namespace verona::interop
             clang::CK_LValueToRValue,
             declRef,
             nullptr,
-            clang::VK_LValue,
+            /*clang::VK_LValue*/clang::VK_PRValue,
             clang::FPOptionsOverride());
         auto member = clang::MemberExpr::CreateImplicit(
             *ast,
@@ -506,7 +507,7 @@ namespace verona::interop
             clang::CK_LValueToRValue,
             member,
             nullptr,
-            clang::VK_LValue,
+            /*clang::VK_LValue*/clang::VK_PRValue,
             clang::FPOptionsOverride());
         // Add the argument.
         memberArgs.push_back(arg);
@@ -555,10 +556,7 @@ namespace verona::interop
       
       auto compStmt = clang::CompoundStmt::Create(*ast, lines, loc, loc);
       proxy->setBody(compStmt);
-      proxy->dump();
-      std::cout << "-------------------------" << std::endl;
-
-      return nullptr;
+      markAsUsed(proxy);
     }
 
     /**

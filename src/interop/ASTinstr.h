@@ -21,6 +21,8 @@ namespace verona::interop
   // It must be a template class that depends on the ret and arg types.
   extern const char* METHOD_NAME;
 
+  void generate_dispatchers(CXXInterface& interface);
+
   void specialize_export_function(CXXInterface& interface);
 
 } // namespace verona::interop;

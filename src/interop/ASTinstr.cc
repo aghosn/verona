@@ -69,6 +69,22 @@ namespace verona::interop
     return retval;
   }
 
+  void generate_dispatchers(CXXInterface& interface)
+  {
+    const CXXQuery* query = interface.getQuery();
+    const CXXBuilder* builder = interface.getBuilder();
+    assert(query != nullptr);
+    assert(builder != nullptr);
+    
+    // Generate dispatchers for each target
+    for (auto target: target_functions)
+    {
+      clang::FunctionDecl* decl = query->getFunction(target);
+      assert(decl != nullptr);
+      builder->generateDispatcher(decl);
+    }
+  }
+
   void specialize_export_function(CXXInterface& interface)
   {
     const CXXQuery* query = interface.getQuery();
@@ -117,10 +133,6 @@ namespace verona::interop
       auto call = builder->createMemberCallFunctionArg(
         exportFunction, args, intTy, sbInit);
       calls.push_back(call);
-     /* if (target == "foo") {
-        builder->findStructDef(decl);
-      }*/
-      builder->createStruct(decl);
     }
     clang::SourceLocation loc = sbInit->getLocation();
     // Return statement

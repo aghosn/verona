@@ -28,7 +28,16 @@ namespace verona::interop
 
   static Function* find_function(Module& mod, string name)
   {
+    auto dispatcher = DISP_PREFIX + name; 
     for (auto& f: mod)
+    {
+      auto fname = demangle(f.getName().str());
+      if (fname.find(dispatcher) != std::string::npos)
+      {
+        return &f;
+      }
+    }
+    /*for (auto& f: mod)
     {
       auto fname = demangle(f.getName().str());
       auto idx = fname.find('(');
@@ -39,7 +48,7 @@ namespace verona::interop
       if (fname == name) {
         return &f;
       }
-    }
+    }*/
     return nullptr;
   }
 
