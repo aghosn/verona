@@ -387,7 +387,9 @@ namespace verona::interop
       auto voidStar = ast->getPointerType(voidQual);
       llvm::SmallVector<clang::QualType, 0> args{voidStar};
       std::string name = DISP_PREFIX + target->getName().str();
-      auto proxy = buildFunction(name, args, target->getReturnType());
+
+      // All proxies have `void` return type.
+      auto proxy = buildFunction(name, args, voidQual/*target->getReturnType()*/);
       
       // Generate a struct that corresponds to target arguments.
       auto loc = proxy->getLocation(); 
@@ -406,11 +408,21 @@ namespace verona::interop
         fields.push_back(field);
         counter++;
       }
+      
+      // Handle return type:
+      if (target->getReturnType() != voidQual)
+      {
+        auto type = target->getReturnType();
+        clang::IdentifierInfo& retName = ast->Idents.get("ret");
+        auto field = clang::FieldDecl::Create(*ast, record, loc, loc, &retName, type, ast->getTrivialTypeSourceInfo(type), nullptr, true, clang::ICIS_NoInit);
+        field->setAccess(clang::AS_public);
+        record->addDecl(field);
+        fields.push_back(field);
+      }
       record->completeDefinition();
      
       auto &sema = Clang->getSema();
       auto groupPtr = sema.ConvertDeclToDeclGroup(record);
-      //auto recDecl = new (clang::DeclStmt)(groupPtr.get(), loc, loc);
       auto recDecl = sema.ActOnDeclStmt(groupPtr, loc, loc);
 
       // Create a local variable and cast void ptr to the struct type.
@@ -552,7 +564,51 @@ namespace verona::interop
       //lines.push_back(record);
       lines.push_back(recDecl.get());
       lines.push_back(varDecl.get());
-      lines.push_back(call);  
+
+      // If there is a non-void return type, assign the result to the struct.
+      if (target->getReturnType() != voidQual)
+      {
+       clang::NestedNameSpecifierLoc spec;
+       auto retField = fields.back();
+       auto declRef = clang::DeclRefExpr::Create(
+            *ast,
+            spec,
+            loc,
+            strct,
+            false,
+            loc,
+            ptrQualType,
+            clang::VK_LValue);
+        auto implicit = clang::ImplicitCastExpr::Create(
+            *ast,
+            ptrQualType,
+            clang::CK_LValueToRValue,
+            declRef,
+            nullptr,
+            clang::VK_PRValue,
+            clang::FPOptionsOverride());
+        auto member = clang::MemberExpr::CreateImplicit(
+            *ast,
+            implicit,
+            true,
+            retField,
+            target->getReturnType(),
+            clang::VK_LValue,
+            clang::OK_BitField);
+        auto binop = clang::BinaryOperator::Create(
+            *ast, 
+            member,
+            call,
+            clang::BO_Assign,
+            target->getReturnType(),
+            clang::VK_LValue,
+            clang::OK_BitField,
+            loc,
+            clang::FPOptionsOverride());
+        lines.push_back(binop);
+      } else {
+        lines.push_back(call);
+      }
       
       auto compStmt = clang::CompoundStmt::Create(*ast, lines, loc, loc);
       proxy->setBody(compStmt);

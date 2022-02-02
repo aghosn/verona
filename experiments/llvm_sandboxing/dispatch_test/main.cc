@@ -1,5 +1,6 @@
 //#include <process_sandbox/cxxsandbox.h>
-void foo(int a, int b) {
+int foo(int a, int b) {
+  return a+b;
 }
 
 void bar(int a, int b) {}
