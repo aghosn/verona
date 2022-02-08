@@ -39,7 +39,7 @@ int main(int argc, const char** argv)
     l->accept(&printer);
   }
 
-  Interpreter interp(parser);
+  Interpreter interp(&parser);
   interp.eval();
   return 0;
 }

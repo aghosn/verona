@@ -89,6 +89,7 @@ namespace mlexer
     this->la = 0;
     while (std::getline(file, str))
     {
+      content.push_back(str);
       this->pos = 0;
       // Skip empty lines
       if (!std::all_of(str.begin(), str.end(), isspace))
@@ -314,6 +315,29 @@ namespace mlexer
         assert(0);
     }
     return nullptr;
+  }
+
+  void Lexer::dump(int la, int col, int lines, bool error)
+  {
+    if (la < 0 || la >= content.size())
+    {
+      std::cerr << "------------ No valid source info -------------" << std::endl;
+      return;
+    }
+
+    int end = ((la + lines) < content.size())? la+lines : content.size()-1;
+    for (int i = la; i <= end; i++) {
+      std::cerr << content[i] << std::endl;
+      if (i == la && error && col >= 0 && col < content[i].size())
+      {
+        // TODO cleaner way of doing this?
+        for (int j = 0; j < col; j++)
+        {
+          std::cerr << " ";
+        }
+        std:: cerr << "^" << std::endl;
+      }
+    }
   }
 
 } // namespace mlexer

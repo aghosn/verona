@@ -11,7 +11,7 @@ namespace interpreter {
    */
   class Interpreter: public ir::Visitor {
     public:
-      Interpreter(ir::Parser parser);
+      Interpreter(ir::Parser* parser);
       /**
        * Returns false if we have more instructions, true if we are done.
        */
@@ -20,6 +20,7 @@ namespace interpreter {
       void visit(ir::NodeDef* node);
     private:
       State state;
+      ir::Parser* parser;
 
     void evalVar(verona::ir::Var& node);
     void evalDup(verona::ir::Dup& node);

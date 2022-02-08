@@ -82,6 +82,9 @@ namespace mlexer
     std::string file;
     std::vector<Line> lines;
 
+    // For debug, keep the original content
+    std::vector<std::string> content;
+
     Lexer(std::string path);
     ~Lexer();
 
@@ -92,6 +95,7 @@ namespace mlexer
     Token peek();
     void rewind();
     void reset();
+    void dump(int la, int col, int lines, bool error);
 
   private:
     void parseFile();
