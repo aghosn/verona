@@ -329,7 +329,7 @@ Interpreter::Interpreter(ir::Parser parser) {
     // v ∈ StorageLoc ⇒ ¬iso(σ, ι)
     Shared<ir::Value> v = nullptr;
     switch(m->kind()) {
-      case ir::Kind::Function:
+      case ir::Kind::FunctionID:
         v = m;
         break;
       case ir::Kind::StorageLoc:

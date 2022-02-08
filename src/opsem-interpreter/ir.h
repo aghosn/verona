@@ -17,6 +17,7 @@ namespace verona::ir
     ID,
     TypeID,
     ObjectID,
+    FunctionID,
     StorageLoc,
     Var,
     Dup,
@@ -181,12 +182,12 @@ namespace verona::ir
   };
 
   // Member ::= Function | Id
-  struct Member /*: Expr*/
+  struct Member : NodeDef/*: Expr*/
   {};
 
   // TODO(aghosn) quick way to change if I fucked up.
   // Let's take a litteral approach to the problem.
-  struct ID : Identifier, Member, NodeDef
+  struct ID : Identifier, Member
   {
     Kind kind() override
     {
@@ -554,7 +555,7 @@ namespace verona::ir
     }
   };
   // Class member field
-  struct Field : Member, NodeDef
+  struct Field : Member 
   {
     Node<ID> id;
     Node<Type> type;
@@ -573,7 +574,18 @@ namespace verona::ir
     }
   };
 
-  struct Function : Value, Apply, Member
+  /**
+   * TODO(aghosn) introduced this to act as function reference and value;
+   */
+  struct FunctionID : Value, Identifier
+  {
+    Kind kind() override
+    {
+      return Kind::FunctionID;
+    }
+  };
+
+  struct Function : Apply, Member
   {
     List<Expr> exprs;
 
