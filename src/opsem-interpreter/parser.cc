@@ -13,8 +13,29 @@ namespace verona::ir
 
   Parser::~Parser(){};
 
+  // Statement := Expr | Function
+  Node<NodeDef> Parser::parseStatement()
+  {
+    Token t = lexer.peek();
+    switch (t.kind)
+    {
+      case TokenKind::Function:
+        {
+          dropExpected(TokenKind::Function);
+          auto func = parseFunction();
+          func->tok = t;
+          return func;
+        }
+        assert(0);
+      default:
+        return parseExpression();
+    }
+    assert(0);
+    return nullptr;
+  }
+
   // Parses an expression
-  Node<Expr> Parser::parseStatement()
+  Node<Expr> Parser::parseExpression()
   {
     // Can only be an identifier or a keyword
     Token t = lexer.next();
@@ -26,6 +47,7 @@ namespace verona::ir
         auto left = List<ID>();
         auto id = make_shared<ID>();
         id->name = t.text;
+        id->tok = t;
         left.push_back(id);
 
         // We have a list
@@ -45,6 +67,7 @@ namespace verona::ir
         auto call = parseApply();
         tailcall->function = call.first;
         tailcall->args = call.second;
+        tailcall->tok = t;
         parseEOL();
         return tailcall;
       }
@@ -66,6 +89,7 @@ namespace verona::ir
         branch->branch2->function = b2.first;
         branch->branch2->args = b2.second;
         parseEOL();
+        branch->tok = t;
         return branch;
       }
         assert(0);
@@ -74,14 +98,15 @@ namespace verona::ir
         auto ret = make_shared<Return>();
         ret->returns = parseListUntil(TokenKind::SemiColon);
         parseEOL();
+        ret->tok = t;
         return ret;
       }
         assert(0);
       case TokenKind::Error:
       {
         parseEOL();
-        // TODO(aghosn) fix
         auto err = make_shared<Err>();
+        err->tok = t;
         return err;
       }
         assert(0);
@@ -90,6 +115,7 @@ namespace verona::ir
         auto acquire = make_shared<Acquire>();
         acquire->target = parseIdentifier<ID>();
         parseEOL();
+        acquire->tok = t;
         return acquire;
       }
         assert(0);
@@ -99,6 +125,7 @@ namespace verona::ir
         // TODO handle the value case
         release->target = parseIdentifier<ID>();
         parseEOL();
+        release->tok = t;
         return release;
       }
         assert(0);
@@ -107,12 +134,8 @@ namespace verona::ir
         auto fulfill = make_shared<Fulfill>();
         fulfill->target = parseIdentifier<ID>();
         parseEOL();
+        fulfill->tok = t;
         return fulfill;
-      }
-        assert(0);
-      case TokenKind::Function:
-      {
-        return parseFunction();
       }
         assert(0);
       case TokenKind::Class:
@@ -122,6 +145,7 @@ namespace verona::ir
         classdecl->members = parseMembers();
         dropExpected(TokenKind::RBracket);
         parseEOL();
+        classdecl->tok = t;
         return classdecl;
       }
         assert(0);
@@ -133,6 +157,7 @@ namespace verona::ir
         call->function = apply.first;
         call->args = apply.second;
         parseEOL();
+        call->tok = t;
         return call;
       }
         assert(0);
@@ -193,6 +218,7 @@ namespace verona::ir
     lexer.next();
     auto id = make_shared<T>();
     id->name = t.text;
+    id->tok = t;
     return id;
   }
 
@@ -210,6 +236,7 @@ namespace verona::ir
     auto storage = make_shared<StorageLoc>();
     storage->objectid = oid;
     storage->id = id;
+    storage->tok = t;
     return storage;
   }
 
@@ -276,6 +303,7 @@ namespace verona::ir
       {
         auto ctch = make_shared<Catch>();
         ctch->left = v;
+        ctch->tok = t;
         return ctch;
       }
         assert(0);
@@ -283,6 +311,7 @@ namespace verona::ir
       {
         auto var = make_shared<Var>();
         var->left = v;
+        var->tok = t;
         return var;
       }
         assert(0);
@@ -291,6 +320,7 @@ namespace verona::ir
         auto dup = make_shared<Dup>();
         dup->y = parseIdentifier<ID>();
         dup->left = v;
+        dup->tok = t;
         return dup;
       }
         assert(0);
@@ -299,6 +329,7 @@ namespace verona::ir
         auto load = make_shared<Load>();
         load->left = v;
         load->source = parseIdentifier<ID>();
+        load->tok = t;
         return load;
       }
         assert(0);
@@ -308,6 +339,7 @@ namespace verona::ir
         store->left = v;
         store->y = parseStorageLoc();
         store->z = parseIdentifier<ID>();
+        store->tok = t;
         return store;
       }
         assert(0);
@@ -317,6 +349,7 @@ namespace verona::ir
         lookup->left = v;
         lookup->y = parseIdentifier<ID>();
         lookup->z = parseIdentifier<ID>();
+        lookup->tok = t;
         return lookup;
       }
         assert(0);
@@ -326,6 +359,7 @@ namespace verona::ir
         tpetest->left = v;
         tpetest->y = parseIdentifier<ID>();
         tpetest->type = parseTypeId();
+        tpetest->tok = t;
         return tpetest;
       }
         assert(0);
@@ -334,6 +368,7 @@ namespace verona::ir
         auto nnew = make_shared<NewAlloc>();
         nnew->left = v;
         nnew->type = parseTypeId();
+        nnew->tok = t;
         return nnew;
       }
         assert(0);
@@ -342,6 +377,7 @@ namespace verona::ir
         auto nstack = make_shared<StackAlloc>();
         nstack->left = v;
         nstack->type = parseTypeId();
+        nstack->tok = t;
         return nstack;
       }
         assert(0);
@@ -352,6 +388,7 @@ namespace verona::ir
         call->left = v;
         call->function = apply.first;
         call->args = apply.second;
+        call->tok = t;
         return call;
       }
         assert(0);
@@ -363,6 +400,7 @@ namespace verona::ir
         assert(apply.second.size() >= 1);
         region->function = apply.first;
         region->args = apply.second;
+        region->tok = t;
         return region;
       }
         assert(0);
@@ -374,6 +412,7 @@ namespace verona::ir
         create->left = v;
         create->function = apply.first;
         create->args = apply.second;
+        create->tok = t;
         return create;
       }
         assert(0);
@@ -382,6 +421,7 @@ namespace verona::ir
         auto freeze = make_shared<Freeze>();
         freeze->left = v;
         freeze->target = parseIdentifier<ID>();
+        freeze->tok = t;
         return freeze;
       }
         assert(0);
@@ -390,6 +430,7 @@ namespace verona::ir
         auto merge = make_shared<Merge>();
         merge->left = v;
         merge->target = parseIdentifier<ID>();
+        merge->tok = t;
         return merge;
       }
         assert(0);
@@ -411,6 +452,7 @@ namespace verona::ir
     lexer.next();
     auto id = make_shared<TypeId>();
     id->name = t.text;
+    id->tok = t;
     return id;
   }
 
@@ -421,7 +463,7 @@ namespace verona::ir
     parseEOL();
     while (lexer.peek().kind != TokenKind::RBracket)
     {
-      body.push_back(parseStatement());
+      body.push_back(parseExpression());
     }
     assert(lexer.peek().kind == TokenKind::RBracket);
     dropExpected(TokenKind::RBracket);
@@ -448,8 +490,10 @@ namespace verona::ir
           assert(0);
         case TokenKind::Function:
         {
+          Token t = lexer.peek();
           dropExpected(TokenKind::Function);
           auto function = parseFunction();
+          function->tok = t;
           members[function->function->name] = function;
           break;
         }
@@ -547,6 +591,7 @@ namespace verona::ir
         assert(0 && "Unknown type construct");
     }
     assert(result != nullptr);
+    result->tok = t;
     return result;
   }
 

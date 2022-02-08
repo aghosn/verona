@@ -1,0 +1,21 @@
+class Int {
+
+}
+
+class Obj {
+  a: Int
+}
+
+fn foo() {
+  x = stack Obj
+  y = stack Int
+  z = store x.a y
+  release z
+  return x
+}
+
+fn main(a, b) {
+  x = call foo()
+  release x
+  return
+}

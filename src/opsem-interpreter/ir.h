@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include <verona.h>
+#include "lexer.h"
 
 namespace rt = verona::rt;
 
@@ -12,7 +13,7 @@ namespace verona::ir
   enum class Kind
   {
     Invalid,
-    Identifier,
+    //Identifier,
     ID,
     TypeID,
     ObjectID,
@@ -103,6 +104,8 @@ namespace verona::ir
    */
   struct NodeDef
   {
+    mlexer::Token tok;
+
     // virtual ~NodeDef() = default;
     virtual Kind kind() = 0;
 
@@ -149,14 +152,14 @@ namespace verona::ir
    * @comment: I put it in a struct for the moment in case I need more than just
    * a name. Maybe replace with a constant or make it extend unescaped string?
    */
-  struct Identifier : Expr
+  struct Identifier /*: Expr*/
   {
     std::string name;
 
-    Kind kind() override
+    /*Kind kind() override
     {
       return Kind::Identifier;
-    }
+    }*/
   };
 
   struct Type
@@ -178,12 +181,12 @@ namespace verona::ir
   };
 
   // Member ::= Function | Id
-  struct Member : Expr
+  struct Member /*: Expr*/
   {};
 
   // TODO(aghosn) quick way to change if I fucked up.
   // Let's take a litteral approach to the problem.
-  struct ID : Identifier, Member
+  struct ID : Identifier, Member, NodeDef
   {
     Kind kind() override
     {
@@ -491,7 +494,7 @@ namespace verona::ir
     }
   };
 
-  struct TypeDecl : NodeDef, Type
+  struct TypeDecl : Type
   {
     List<TypeId> typeids;
     Map<Id, Member> members;
@@ -551,7 +554,7 @@ namespace verona::ir
     }
   };
   // Class member field
-  struct Field : Member
+  struct Field : Member, NodeDef
   {
     Node<ID> id;
     Node<Type> type;

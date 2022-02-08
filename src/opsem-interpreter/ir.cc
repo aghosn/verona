@@ -8,8 +8,8 @@ namespace verona::ir
     {
       case Kind::Invalid:
         return "Invalid";
-      case Kind::Identifier:
-        return "Identifier";
+      /*case Kind::Identifier:
+        return "Identifier";*/
       case Kind::ID:
         return "ID";
       case Kind::TypeID:

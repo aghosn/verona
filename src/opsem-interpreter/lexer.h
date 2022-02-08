@@ -65,6 +65,10 @@ namespace mlexer
     // TODO figure out what we want.
     std::string text;
     TokenKind kind;
+
+    // Debugging information
+    int la;
+    int pos;
   };
 
   using Line = std::vector<Token>;

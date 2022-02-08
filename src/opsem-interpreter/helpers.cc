@@ -53,9 +53,9 @@ namespace mlexer::helpers
     return true;
   }
 
-  vector<string> split(string& str)
+  vector<pair<string, int>> split(string& str)
   {
-    vector<string> result;
+    vector<pair<string, int>> result;
     if (str.size() == 0)
     {
       return result;
@@ -92,7 +92,7 @@ namespace mlexer::helpers
         std::cerr << "Full line: '" << str << "'" << endl;
         exit(EXIT_FAILURE);
       }
-      result.push_back(sub);
+      result.push_back(pair<string, int>{sub, front});
       front = current;
     }
     return result;

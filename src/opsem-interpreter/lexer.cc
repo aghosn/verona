@@ -86,14 +86,22 @@ namespace mlexer
     }
 
     std::string str;
+    this->la = 0;
     while (std::getline(file, str))
     {
+      this->pos = 0;
       // Skip empty lines
       if (!std::all_of(str.begin(), str.end(), isspace))
       {
         this->lines.push_back(this->parseLine(str));
       }
+
+      this->la++;
     }
+
+    // Reset la and pos
+    this->la = 0;
+    this->pos = 0;
   }
 
   // Helper function to split string according to whitespaces.
@@ -104,7 +112,10 @@ namespace mlexer
     auto words = split(line);
     for (auto w : words)
     {
-      result.push_back(parseWord(w));
+      auto word = parseWord(w.first);
+      word.la = la;
+      word.pos = w.second;
+      result.push_back(word);
     }
     Token t = {";", TokenKind::SemiColon};
     result.push_back(t);

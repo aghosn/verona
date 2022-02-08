@@ -25,7 +25,8 @@ namespace verona::ir
     void parseEOL();
     template<typename T>
     Node<T> parseIdentifier();
-    Node<Expr> parseStatement();
+    Node<NodeDef> parseStatement();
+    Node<Expr> parseExpression();
     Node<Function> parseFunction();
     List<Expr> parseBlock();
     Map<Id, Member> parseMembers();
