@@ -23,11 +23,11 @@ int main(int argc, const char** argv)
   }
   mlexer::Lexer lexer(argv[1]);
 
-  while (lexer.hasNext())
-  {
-    cout << " " << mlexer::tokenkindname(lexer.next().kind);
-  }
-  lexer.reset();
+  //while (lexer.hasNext())
+  //{
+  //  cout << " " << mlexer::tokenkindname(lexer.next().kind);
+  //}
+  //lexer.reset();
 
   Parser parser(lexer);
   parser.parse();
