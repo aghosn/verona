@@ -167,8 +167,8 @@ Interpreter::Interpreter(ir::Parser* parser) {
     string x = node.left[0]->name;
 
     // x ∉ σ
-    CHECK((!state.isDefinedInFrame(x)), "Name already defined");
-    CHECK(state.containsType(node.type->name), "Undefined type");
+    CHECK((!state.isDefinedInFrame(x)), E_NAME_DEF(x));
+    CHECK(state.containsType(node.type->name), E_TYPE_NOT_DEF(node.type->name));
 
     // ι ∉ σ
     //σ[ι↦(σ.frame.regions, τᵩ)]
@@ -197,18 +197,18 @@ Interpreter::Interpreter(ir::Parser* parser) {
   // σ, x = dup y; e* → σ[x↦σ(y)], acquire x; e*
   void Interpreter::evalDup(verona::ir::Dup& node)
   {
-    CHECK(node.left.size() == 1, "Need exactly one x");
+    CHECK(node.left.size() == 1, E_WRONG_NB(1, node.left.size()));
     string x = node.left[0]->name;
     string y = node.y->name;
 
     // x ∉ σ
-    CHECK(!state.isDefinedInFrame(x), "Name already defined");
+    CHECK(!state.isDefinedInFrame(x), E_NAME_DEF(x));
    
     // ¬iso(σ, σ(y))
-    CHECK(state.isDefinedInFrame(y), "Object not defined");
+    CHECK(state.isDefinedInFrame(y), E_NAME_NOT_DEF(y));
     auto yvalue = state.frameLookup(y);
     Shared<Object> target = state.getObjectByName(y);
-    CHECK(!target->obj->debug_is_iso(), "Target cannot be iso");
+    CHECK(!target->obj->debug_is_iso(), E_CANNOT_BE_ISO);
     
     // σ[x↦σ(y)]
     state.addInFrame(x, state.getValueByName(y));
@@ -224,24 +224,25 @@ Interpreter::Interpreter(ir::Parser* parser) {
   // σ, x = load y; e* → σ[x↦σ(f)], acquire x; e*
   void Interpreter::evalLoad(verona::ir::Load& node)
   {
-    CHECK(node.left.size() == 1, "Need exactly one x");
+    CHECK(node.left.size() == 1, E_WRONG_NB(1, node.left.size()));
     string x = node.left[0]->name;
     string y = node.source->name;
 
     // x ∉ σ
-    CHECK(!state.isDefinedInFrame(x), "x is not defined in frame");
+    CHECK(!state.isDefinedInFrame(x), E_NAME_DEF(x));
 
     // f = σ(y)
     // ¬iso(σ, σ(f))
-    CHECK(state.isDefinedInFrame(y), "y is not defined in frame");
+    CHECK(state.isDefinedInFrame(y), E_NAME_NOT_DEF(y));
     auto f = state.frameLookup(y);
-    CHECK(f->kind() == ir::Kind::StorageLoc, "f is not of storage kind");
+    CHECK(f->kind() == ir::Kind::StorageLoc, E_WRONG_KIND(ir::Kind::StorageLoc, f->kind()));
 
     auto storage = dynamic_pointer_cast<ir::StorageLoc>(f);
     ObjectId oid = storage->objectid->name;
     Id id = storage->id->name;
-    CHECK(state.objects.contains(oid), "No object with corresponding oid");
-    CHECK(state.fields.contains(oid) && state.fields[oid].contains(id), "No field for oid.id");
+    CHECK(state.objects.contains(oid), E_OID_NOT_DEF(oid));
+    CHECK(state.fields.contains(oid) && state.fields[oid].contains(id),
+        E_MISSING_FIELD(oid, id));
     
     auto value = state.fields[oid][id]; 
     // TODO check if this value corresponds to an iso object.
@@ -263,33 +264,33 @@ Interpreter::Interpreter(ir::Parser* parser) {
   //σ, x = store y z; e* → σ[f↦v][x↦σ(f)]\{z}, e*
   void Interpreter::evalStore(verona::ir::Store& node)
   {
-    CHECK(node.left.size() == 1, "Need exactly one x");
+    CHECK(node.left.size() == 1, E_WRONG_NB(1, node.left.size()));
     string x = node.left[0]->name;
     ir::Node<ir::StorageLoc> y = node.y;
     string z = node.z->name;
 
     //x ∉ σ
-    CHECK(!state.isDefinedInFrame(x), "Name x already defined");
+    CHECK(!state.isDefinedInFrame(x), E_NAME_DEF(x));
     // TODO norepeat
     //f = σ(y)
-    CHECK(state.isDefinedInFrame(y->objectid->name), "The object y is not defined");
+    CHECK(state.isDefinedInFrame(y->objectid->name), E_NAME_NOT_DEF(y->objectid->name));
     auto yoid = dynamic_pointer_cast<ir::ObjectID>(state.getValueByName(y->objectid->name)); 
-    CHECK(state.fields.contains(yoid->name), "The y object ID does not exist");
-    CHECK(state.fields[yoid->name].contains(y->id->name), "objectid does not have a field");
+    CHECK(state.fields.contains(yoid->name), E_OID_NOT_DEF(yoid->name));
+    CHECK(state.fields[yoid->name].contains(y->id->name), E_MISSING_FIELD(yoid->name, y->id->name));
     auto f = state.fields[yoid->name][y->id->name];
 
     // Check the field is storable
     // TODO find a better way to implement that.
     auto ytypeName = state.getObjectByName(y->objectid->name)->type; 
     auto ytypeDecl = state.getTypeByName(ytypeName);
-    CHECK(ytypeDecl->members.contains(y->id->name), "Field is unknown in the type");
+    CHECK(ytypeDecl->members.contains(y->id->name), E_MISSING_FIELD(ytypeName, y->id->name));
     auto _field = ytypeDecl->members[y->id->name];
-    CHECK(_field->kind() == ir::Kind::Field, "Member is not a field");
+    CHECK(_field->kind() == ir::Kind::Field, E_WRONG_KIND(ir::Kind::Field, _field->kind()));
     auto field = dynamic_pointer_cast<ir::Field>(_field);
-    CHECK(field->type->isStorable(), "The field is not storable");
+    CHECK(field->type->isStorable(), E_NOT_STORABLE((y->id->name)));
 
     //v = σ(z)
-    CHECK(state.isDefinedInFrame(z), "Source of store not defined");
+    CHECK(state.isDefinedInFrame(z), E_NAME_NOT_DEF(z));
     auto v = state.frameLookup(z);
     
     // σ[f↦v]
@@ -314,24 +315,24 @@ Interpreter::Interpreter(ir::Parser* parser) {
   //σ, x = lookup y z; e* → σ[x↦v], acquire x; e*
   void Interpreter::evalLookup(verona::ir::Lookup& node)
   {
-    CHECK(node.left.size() == 1, "Need exactly one x");
+    CHECK(node.left.size() == 1, E_WRONG_NB(1, node.left.size()));
     string x = node.left[0]->name;
     string y = node.y->name;
     string z = node.z->name;
 
     //x ∉ σ
-    CHECK(!state.isDefinedInFrame(x), "x already defined");
+    CHECK(!state.isDefinedInFrame(x), E_NAME_DEF(x));
 
     //ι = σ(y)
-    CHECK(state.isDefinedInFrame(y), "y not defined in frame");
+    CHECK(state.isDefinedInFrame(y), E_NAME_NOT_DEF(y));
     auto _l = state.getValueByName(y);
-    CHECK(_l->kind() == ir::Kind::ObjectID, "expecting objectid kind");
+    CHECK(_l->kind() == ir::Kind::ObjectID, E_WRONG_KIND(ir::Kind::ObjectID, _l->kind()));
     auto l = dynamic_pointer_cast<ir::ObjectID>(_l);
     
     // m = σ(ι)(z)
     // v = (ι, m)
-    CHECK(state.fields.contains(l->name), "The objectId is invalid");
-    CHECK(state.fields[l->name].contains(z), "There is no such field in the object");
+    CHECK(state.fields.contains(l->name), E_OID_NOT_DEF(l->name));
+    CHECK(state.fields[l->name].contains(z), E_MISSING_FIELD(l->name, z));
     auto m = state.fields[l->name][z];
 
     // v = (ι, m) if m ∈ Id
@@ -343,12 +344,12 @@ Interpreter::Interpreter(ir::Parser* parser) {
         v = m;
         break;
       case ir::Kind::StorageLoc:
-        CHECK(state.objects[l->name]->obj->debug_is_iso(), "Lookup with an iso storageloc");
+        CHECK(state.objects[l->name]->obj->debug_is_iso(), E_MUST_BE_ISO);
       case ir::Kind::ObjectID:
        v = m; 
        break;
       default:
-        CHECK(0, "Can a lookup map to a bool or undefined?");
+        CHECK(0, E_MISSING_CASE);
     }
 
     // σ[x↦v]
@@ -367,15 +368,15 @@ Interpreter::Interpreter(ir::Parser* parser) {
   //σ, x = typetest y τ; e* → σ[x↦v], e*
   void Interpreter::evalTypetest(verona::ir::Typetest& node)
   {
-    CHECK(node.left.size() == 1, "Need exactly one x");
+    CHECK(node.left.size() == 1, E_WRONG_NB(1, node.left.size()));
     string x = node.left[0]->name;
     string y = node.y->name;
     string tpe = node.type->name;
 
     // x ∉ σ
-    CHECK(!state.isDefinedInFrame(x), "x already defined in frame");
-    CHECK(state.containsType(tpe), "Undefined type");
-    CHECK(state.isDefinedInFrame(y), "y is not defined");
+    CHECK(!state.isDefinedInFrame(x), E_NAME_DEF(x));
+    CHECK(state.containsType(tpe), E_TYPE_NOT_DEF(tpe));
+    CHECK(state.isDefinedInFrame(y), E_NAME_NOT_DEF(y));
 
     // v = σ(ι) <: τ if ι ∈ ObjectId where ι = σ(y)
     Shared<ir::Value> res = make_shared<ir::False>();
@@ -408,13 +409,13 @@ end:
   //σ, x = new τ; e* → σ[ι↦(ρ, τ)][x↦ι], e*
   void Interpreter::evalNewAlloc(verona::ir::NewAlloc& node)
   {
-    CHECK(node.left.size() == 1, "Need exactly one x");
+    CHECK(node.left.size() == 1, E_WRONG_NB(1, node.left.size()));
     string x = node.left[0]->name;
     string type = node.type->name;
 
     // x ∉ σ
-    CHECK(!state.isDefinedInFrame(x), "x already defined in frame");
-    CHECK(state.containsType(type), "Undefined type");
+    CHECK(!state.isDefinedInFrame(x), E_NAME_DEF(x));
+    CHECK(state.containsType(type), E_TYPE_NOT_DEF(type));
     
     // ι ∉ σ
     // σ[ι↦(ρ, τ)]
@@ -451,11 +452,11 @@ end:
   // σ, x = stack τ; e* → σ[ι↦(σ.frame.regions, τ)][x↦ι], e*
   void Interpreter::evalStackAlloc(verona::ir::StackAlloc& node)
   {
-    CHECK(node.left.size() == 1, "Need exactly one x");
+    CHECK(node.left.size() == 1, E_WRONG_NB(1, node.left.size()));
     string x = node.left[0]->name;
     string type = node.type->name;
-    CHECK(!state.isDefinedInFrame(x), "x already defined in frame");
-    CHECK(state.containsType(type), "type not defined");
+    CHECK(!state.isDefinedInFrame(x), E_NAME_DEF(x));
+    CHECK(state.containsType(type), E_TYPE_NOT_DEF(type));
 
     // ι ∉ σ
     //σ[ι↦(σ.frame.regions, τᵩ)]
@@ -493,7 +494,7 @@ end:
     norepeat2(node.args, node.function);
     // x ∉ σ
     for (auto x: node.left) {
-      CHECK(!state.isDefinedInFrame(x->name), "x already defined in frame");
+      CHECK(!state.isDefinedInFrame(x->name), E_NAME_DEF(x->name));
     }
     auto conts = state.exec_state.getContinuation();
     List<Region*> p;
@@ -513,9 +514,10 @@ end:
     auto lambda = state.getFunction(x);
 
     // live(σ, y*)
-    CHECK(node.args.size() == lambda->args.size(), "Mismatching sizes");
+    CHECK(node.args.size() == lambda->args.size(),
+        E_WRONG_NB(lambda->args.size(), node.args.size()));
     for (auto y: node.args) {
-      CHECK(state.isDefinedInFrame(y->name), "Undefined name in frame");
+      CHECK(state.isDefinedInFrame(y->name), E_NAME_NOT_DEF(y->name));
     }
 
     // σ[λ.args↦σ(y*)]
@@ -543,29 +545,30 @@ end:
     norepeat2(node.args, node.function);
     // x ∉ σ
     for (auto x: node.left) {
-      CHECK(!state.isDefinedInFrame(x->name), "Already defined in frame");
+      CHECK(!state.isDefinedInFrame(x->name), E_NAME_DEF(x->name));
     }
     
     string y = node.function->name;
     auto yfunc = state.getFunction(y);
 
-    CHECK(node.args.size() > 0, "Not enough args");
-    CHECK(node.args.size() == yfunc->args.size(), "Mismatch sizes");
+    CHECK(node.args.size() > 0, E_WRONG_NB_AT_LEAST(0, node.args.size()));
+    CHECK(node.args.size() == yfunc->args.size(),
+        E_WRONG_NB(yfunc->args.size(), node.args.size()));
     for (auto arg: node.args) {
-      CHECK(state.isDefinedInFrame(arg->name), "Name not defined in frame");
+      CHECK(state.isDefinedInFrame(arg->name), E_NAME_NOT_DEF(arg->name));
     }
     
     // ι = σ(z)
     string z = node.args[0]->name;
     auto _l = state.frameLookup(z);
-    CHECK(_l->kind() == ir::Kind::ObjectID, "Argument is not an object id");
+    CHECK(_l->kind() == ir::Kind::ObjectID, E_WRONG_KIND(ir::Kind::ObjectID, _l->kind()));
     auto l = state.getObjectByName(z);
 
     // ρ = σ(ι).regions
     auto regions = l->regions;
 
     // iso(σ, ι)
-    CHECK(l->obj->debug_is_iso(), "z must reference an iso object");
+    CHECK(l->obj->debug_is_iso(), E_MUST_BE_ISO);
 
     // TODO (unpin(σ₁, z*))
     auto conts = state.exec_state.getContinuation();
@@ -583,7 +586,7 @@ end:
   void Interpreter::evalCreate(verona::ir::Create& node) {
     // x ∉ σ
     for (auto x: node.left) {
-      CHECK(!state.isDefinedInFrame(x->name), "Name already defined");
+      CHECK(!state.isDefinedInFrame(x->name), E_NAME_DEF(x->name));
     }
 
     // get y
@@ -615,13 +618,15 @@ end:
   // σ₁, branch x y(y*) z(z*) → σ₂, e*
   void Interpreter::evalBranch(verona::ir::Branch& node) {
     string x = node.condition->name;
-    CHECK(state.isDefinedInFrame(x), "Name undefined in frame");
+    CHECK(state.isDefinedInFrame(x), E_NAME_NOT_DEF(x));
     string y = node.branch1->function->name;
     ir::Node<ir::Function> yfunc = state.getFunction(y);
-    CHECK(yfunc->args.size() == node.branch1->args.size(), "Mismatch in size");
+    CHECK(yfunc->args.size() == node.branch1->args.size(),
+        E_WRONG_NB(node.branch1->args.size(), yfunc->args.size()));
     string z = node.branch2->function->name;
     ir::Node<ir::Function> zfunc = state.getFunction(z);
-    CHECK(zfunc->args.size() == node.branch2->args.size(), "Mismatch in size");
+    CHECK(zfunc->args.size() == node.branch2->args.size(),
+      E_WRONG_NB(node.branch2->args.size(), zfunc->args.size()));
 
     // live(σ₁, x; y; z; y*)
     // TODO check that with sylvan
@@ -645,7 +650,7 @@ end:
         condition = false;
         break;
       default:
-        CHECK(0, "Branch malformed, x is not a boolean"); 
+        CHECK(0, E_MISSING_CASE); 
     }
     if (condition) {
       state.exec_state = {yfunc->exprs, _PC_RESET};
@@ -666,9 +671,10 @@ end:
   // --- [return]
   // σ₁, return x* → σ₂\ιs, ϕ₂.cont
   void Interpreter::evalReturn(verona::ir::Return& node) {
-    CHECK(live(state, node.returns), "Error with liveliness"); 
+    CHECK(live(state, node.returns), E_LIVELINESS); 
     // σ₁.frames = (ϕ*; ϕ₁; ϕ₂)
-    CHECK(state.frames.size() >= 2, "Not enough frames for a return");
+    CHECK(state.frames.size() >= 2, 
+        E_WRONG_NB_AT_LEAST(1, state.frames.size()));
     // σ₂ = ((ϕ*; ϕ₁[ϕ₂.ret↦σ₁(x*)]), σ₁.objects, σ₁.fields, σ₁.except)
     auto phi1 = state.frames[state.frames.size() - 2];
     auto phi2 = state.frames[state.frames.size() - 1];
@@ -676,13 +682,14 @@ end:
     bool samereg = sameRegions(phi1->regions, phi2->regions);
 
     // Discard return values or assign them.
-    CHECK(phi2->rets.size() == node.returns.size(), "Mismatch in size");
+    CHECK(phi2->rets.size() == node.returns.size(), 
+        E_WRONG_NB(node.returns.size(), phi2->rets.size()));
     for (int i = 0; i < phi2->rets.size(); i++) {
       auto x = node.returns[i]->name;
       auto ret = phi2->rets[i];
-      CHECK(phi2->containsName(x), "Return value undefined in phi2");
+      CHECK(phi2->containsName(x), E_NAME_NOT_DEF(x));
       auto val = phi2->lookup[x];
-      CHECK((samereg || isIsoOrImm(state, val)), "Value must be iso or immutable"); 
+      CHECK((samereg || isIsoOrImm(state, val)), E_MUST_BE_ISO); 
       phi1->lookup[ret] = phi2->lookup[x];
     }
     
@@ -714,10 +721,10 @@ end:
   // --- [catch]
   // σ₁, x = catch; e* → σ₂[x↦σ₁.except], e*
   void Interpreter::evalCatch(verona::ir::Catch& node) {
-    CHECK(node.left.size() == 1, "Need exactly one x");
+    CHECK(node.left.size() == 1, E_WRONG_NB(1, node.left.size()));
     string x = node.left[0]->name;
-    CHECK(!state.isDefinedInFrame(x), "Name already defined");
-    CHECK(state.except == true, "Wrong exception state");
+    CHECK(!state.isDefinedInFrame(x), E_NAME_DEF(x));
+    CHECK(state.except == true, E_UNEXPECTED_VALUE);
     auto val = make_shared<ir::True>();
     state.addInFrame(x, val); 
     //TODO is dat it?
@@ -732,11 +739,12 @@ end:
   // σ, acquire x; e* → σ, e*
   void Interpreter::evalAcquire(verona::ir::Acquire& node) {
     string x = node.target->name;
-    CHECK(state.isDefinedInFrame(x), "Name is undefined in frame");
+    CHECK(state.isDefinedInFrame(x), E_NAME_NOT_DEF(x));
     auto value = state.frameLookup(x);
-    CHECK(value->kind() == ir::Kind::ObjectID, "Value should be an object id");
+    CHECK(value->kind() == ir::Kind::ObjectID,
+        E_WRONG_KIND(ir::Kind::ObjectID, value->kind()));
     auto oid = dynamic_pointer_cast<ir::ObjectID>(value);
-    CHECK(state.objects.contains(oid->name), "No object with that name");
+    CHECK(state.objects.contains(oid->name), E_OID_NOT_DEF(oid->name));
     // TODO ???
   }
 
@@ -748,7 +756,7 @@ end:
   // σ, release x; e* → σ, e*
   void Interpreter::evalRelease(verona::ir::Release& node) {
     string x = node.target->name;
-    CHECK(state.isDefinedInFrame(x), "Name undefined in frame");
+    CHECK(state.isDefinedInFrame(x), E_NAME_NOT_DEF(x));
     // TODO how do we release it?
     state.removeFromFrame(x);
     // TODO Should remove from objects??
@@ -769,25 +777,25 @@ end:
   // --- [freeze]
   // σ, x = freeze y; e* → σ[σ(v).regions→∅]\{y}[x↦v], acquire x; e*
   void Interpreter::evalFreeze(verona::ir::Freeze& node) {
-    CHECK(node.left.size() == 1, "Need exactly one x");
+    CHECK(node.left.size() == 1, E_WRONG_NB(1, node.left.size()));
     string x = node.left[0]->name;
-    CHECK(!state.isDefinedInFrame(x), "Name already defined in frame");
+    CHECK(!state.isDefinedInFrame(x), E_NAME_DEF(x));
     string y = node.target->name;
-    CHECK(state.isDefinedInFrame(y), "Name not defined in frame");
+    CHECK(state.isDefinedInFrame(y), E_NAME_NOT_DEF(y));
     Shared<Object> target = state.getObjectByName(y);
-    CHECK(target->obj->debug_is_iso(), "Object should be iso");
+    CHECK(target->obj->debug_is_iso(), E_MUST_BE_ISO);
     
     //rt::Object* res = rt::api::freeze(target);
     //TODO THE HELL IS V? Should be l
   }
   void Interpreter::evalMerge(verona::ir::Merge& node) {
-    CHECK(node.left.size() == 1, "Need exactlu one x");
+    CHECK(node.left.size() == 1, E_WRONG_NB(1, node.left.size()));
     string x = node.left[0]->name;
-    CHECK(!state.isDefinedInFrame(x), "Name already defined in frame");
+    CHECK(!state.isDefinedInFrame(x), E_NAME_DEF(x));
     string y = node.target->name;
-    CHECK(state.isDefinedInFrame(y), "Name undefined in frame");
+    CHECK(state.isDefinedInFrame(y), E_NAME_NOT_DEF(y));
     Shared<Object> target = state.getObjectByName(y);
-    CHECK(target->obj->debug_is_iso(), "Target should be iso");
+    CHECK(target->obj->debug_is_iso(), E_MUST_BE_ISO);
     //TODO something with the frame.
     //rt::Object* res = rt::api::merge(target);
     //TODO is that correct?
