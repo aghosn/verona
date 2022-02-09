@@ -65,7 +65,7 @@ Interpreter::Interpreter(ir::Parser* parser) {
       instr->accept(this);
     } catch (InterpreterException& e)
     {
-      cerr << "[DUMP]:" << endl;
+      cerr << "[DUMP]: Error line " << instr->tok.la << endl;
       this->parser->lexer.dump(instr->tok.la, instr->tok.pos, 3, true); 
       return true;
     }
