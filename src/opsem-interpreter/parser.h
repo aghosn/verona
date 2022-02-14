@@ -28,6 +28,7 @@ namespace verona::ir
     Node<NodeDef> parseStatement();
     Node<Expr> parseExpression();
     Node<Function> parseFunction();
+    LookupType parseLookupType(); 
     List<Expr> parseBlock();
     Map<Id, Member> parseMembers();
     Node<Field> parseField();

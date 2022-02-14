@@ -341,13 +341,21 @@ Interpreter::Interpreter(ir::Parser* parser) {
     Shared<ir::Value> v = nullptr;
     switch(m->kind()) {
       case ir::Kind::FunctionID:
+        CHECK(node.type == ir::LookupType::Func,
+            E_WRONG_LOOKUP(node.type, ir::LookupType::Func));
         v = m;
         break;
       case ir::Kind::StorageLoc:
         CHECK(state.objects[l->name]->obj->debug_is_iso(), E_MUST_BE_ISO);
+        CHECK(node.type == ir::LookupType::Loc,
+            E_WRONG_LOOKUP(node.type, ir::LookupType::Loc));
+        v = m;
+        break;
       case ir::Kind::ObjectID:
-       v = m; 
-       break;
+        CHECK(node.type == ir::LookupType::Obj,
+            E_WRONG_LOOKUP(node.type, ir::LookupType::Obj));
+        v = m; 
+        break;
       default:
         CHECK(0, E_MISSING_CASE);
     }

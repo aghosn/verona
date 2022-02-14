@@ -257,9 +257,16 @@ namespace verona::ir
     }
   };
 
-  // lookup y z
+  enum class LookupType {
+    Obj,
+    Func,
+    Loc,
+  }; 
+
+  // lookup type y z
   struct Lookup : Assign
   {
+    LookupType type;
     Node<ID> y;
     Node<ID> z;
 

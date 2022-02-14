@@ -347,6 +347,7 @@ namespace verona::ir
       {
         auto lookup = make_shared<Lookup>();
         lookup->left = v;
+        lookup->type = parseLookupType();
         lookup->y = parseIdentifier<ID>();
         lookup->z = parseIdentifier<ID>();
         lookup->tok = t;
@@ -593,6 +594,21 @@ namespace verona::ir
     assert(result != nullptr);
     result->tok = t;
     return result;
+  }
+
+  LookupType Parser::parseLookupType() {
+    auto t = lexer.next();
+    assert(t.kind == TokenKind::Identifier);
+    if (t.text == "O") {
+      return LookupType::Obj;
+    } else if (t.text == "F") {
+      return LookupType::Func;
+    } else if (t.text == "L") {
+      return LookupType::Loc;
+    }
+    // Unknown lookup type
+    assert(0 && "Unknown lookup type!");
+    return LookupType::Loc;
   }
 
   Node<TypeRef> Parser::parseTypeOp()
