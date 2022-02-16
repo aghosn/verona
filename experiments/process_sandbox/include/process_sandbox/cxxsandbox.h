@@ -244,10 +244,38 @@ namespace sandbox
     }
   };
 
-  extern "C" void sandbox_call(int idx, void* args)
-  {
+  /**
+   * This class eases the interop work as clang more easily lets you 
+   * specialize a class template than a function template.
+   */
+  template<typename Ret, typename... Args>
+  class ClangExporter {
+    public:
+      using CallFrame = argframe<Ret, Args...>;
+      static void export_function(Ret (*fn)(Args...))
+      {
+        ExportedLibrary::export_function(fn);
+      }
+
+      static void call_function(Ret (*fn)(Args...), void* callframe)
+      {
+        assert(callframe != nullptr);
+        auto frame = (static_cast<CallFrame*>(callframe)); 
+        if constexpr(!std::is_void_v<Ret>)
+        {
+          frame->ret = std::apply(fn, frame->args);
+        }
+        else 
+        {
+          std::apply(fn, frame->args);
+        }
+      }
+  };
+
+  extern "C" void sandbox_call(int idx, void* args);
+  /*{
     ExportedLibrary::call(idx, args);
-  }
+  }*/
 
   /**
    * Helpers that assist with type deduction for `Function` objects.

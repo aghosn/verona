@@ -7,8 +7,13 @@
 #include "CXXType.h"
 #include "Compiler.h"
 
+#include <iostream>
+#include <string>
+
 namespace verona::interop
 {
+
+  static const char* DISP_PREFIX = "_verona_proxy_";
   /**
    * C++ Builder Interface.
    *
@@ -37,12 +42,21 @@ namespace verona::interop
         return CXXType{};
       }
 
-      auto& S = Clang->getSema();
-
       // Check if this specialisation is already present in the AST
       // (declaration, definition, used).
       clang::ClassTemplateDecl* ClassTemplate =
         classTemplate.getAs<clang::ClassTemplateDecl>();
+      void* InsertPos = nullptr;
+      clang::ClassTemplateSpecializationDecl* Def =
+        _instantiateClassTemplate(ClassTemplate, args);
+      return CXXType{Def};
+    }
+
+    clang::ClassTemplateSpecializationDecl* _instantiateClassTemplate(
+      clang::ClassTemplateDecl* ClassTemplate,
+      llvm::ArrayRef<clang::TemplateArgument> args) const
+    {
+      auto& S = Clang->getSema();
       void* InsertPos = nullptr;
       clang::ClassTemplateSpecializationDecl* Decl =
         ClassTemplate->findSpecialization(args, InsertPos);
@@ -88,9 +102,13 @@ namespace verona::interop
           Decl->getDefinition());
       }
 
+      // TODO I modified the following lines because they faulted.
+      // The lexical context from def was different than DC.
+      // This seems to fix it.
       auto* DC = ast->getTranslationUnitDecl();
+      Def->setLexicalDeclContext(DC);
       DC->addDecl(Def);
-      return CXXType{Def};
+      return Def;
     }
 
     /**
@@ -210,6 +228,13 @@ namespace verona::interop
 
       // Instantiate and return the definition
       return instantiateClassTemplate(ty, args);
+    }
+
+    clang::ClassTemplateSpecializationDecl* buildTemplateType(
+      clang::ClassTemplateDecl* ty,
+      llvm::ArrayRef<clang::TemplateArgument> params) const
+    {
+      return _instantiateClassTemplate(ty, params);
     }
 
     /**
@@ -354,6 +379,242 @@ namespace verona::interop
       return callStmt;
     }
 
+    // TODO For the moment we do not have a return value ...
+    void generateDispatcher(clang::FunctionDecl* target) const
+    {
+      // TODO add void  to the query thing 
+      clang::QualType voidQual = ast->VoidTy; 
+      auto voidStar = ast->getPointerType(voidQual);
+      llvm::SmallVector<clang::QualType, 0> args{voidStar};
+      std::string name = DISP_PREFIX + target->getName().str();
+
+      // All proxies have `void` return type.
+      auto proxy = buildFunction(name, args, voidQual/*target->getReturnType()*/);
+      
+      // Generate a struct that corresponds to target arguments.
+      auto loc = proxy->getLocation(); 
+      clang::IdentifierInfo& structName = ast->Idents.get("tmp_struct");
+      auto record = ast->buildImplicitRecord("tmp_struct");
+      record->startDefinition();
+      std::vector<clang::FieldDecl*> fields;
+      int counter = 0;
+      for (auto p: target->parameters())
+      {
+        auto type = p->getType();
+        clang::IdentifierInfo& fieldName = ast->Idents.get("a"+std::to_string(counter));
+        auto field = clang::FieldDecl::Create(*ast, record, loc, loc, &fieldName, type, ast->getTrivialTypeSourceInfo(type), nullptr, true, clang::ICIS_NoInit); 
+        field->setAccess(clang::AS_public);
+        record->addDecl(field);
+        fields.push_back(field);
+        counter++;
+      }
+      
+      // Handle return type:
+      if (target->getReturnType() != voidQual)
+      {
+        auto type = target->getReturnType();
+        clang::IdentifierInfo& retName = ast->Idents.get("ret");
+        auto field = clang::FieldDecl::Create(*ast, record, loc, loc, &retName, type, ast->getTrivialTypeSourceInfo(type), nullptr, true, clang::ICIS_NoInit);
+        field->setAccess(clang::AS_public);
+        record->addDecl(field);
+        fields.push_back(field);
+      }
+      record->completeDefinition();
+     
+      auto &sema = Clang->getSema();
+      auto groupPtr = sema.ConvertDeclToDeclGroup(record);
+      auto recDecl = sema.ActOnDeclStmt(groupPtr, loc, loc);
+
+      // Create a local variable and cast void ptr to the struct type.
+      clang::ParmVarDecl* voidptr = proxy->getParamDecl(0);
+      // Necessary, otherwise it fails in codegen.
+      markAsUsed(voidptr);
+      voidptr->markUsed(*ast);
+      clang::IdentifierInfo& castId = ast->Idents.get("_a_");
+      auto qualType = ast->getRecordType(record);
+      auto ptrQualType = ast->getPointerType(qualType);
+      auto strct = clang::VarDecl::Create(
+          *ast,
+          proxy,
+          loc,
+          loc,
+          &castId,
+          ptrQualType,
+          ast->getTrivialTypeSourceInfo(ptrQualType),
+          clang::StorageClass::SC_None);
+      // Necessary, otherwise fails in codegen
+      markAsUsed(strct);
+      strct->markUsed(*ast);
+      clang::NestedNameSpecifierLoc spec1;
+      auto declRef = clang::DeclRefExpr::Create(
+          *ast,
+          spec1,
+          loc,
+          voidptr,
+          false,
+          loc,
+          voidptr->getOriginalType(),
+          clang::VK_LValue);
+      auto castExpr = clang::ImplicitCastExpr::Create(
+          *ast,
+          voidptr->getOriginalType(),
+          clang::CK_LValueToRValue,
+          declRef,
+          nullptr,
+          clang::VK_LValue,
+          clang::FPOptionsOverride());
+      // This might be required to avoid failing at codegen.
+      castExpr->setIsPartOfExplicitCast(true);
+      auto cCast = clang::CStyleCastExpr::Create(
+          *ast,
+          ptrQualType,
+          clang::VK_LValue,
+          clang::CK_BitCast,
+          castExpr,
+          nullptr,
+          clang::FPOptionsOverride(),
+          ast->getTrivialTypeSourceInfo(ptrQualType),
+          strct->getLocation(),
+          loc);
+      strct->setInit(cCast);
+
+      groupPtr = sema.ConvertDeclToDeclGroup(strct);
+      auto varDecl = sema.ActOnDeclStmt(groupPtr, loc, loc); //clang::DeclStmt(groupPtr.get(), loc, loc);
+      
+      // Create arguments and type cast.
+      std::vector<clang::Expr*> memberArgs;
+      int i = 0;
+      for (auto p: target->parameters())
+      {
+        clang::NestedNameSpecifierLoc spec;
+        // Reference to the local variable.
+        auto declRef = clang::DeclRefExpr::Create(
+            *ast,
+            spec,
+            loc,
+            strct,
+            false,
+            loc,
+            ptrQualType,
+            clang::VK_LValue);
+        auto implicit = clang::ImplicitCastExpr::Create(
+            *ast,
+            ptrQualType,
+            clang::CK_LValueToRValue,
+            declRef,
+            nullptr,
+            /*clang::VK_LValue*/clang::VK_PRValue,
+            clang::FPOptionsOverride());
+        auto member = clang::MemberExpr::CreateImplicit(
+            *ast,
+            implicit,
+            true,
+            fields[i]/*member??*/,
+            p->getOriginalType(),
+            clang::VK_LValue,
+            clang::OK_BitField);
+        auto arg = clang::ImplicitCastExpr::Create(
+            *ast,
+            p->getOriginalType(),
+            clang::CK_LValueToRValue,
+            member,
+            nullptr,
+            /*clang::VK_LValue*/clang::VK_PRValue,
+            clang::FPOptionsOverride());
+        // Add the argument.
+        memberArgs.push_back(arg);
+        i++;
+      }
+
+      // Create the function call.
+      clang::DeclarationNameInfo info;
+      clang::NestedNameSpecifierLoc spec;
+      auto funcTy = target->getFunctionType();
+      auto funcQualTy = clang::QualType(funcTy, 0);
+      auto expr = clang::DeclRefExpr::Create(
+          *ast,
+          spec,
+          loc,
+          target,
+          false,
+          info,
+          funcQualTy,
+          clang::VK_LValue);
+
+      // Implicit cast to function pointer.
+      auto implCast = clang::ImplicitCastExpr::Create(
+          *ast,
+          ast->getPointerType(funcQualTy),
+          clang::CK_FunctionToPointerDecay,
+          expr,
+          nullptr,
+          clang::VK_PRValue,
+          clang::FPOptionsOverride());
+
+      auto call = clang::CallExpr::Create(
+          *ast,
+          implCast,
+          memberArgs,
+          target->getReturnType(),
+          clang::VK_PRValue,
+          loc,
+          clang::FPOptionsOverride());
+          
+      std::vector<clang::Stmt*>lines;
+      //lines.push_back(record);
+      lines.push_back(recDecl.get());
+      lines.push_back(varDecl.get());
+
+      // If there is a non-void return type, assign the result to the struct.
+      if (target->getReturnType() != voidQual)
+      {
+       clang::NestedNameSpecifierLoc spec;
+       auto retField = fields.back();
+       auto declRef = clang::DeclRefExpr::Create(
+            *ast,
+            spec,
+            loc,
+            strct,
+            false,
+            loc,
+            ptrQualType,
+            clang::VK_LValue);
+        auto implicit = clang::ImplicitCastExpr::Create(
+            *ast,
+            ptrQualType,
+            clang::CK_LValueToRValue,
+            declRef,
+            nullptr,
+            clang::VK_PRValue,
+            clang::FPOptionsOverride());
+        auto member = clang::MemberExpr::CreateImplicit(
+            *ast,
+            implicit,
+            true,
+            retField,
+            target->getReturnType(),
+            clang::VK_LValue,
+            clang::OK_BitField);
+        auto binop = clang::BinaryOperator::Create(
+            *ast, 
+            member,
+            call,
+            clang::BO_Assign,
+            target->getReturnType(),
+            clang::VK_LValue,
+            clang::OK_BitField,
+            loc,
+            clang::FPOptionsOverride());
+        lines.push_back(binop);
+      } else {
+        lines.push_back(call);
+      }
+      
+      auto compStmt = clang::CompoundStmt::Create(*ast, lines, loc, loc);
+      proxy->setBody(compStmt);
+      markAsUsed(proxy);
+    }
+
     /**
      * Create a return instruction
      *
@@ -366,6 +627,78 @@ namespace verona::interop
         clang::ReturnStmt::Create(*ast, func->getLocation(), val, nullptr);
       func->setBody(retStmt);
       return retStmt;
+    }
+
+    /**
+     * Marks a declaration as being used to prevent DCE.
+     */
+    void markAsUsed(clang::Decl* decl) const
+    {
+      assert(decl != nullptr);
+      auto& S = Clang->getSema();
+      clang::AttributeCommonInfo CommonInfo = {clang::SourceRange{}};
+      decl->addAttr(clang::UsedAttr::Create(S.Context, CommonInfo));
+    }
+
+    /**
+     * Create a call instruction with func pointer argument.
+     * @warn does not set the caller body to allow for compoud statements.
+     *
+     */
+    clang::Expr* createMemberCallFunctionArg(
+      clang::CXXMethodDecl* method,
+      llvm::ArrayRef<clang::ValueDecl*> args,
+      clang::QualType retTy,
+      clang::FunctionDecl* caller) const
+    {
+      clang::SourceLocation loc = caller->getLocation();
+      clang::DeclarationNameInfo info;
+      clang::NestedNameSpecifierLoc spec;
+      auto& S = Clang->getSema();
+
+      // Create an expression for each argument
+      llvm::SmallVector<clang::Expr*, 1> argExpr;
+      for (auto arg : args)
+      {
+        auto funcTy = arg->getFunctionType();
+        auto funcQualTy = clang::QualType(funcTy, 0);
+        // Get expression from declaration
+        auto e = clang::DeclRefExpr::Create(
+          *ast,
+          spec,
+          loc,
+          arg,
+          /*capture=*/false,
+          info,
+          funcQualTy,
+          clang::VK_LValue);
+
+        // Implicit cast to r-value
+        auto cast = clang::ImplicitCastExpr::Create(
+          *ast,
+          ast->getPointerType(funcQualTy),
+          clang::CK_FunctionToPointerDecay,
+          e,
+          /*base path=*/nullptr,
+          clang::VK_PRValue,
+          clang::FPOptionsOverride());
+        argExpr.push_back(cast);
+      }
+
+      // Create a call to the method
+      auto expr = getCXXMethodPtr(method, loc);
+      auto callStmt = callCXXMethod(method, expr, argExpr, retTy, loc);
+
+      // Mark method as used
+      clang::AttributeCommonInfo CommonInfo = {clang::SourceRange{}};
+      method->addAttr(clang::UsedAttr::Create(S.Context, CommonInfo));
+
+      return callStmt;
+    }
+
+    clang::ASTContext* getASTContext() const
+    {
+      return ast;
     }
   };
 } // namespace verona::interop

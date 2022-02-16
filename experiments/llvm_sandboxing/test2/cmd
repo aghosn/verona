@@ -1,0 +1,3 @@
+#!/bin/bash
+
+../../../build/dist/verona-interop --dump --sandbox --targets="targets.txt" --includes="includes.txt" main.cc

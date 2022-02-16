@@ -1,0 +1,3 @@
+#!/bin/bash
+
+../../../build/dist/verona-interop --includes="includes.txt" main.cc

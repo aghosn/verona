@@ -21,7 +21,7 @@ link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 add_definitions(${CLANG_DEFINITIONS})
 
-add_llvm_executable(verona-interop verona-interop.cc)
+add_llvm_executable(verona-interop verona-interop.cc ASTinstr.cc IRinstr.cc)
 llvm_update_compile_flags(verona-interop)
 
 target_link_libraries(verona-interop PRIVATE
@@ -44,3 +44,8 @@ target_link_libraries(verona-interop PRIVATE
     clangCodeGen)
 
 install(TARGETS verona-interop RUNTIME DESTINATION .)
+
+add_library(libinterop 
+  verona-interop.cc
+  ASTinstr.cc
+  IRinstr.cc)
