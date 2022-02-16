@@ -1,0 +1,30 @@
+class Int {
+
+}
+
+class Obj {
+  a: Int
+}
+
+fn tBranch(x, y) {
+  release x
+  release y
+  return
+}
+
+fn fBranch(x, y) {
+  release x
+  release y
+  return
+}
+
+fn foo() {
+  x = stack Obj
+  y = typetest x Obj
+  branch y tBranch(x, y) fBranch(x, y) 
+}
+
+fn main(a, b) {
+  call foo() 
+  return
+}

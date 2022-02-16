@@ -1,0 +1,55 @@
+x = var
+
+x = dup y
+
+x = load y
+
+x = store y.id z
+
+x = lookup y z
+
+x = typetest x τ
+
+x = new τ
+
+x = stack τ
+
+x* = call y(y*)
+
+x* = region y(z, z*)
+
+x* = create GC y(z*)
+
+tailcall x(x*)
+
+branch x y(y*) z(z*)
+
+return x*
+
+error
+
+x = catch
+
+acquire x
+
+release x
+
+release v
+
+fulfill x
+
+fn y(a, b, c) {
+  x = create GC z(w)
+}
+
+class MyClass {
+
+  fn foo(a, b) {
+    x = stack T
+  }
+
+  bar: T
+  beer: store T1
+  bear: (A & (B | C), D)
+
+}

@@ -1,0 +1,19 @@
+class Int {
+}
+
+fn foo() {
+  x = new Int
+  return x
+}
+
+fn bar() {
+  y = call foo() 
+  return y
+}
+
+
+fn main(a, b) {
+  z = call bar()
+  release z
+  return
+}

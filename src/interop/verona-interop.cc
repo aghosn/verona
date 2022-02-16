@@ -1,10 +1,13 @@
 // Copyright Microsoft and Project Verona Contributors.
 // SPDX-License-Identifier: MIT
 
+#include "ASTinstr.h"
+#include "IRinstr.h"
 #include "CXXInterface.h"
 #include "FS.h"
 #include "config.h"
 
+#include <filesystem> // C++17
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -25,6 +28,40 @@ namespace cl = llvm::cl;
 
 namespace
 {
+  // Options (@aghosn) for sandboxing instrumentation
+  // Turn on sandboxing
+  cl::opt<bool> sandbox(
+    "sandbox",
+    cl::desc("Generate sandbox instrumentation. Expects --targets to be on."),
+    cl::Optional,
+    cl::init(false));
+  // Fully qualified name of the class that exports sandboxed library funcs.
+  // Must have a static function called 'export_function'.
+  cl::opt<string> sbexporter(
+      "sbexporter",
+      cl::desc("Fully qualified name of the class registering libray functions"),
+      cl::Optional,
+      cl::value_desc(sbexporter),
+      cl::init("sandbox::ClangExporter"));
+  // Supply the list of target functions.
+  cl::opt<string> targets(
+    "targets",
+    cl::desc("<targets file> A file with a list of library functions to expose"),
+    cl::Optional,
+    cl::value_desc(targets));
+  // Supply a list of includes
+  cl::opt<string> includes(
+    "includes",
+    cl::desc("<includes file> A file with a list of include directories"),
+    cl::Optional,
+    cl::value_desc(includes));
+  // Generate the dispatch_function
+  cl::opt<bool> gendispatch(
+    "gendispatch",
+    cl::desc("Generate the dispatcher with llvm IR"),
+    cl::Optional,
+    cl::init(false));
+
   // For help's sake, will never be parsed, as we intercept
   cl::opt<string> config(
     "config",
@@ -84,29 +121,69 @@ namespace
   /// Parse config file adding args to the args globals
   void parseCommandLine(int argc, char** argv, vector<string>& includePath)
   {
-    // Replace "--config file" with the contents of file
-    CmdLineAppend app;
-    if (!app.parse(argc, argv))
+    // Parse the command line
+    cl::ParseCommandLineOptions(argc, argv, "Verona Interop test\n");
+    std::vector<std::string> paths;
+    if (!config.empty())
     {
-      auto paths = app.configPaths();
-      // Whatever error was on the last config file
-      auto lastConfig = paths[paths.size() - 1];
-      cerr << "Error opening config file " << lastConfig.c_str() << endl;
-      exit(1);
+      std::ifstream file(config);
+      if (!file.good())
+      {
+        cerr << "Error opening config file " << config << endl;
+        exit(1);
+      }
+      paths.push_back(config);
     }
 
+    // Parsing targets
+    if (!targets.empty())
+    {
+      std::ifstream file(targets);
+      if (!file.good())
+      {
+        cerr << "Error opening targets file " << targets << endl;
+        exit(1);
+      }
+
+      // Read the file and add all of functions (one per line) to the targets.
+      std::string line;
+      while (std::getline(file, line))
+      {
+        target_functions.push_back(line);
+      }
+    }
+
+    // Parsing includes
+    if (!includes.empty()) {
+      std::ifstream file(includes);
+      if (!file.good())
+      {
+        cerr << "Error opening includes file " << includes << endl;
+        exit(1);
+      }
+
+      // Read the file and add all of functions (one per line) to the targets.
+      std::string line;
+      while (std::getline(file, line))
+      {
+        includePath.push_back(line);
+      }
+    }
+
+    // Adding the exporter class
+    exporter_class_name = sbexporter;
+
     // Add the path to the config files to the include path
-    auto paths = app.configPaths();
     for (auto path : paths)
     {
       auto conf = FSHelper::getRealPath(path);
       auto dir = FSHelper::getDirName(conf);
+      if (std::filesystem::is_directory(conf))
+      {
+        dir = conf;
+      }
       includePath.push_back(dir);
     }
-
-    // Parse the command line
-    cl::ParseCommandLineOptions(
-      app.argc(), app.argv(), "Verona Interop test\n");
   }
 
   /// Test call
@@ -274,6 +351,15 @@ int main(int argc, char** argv)
     test_function("verona_wrapper_fn_1", interface);
   }
 
+  //  Generate the sandbox instrumentation.
+  if (sandbox)
+  {
+    //TODO Check that we have the list of targets.
+    //TODO remove this eventually, we don't need it
+    //specialize_export_function(interface);
+    generate_dispatchers(interface);
+  }
+
   // Dumps the AST before trying to emit LLVM for debugging purposes
   // NOTE: Output is not stable, don't use it for tests
   if (dumpIR)
@@ -284,6 +370,13 @@ int main(int argc, char** argv)
   // Emit whatever is left on the main file
   // This is silent, just to make sure nothing breaks here
   auto mod = interface.emitLLVM();
+  assert(mod != nullptr);
+
+  // LLVM IR instrumentation
+  if (sandbox && gendispatch)
+  {
+    generate_dispatch_function(*mod);    
+  }
 
   // Dump LLVM IR for debugging purposes
   // NOTE: Output is not stable, don't use it for tests

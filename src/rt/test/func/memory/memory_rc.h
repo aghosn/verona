@@ -7,26 +7,22 @@
 namespace memory_rc
 {
   constexpr auto region_type = RegionType::Rc;
-  using C = C1<region_type>;
-  using F = F1<region_type>;
-  using MC = MediumC2<region_type>;
-  using MF = MediumF2<region_type>;
-  using LC = LargeC2<region_type>;
-  using LF = LargeF2<region_type>;
-  using XC = XLargeC2<region_type>;
-  using XF = XLargeF2<region_type>;
+  using C = C1;
+  using F = F1;
+  using MC = MediumC2;
+  using MF = MediumF2;
+  using LC = LargeC2;
+  using LF = LargeF2;
+  using XC = XLargeC2;
+  using XF = XLargeF2;
 
-  using Cx = C3<region_type>;
-  using Fx = F3<region_type>;
+  using Cx = C3;
+  using Fx = F3;
 
-  template<class... T>
-  uintptr_t alloc_garbage_helper(Alloc& alloc, Object* o, uintptr_t count)
+  void push_lins_stack(Object* o)
   {
-    alloc_in_region<T...>(alloc, o);
-    auto ds = Region::debug_size(o);
-    uintptr_t new_count = sizeof...(T) + count;
-    check(ds == new_count); // o + T...
-    return new_count;
+    incref(o);
+    decref(o);
   }
 
   /**
@@ -38,102 +34,87 @@ namespace memory_rc
    **/
   void test_basic()
   {
-    // Allocate a lot of garbage.
-    {
-      auto& alloc = ThreadAlloc::get();
-      auto* o = new (alloc) C;
-
-      uintptr_t obj_count = 1;
-
-      obj_count =
-        alloc_garbage_helper<C, F, MC, MF, LC, LF, XC, XF>(alloc, o, obj_count);
-      obj_count = alloc_garbage_helper<C, C, C, XF, XF, MC, LC, LF, F, F, XC>(
-        alloc, o, obj_count);
-      obj_count = alloc_garbage_helper<C, C, C, XF, XF, MC, LC, LF, F, F, XC>(
-        alloc, o, obj_count);
-      obj_count = alloc_garbage_helper<XC, XC, XC, XF, MC>(alloc, o, obj_count);
-      obj_count =
-        alloc_garbage_helper<F, F, F, C, C, C, C, F>(alloc, o, obj_count);
-
-      Region::release(alloc, o);
-      snmalloc::debug_check_empty<snmalloc::Alloc::StateHandle>();
-    }
-
     // Allocate a lot of objects that are all connected.
     // Then decref the root and see if children are deallocated.
     {
-      auto& alloc = ThreadAlloc::get();
-      auto* o = new (alloc) C;
+      auto* o = new (RegionType::Rc) C;
 
-      auto* o1 = new (alloc, o) C;
-      auto* o2 = new (alloc, o) C;
-      auto* o3 = new (alloc, o) C;
-      auto* o4 = new (alloc, o) C;
-      auto* o5 = new (alloc, o) C;
-      auto* o6 = new (alloc, o) C;
-      auto* o7 = new (alloc, o) C;
+      {
+        UsingRegion rc(o);
 
-      // Link them up
-      o1->f1 = o2;
-      o1->f2 = o4;
-      o2->f1 = o3;
-      o2->f2 = o4;
-      RegionRc::incref(o4, o);
+        auto* o1 = new C;
+        auto* o2 = new C;
+        auto* o3 = new C;
+        auto* o4 = new C;
+        auto* o5 = new C;
+        auto* o6 = new C;
+        auto* o7 = new C;
 
-      o4->f1 = o5;
-      RegionRc::incref(o5, o);
-      o5->f1 = o6;
-      o5->f2 = o7;
+        // Link them up
+        o->f1 = o1;
+        o1->f1 = o2;
+        o1->f2 = o4;
+        o2->f1 = o3;
+        o2->f2 = o4;
+        incref(o4);
 
-      check(Region::debug_size(o) == 8);
-      check(RegionRc::get_ref_count(o1, o) == 1);
-      check(RegionRc::get_ref_count(o2, o) == 1);
-      check(RegionRc::get_ref_count(o3, o) == 1);
-      check(RegionRc::get_ref_count(o4, o) == 2);
-      check(RegionRc::get_ref_count(o5, o) == 2);
-      check(RegionRc::get_ref_count(o6, o) == 1);
-      check(RegionRc::get_ref_count(o7, o) == 1);
+        o4->f1 = o5;
+        o5->f1 = o6;
+        o5->f2 = o7;
 
-      // Decref'ing o1 to 0 should trigger a deallocation.
-      RegionRc::decref(alloc, o1, o);
+        check(debug_size() == 8);
+        check(debug_get_ref_count(o1) == 1);
+        check(debug_get_ref_count(o2) == 1);
+        check(debug_get_ref_count(o3) == 1);
+        check(debug_get_ref_count(o4) == 2);
+        check(debug_get_ref_count(o5) == 1);
+        check(debug_get_ref_count(o6) == 1);
+        check(debug_get_ref_count(o7) == 1);
 
-      check(Region::debug_size(o) == 4);
+        // Decref'ing o5 to 0 should trigger a deallocation.
+        o4->f1 = nullptr;
+        decref(o5);
 
-      Region::release(alloc, o);
+        check(debug_size() == 5);
+      }
+      region_release(o);
       snmalloc::debug_check_empty<snmalloc::Alloc::StateHandle>();
     }
 
     // Allocate objects which link to subregions and check that decrefing ISOs
     // has the correct behaviour.
     {
-      auto& alloc = ThreadAlloc::get();
-      auto* o = new (alloc) C;
+      auto* o = new (RegionType::Rc) C;
 
-      auto* sub1 = new (alloc) C;
-      auto* sub2 = new (alloc) C;
+      auto* sub1 = new (RegionType::Rc) C;
+      auto* sub2 = new (RegionType::Rc) C;
 
-      auto* o1 = new (alloc, o) C;
-      auto* o2 = new (alloc, o) C;
+      {
+        UsingRegion rc(o);
+        auto* o1 = new C;
+        auto* o2 = new C;
 
-      // Link them up
-      o1->f1 = o2;
-      o1->f2 = o;
-      RegionRc::incref(o, o);
-      o2->f1 = sub1;
-      o2->f2 = sub2;
+        // Link them up
+        o->f1 = o1;
+        o1->f1 = o2;
+        o1->f2 = o;
+        incref(o);
+        o2->f1 = sub1;
+        o2->f2 = sub2;
 
-      check(Region::debug_size(o) == 3);
-      check(RegionRc::get_ref_count(o, o) == 2);
-      check(RegionRc::get_ref_count(o1, o) == 1);
-      check(RegionRc::get_ref_count(o2, o) == 1);
+        check(debug_size() == 3);
+        check(debug_get_ref_count(o) == 2);
+        check(debug_get_ref_count(o1) == 1);
+        check(debug_get_ref_count(o2) == 1);
 
-      RegionRc::decref(alloc, o1, o);
+        o->f1 = nullptr;
+        decref(o1);
 
-      check(RegionRc::get_ref_count(o, o) == 1);
+        check(debug_get_ref_count(o) == 1);
 
-      check(Region::debug_size(o) == 1);
-
-      Region::release(alloc, o);
+        check(debug_size() == 1);
+      }
+      region_release(o);
       snmalloc::debug_check_empty<snmalloc::Alloc::StateHandle>();
     }
   }
@@ -143,36 +124,173 @@ namespace memory_rc
    **/
   void test_cycles()
   {
-    auto& alloc = ThreadAlloc::get();
-    auto* o = new (alloc) C;
+    // Start with a simple cycle
+    {
+      auto* o = new (RegionType::Rc) C;
 
-    // Allocate some reachable objects.
-    auto* o1 = new (alloc, o) C;
-    auto* o2 = new (alloc, o) C;
-    auto* o3 = new (alloc, o) C;
-    auto* o4 = new (alloc, o) C;
-    auto* o5 = new (alloc, o) C;
+      {
+        UsingRegion rc(o);
 
-    // cycle: o1 -> o2 -> o3 -> o4 -> o5 -> o1
-    o1->f1 = o2;
-    o2->f1 = o3;
-    o3->f1 = o4;
-    o4->f1 = o5;
-    RegionRc::incref(o1, o);
-    o5->f1 = o1;
+        // Allocate some reachable objects.
+        auto* o1 = new C;
+        auto* o2 = new C;
+        auto* o3 = new C;
+        auto* o4 = new C;
+        auto* o5 = new C;
+        auto* o6 = new C;
 
-    check(Region::debug_size(o) == 6);
-    o5->f1 = nullptr;
-    RegionRc::decref(alloc, o1, o);
-    check(Region::debug_size(o) == 6);
-    // When cycle detection exists. This should dealloc the objects.
-    // check(Region::debug_size(o) == 0);
+        // cycle: o6 -> (o1 -> o2 -> o3 -> o4 -> o5 -> o1)
+        o1->f1 = o2;
+        o2->f1 = o3;
+        o3->f1 = o4;
+        o4->f1 = o5;
+        o5->f1 = o1;
 
-    // Break the cycle
-    RegionRc::decref(alloc, o1, o);
-    check(Region::debug_size(o) == 1);
+        incref(o1);
+        o6->f1 = o1;
 
-    Region::release(alloc, o);
+        check(debug_size() == 7);
+        region_collect();
+        check(debug_size() == 7);
+
+        o6->f1 = nullptr;
+        decref(o1);
+
+        region_collect();
+        check(debug_size() == 2);
+
+        // Re-link the object graph so that release doesn't leave anything.
+        o->f1 = o6;
+      }
+      region_release(o);
+      snmalloc::debug_check_empty<snmalloc::Alloc::StateHandle>();
+    }
+
+    // A cycle where part of the subgraph is rooted by an external reference
+    {
+      auto* o = new (RegionType::Rc) C;
+
+      {
+        UsingRegion rc(o);
+
+        // Allocate some reachable objects.
+        auto* o1 = new C;
+        auto* o2 = new C;
+        auto* o3 = new C;
+        auto* o4 = new C;
+        auto* o5 = new C;
+        auto* o6 = new C;
+
+        // cycle: (o1 -> o2 -> o3 -> o4 -> o5 -> o1)
+        //                     ^
+        //                     o6
+        o1->f1 = o2;
+        o2->f1 = o3;
+        o3->f1 = o4;
+        o4->f1 = o5;
+        o5->f1 = o1;
+
+        incref(o1);
+        o6->f1 = o3;
+        incref(o3);
+
+        check(debug_size() == 7);
+
+        decref(o1);
+
+        region_collect();
+        check(debug_size() == 7);
+
+        // Now add a reference from o1->o6 and try and reclaim the cycle again.
+        // cycle: (o1 -> o2 -> o3 -> o4 -> o5 -> o1)
+        //          |                 ^
+        //          +---------------> o6
+        o1->f2 = o6;
+
+        // Retrigger adding o1 to the lins stack.
+        incref(o1);
+        decref(o1);
+
+        region_collect();
+        check(debug_size() == 1);
+      }
+      region_release(o);
+
+      snmalloc::debug_check_empty<snmalloc::Alloc::StateHandle>();
+    }
+
+    // A cycle which contains references to other subregions.
+    {
+      auto* o = new (RegionType::Rc) C;
+
+      // New subregion
+      auto* p = new (RegionType::Rc) C;
+      {
+        UsingRegion rc(p);
+        auto* p1 = new C;
+        auto* p2 = new C;
+
+        p->f1 = p1;
+        p1->f1 = p2;
+      }
+
+      {
+        UsingRegion rc(o);
+
+        // Allocate some reachable objects.
+        auto* o1 = new C;
+        auto* o2 = new C;
+        auto* o3 = new C;
+
+        o1->f1 = o2;
+        o2->f1 = o3;
+        o2->f2 = p;
+        o3->f1 = o1;
+
+        incref(o1);
+        decref(o1);
+
+        check(debug_size() == 4);
+
+        region_collect();
+        check(debug_size() == 1);
+      }
+      region_release(o);
+      snmalloc::debug_check_empty<snmalloc::Alloc::StateHandle>();
+    }
+
+    // A cycle where the root is the region's ISO.
+    // This should tease out any bugs for special casing that is needed for
+    // entry point objects.
+    {
+      auto* o = new (RegionType::Rc) C;
+      {
+        UsingRegion rc(o);
+
+        // Allocate some reachable objects.
+        auto* o1 = new C;
+        auto* o2 = new C;
+
+        // cycle: (o -> o1 -> o2 -> o)
+        o->f1 = o1;
+        o1->f1 = o2;
+        o2->f1 = o;
+        incref(o);
+
+        /* push_lins_stack(o); */
+
+        /* check(debug_size() == 3); */
+        /* region_collect(); */
+        /* check(debug_size() == 3); */
+
+        o2->f1 = o1;
+        decref(o);
+        incref(o1);
+
+        push_lins_stack(o1);
+      }
+      region_release(o);
+    }
     snmalloc::debug_check_empty<snmalloc::Alloc::StateHandle>();
   }
 
