@@ -8,7 +8,7 @@
 
 namespace verona::interop
 {
-  static const char* DISPATCHER_NAME = "interop_dispacth_function"; 
+  static const char* DISPATCHER_NAME = "sandbox_call"; 
   static const char* DISPATCH_METHOD_NAME = "call_function";
 
   static vector<Function*> find_exporters(Module& mod)
