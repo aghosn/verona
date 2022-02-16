@@ -63,4 +63,5 @@ std::string string_format( const std::string& format, Args ... args )
 #define E_NOT_STORABLE(name) E_FMT("Field '%s' is not storable.", name.c_str())
 #define E_LIVELINESS E_FMT2("Problem with the liveliness.")
 #define E_UNEXPECTED_VALUE E_FMT2("Unexpected value.")
+#define E_STRAT_TO_REGION_TYPE ("Unsafe strategy cannot be converted to Region Type.")
 }

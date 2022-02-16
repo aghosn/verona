@@ -288,6 +288,11 @@ namespace verona::ir
       return AllocStrategy::Arena;
     }
 
+    if (t.text == "Unsafe")
+    {
+      return AllocStrategy::Unsafe;
+    }
+
     std::cerr << "Wrong alloc strategy :'" << t.text << "'" << std::endl;
     assert(0);
     return AllocStrategy::Trace;

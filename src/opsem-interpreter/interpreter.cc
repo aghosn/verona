@@ -34,7 +34,7 @@ Interpreter::Interpreter(ir::Parser* parser) {
 
   // Create original region
   auto mainRegion = new (rt::RegionType::Arena) Region;
-  state.regions[mainRegion] = rt::RegionType::Arena;
+  state.regions[mainRegion] = ir::AllocStrategy::Arena;
   mainframe->regions.push_back(mainRegion);
   rt::api::open_region(mainRegion);
 }
@@ -585,6 +585,38 @@ end:
     state.exec_state = {expr2, _PC_RESET};
   } 
 
+
+  // Converts a strategy to a region type if the strategy is NOT unsafe.
+  static rt::RegionType strategyToRegionType(ir::AllocStrategy strat)
+  {
+    CHECK(strat < ir::AllocStrategy::Unsafe, E_STRAT_TO_REGION_TYPE);
+    switch(strat)
+    {
+      case ir::AllocStrategy::Trace:
+        return rt::RegionType::Trace;
+      case ir::AllocStrategy::Arena:
+        return rt::RegionType::Arena;
+      case ir::AllocStrategy::Rc:
+        return rt::RegionType::Rc;
+      default:
+        CHECK(0, E_MISSING_CASE); 
+    }
+
+    // Should never get here.
+    return rt::RegionType::Trace;
+  }
+
+  static Region* createRegion(ir::AllocStrategy strat)
+  {
+    if (strat < ir::AllocStrategy::Unsafe)
+    {
+      auto type = strategyToRegionType(strat);
+      return new (type) Region;
+    }
+    // TODO handle the case for unsafe.
+    return nullptr;
+  }
+
   // Create a new heap region.
   // x ∉ σ
   // ρ ∉ σ
@@ -603,7 +635,7 @@ end:
   
     // ρ ∉ σ
     //TODO I have to find out what to do here, typecast to my own type?
-    Region* region = new (node.strategy) Region; 
+    Region* region = createRegion(node.strategy); 
     
     // σ₁[ρ↦Σ]
     state.regions[region] = node.strategy;

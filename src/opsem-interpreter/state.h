@@ -90,7 +90,7 @@ namespace interpreter
 
     Map<ObjectId, Map<Id, Shared<ir::Value>>> fields;
 
-    Map<Region*, rt::RegionType> regions;
+    Map<Region*, ir::AllocStrategy> regions;
 
     // TODO figure out they have both in the rules
     bool success;

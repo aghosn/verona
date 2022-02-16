@@ -346,12 +346,13 @@ namespace verona::ir
     }
   };
 
-  using AllocStrategy = rt::RegionType;
-  /* {
-     GC,
+  //using AllocStrategy = rt::RegionType;
+  enum class AllocStrategy {
+     Trace,
      Arena,
-     RC,
-   };*/
+     Rc,
+     Unsafe,
+   };
 
   // create Epsi y(z*)
   struct Create : Assign, Apply
