@@ -41,7 +41,10 @@ target_link_libraries(verona-interop PRIVATE
     clangSema
     clangSerialization
     clangTooling
-    clangCodeGen)
+    clangCodeGen
+    LLVMX86CodeGen
+    LLVMX86AsmParser)
+#LLVM-11 apparently LLVM-11 (which is my system's default, compiles and links but fails at runtime);
 
 install(TARGETS verona-interop RUNTIME DESTINATION .)
 
