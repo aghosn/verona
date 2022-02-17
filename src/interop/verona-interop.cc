@@ -6,6 +6,7 @@
 #include "CXXInterface.h"
 #include "FS.h"
 #include "config.h"
+#include "ObjGen.h"
 
 #include <filesystem> // C++17
 #include <fstream>
@@ -384,6 +385,8 @@ int main(int argc, char** argv)
   {
     mod->dump();
   }
+
+  codegen::generateObjCode(*mod, "/tmp/dump.o");
 
   return 0;
 }
