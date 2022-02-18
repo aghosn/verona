@@ -51,7 +51,7 @@ target_link_libraries(verona-interop PRIVATE
 
 install(TARGETS verona-interop RUNTIME DESTINATION .)
 
-add_library(libinterop 
+add_library(interop SHARED 
   verona-interop.cc
   ASTinstr.cc
   IRinstr.cc
