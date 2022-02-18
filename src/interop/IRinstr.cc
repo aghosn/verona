@@ -90,7 +90,7 @@ namespace verona::interop
     // End.
     BasicBlock *end = BasicBlock::Create(mod.getContext(), "end", proto);
 
-    SwitchInst *SI = builder.CreateSwitch(index, body, target_functions.size());
+    SwitchInst *SI = builder.CreateSwitch(index, end, target_functions.size());
     for (int i = 0; i < target_functions.size(); i++) 
     {
       BasicBlock *BC = BasicBlock::Create(mod.getContext(), "C", proto);
