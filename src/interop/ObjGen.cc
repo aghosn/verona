@@ -1,4 +1,5 @@
-//#include <llvm/MC/TargetRegistry.h>
+#include <stdlib.h>
+#include <string>
 #include <llvm/Support/Host.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/TargetSelect.h>
@@ -63,6 +64,14 @@ namespace codegen
     pass.run(mod);
     dest.flush();
     return 0;
+  }
+
+
+  //FIXME David wanted a prototype fast, so we directly invoke ld. 
+  void linkObject(std::string objname, std::string target)
+  {
+    std::string command = "ld -shared -o "+ target + " " + objname; 
+    system(command.c_str());
   }
 
 } // namespace

@@ -49,6 +49,13 @@ namespace verona::interop::api
     cl::desc("Generate the dispatcher with llvm IR"),
     cl::Optional,
     cl::init(false));
+  // Generate a dynamic library from the compiled code.
+  cl::opt<string> dyntarget(
+      "dyntarget",
+      cl::desc("<name.so> The name (with path) of the final .so library generated from this code. Default to /tmp/libsandboxed.so"),
+      cl::Optional,
+      cl::value_desc(dyntarget),
+      cl::init("/tmp/libsandboxed.so"));
 
   // For help's sake, will never be parsed, as we intercept
   cl::opt<string> config(
@@ -378,6 +385,12 @@ namespace verona::interop::api
      {
        mod->dump();
      }
-     codegen::generateObjCode(*mod, "/tmp/dump.o");
+     auto objname = "/tmp/dump.o";
+     if (codegen::generateObjCode(*mod, objname) != 0)
+     {
+      cerr << "Error generating the object." << endl;
+      return;
+     }
+     codegen::linkObject(objname, dyntarget);
   }
 } // namespace verona::interop::api
