@@ -21,5 +21,6 @@ add_executable(opsem-interpreter
   ${ALL_SOURCE_FILES})
 
 target_link_libraries(opsem-interpreter 
-  verona_rt
-  interop)
+  verona_rt)
+
+#  interop)
