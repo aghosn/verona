@@ -13,9 +13,13 @@ set(ALL_SOURCE_FILES
   visitors.cc
   object.cc
   notation.cc
-  interpreter.cc)
+  interpreter.cc
+  interoperability.cc)
+
 
 add_executable(opsem-interpreter 
   ${ALL_SOURCE_FILES})
 
-target_link_libraries(opsem-interpreter verona_rt)
+target_link_libraries(opsem-interpreter 
+  verona_rt
+  interop)

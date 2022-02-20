@@ -24,7 +24,7 @@ add_definitions(${CLANG_DEFINITIONS})
 add_llvm_executable(verona-interop verona-interop.cc ASTinstr.cc IRinstr.cc ObjGen.cc InteropApi.cc)
 llvm_update_compile_flags(verona-interop)
 
-target_link_libraries(verona-interop PRIVATE
+target_link_libraries(verona-interop PRIVATE 
     clangAST
     clangASTMatchers
     clangAnalysis
@@ -54,6 +54,46 @@ install(TARGETS verona-interop RUNTIME DESTINATION .)
 add_library(interop SHARED 
   verona-interop.cc
   ASTinstr.cc
+  ASTinstr.h
   IRinstr.cc
+  IRinstr.h
   ObjGen.cc
-  InteropApi.cc)
+  ObjGen.h
+  InteropApi.cc
+  CXXBuilder.h
+  CXXQuery.h
+  FS.h
+  Interop.h
+  Compiler.h
+  CXXInterface.h
+  CXXType.h
+  InteropApi.h)
+
+set_target_properties(interop PROPERTIES PUBLIC_HEADER Interop.h)
+
+target_link_libraries(interop PUBLIC
+    clangAST
+    clangASTMatchers
+    clangAnalysis
+    clangBasic
+    clangCodeGen
+    clangDriver
+    clangEdit
+    clangFrontend
+    clangFrontendTool
+    clangLex
+    clangParse
+    clangRewrite
+    clangRewriteFrontend
+    clangSema
+    clangSerialization
+    clangTooling
+    clangCodeGen
+    LLVMX86Disassembler
+    LLVMX86AsmParser 
+    LLVMX86CodeGen 
+    LLVMX86Desc 
+    LLVMX86Info)
+
+
+#TODO include all the libraries inside this one otherwise we have issues.
