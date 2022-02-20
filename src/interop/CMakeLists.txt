@@ -3,25 +3,12 @@ find_package(Threads REQUIRED)
 # We're not building LLVM, but downloading the build dir from an artefact
 set(LLVM_BUILD ${VERONA_LLVM_LOCATION})
 
-set(INTEROP_SOURCES
-  src/verona-interop.cc 
-  src/ASTinstr.cc 
-  src/IRinstr.cc 
-  src/ObjGen.cc 
-  src/InteropApi.cc)
 
-set(INTEROP_HEADERS
-  include/ASTinstr.h
-  include/Compiler.h
-  include/CXXBuilder.h
-  include/CXXInterface.h
-  include/CXXQuery.h
-  include/CXXType.h
-  include/FS.h
-  include/InteropApi.h
-  include/Interop.h
-  include/IRinstr.h
-  include/ObjGen.h)
+FILE(GLOB INTEROP_SOURCES
+  "src/*.cc")
+
+FILE(GLOB INTEROP_HEADERS
+  "include/*.h")
 
 set(LIB_DEPENDENCIES
     clangAST
@@ -76,34 +63,11 @@ target_link_libraries(verona-interop PRIVATE
 
 install(TARGETS verona-interop RUNTIME DESTINATION .)
 
-#add_library(interop SHARED 
-#  ${INTEROP_SOURCES})
-#
-#set_target_properties(interop PROPERTIES PUBLIC_HEADER Interop.h)
-#
-#target_link_libraries(interop PUBLIC
-#    clangAST
-#    clangASTMatchers
-#    clangAnalysis
-#    clangBasic
-#    clangCodeGen
-#    clangDriver
-#    clangEdit
-#    clangFrontend
-#    clangFrontendTool
-#    clangLex
-#    clangParse
-#    clangRewrite
-#    clangRewriteFrontend
-#    clangSema
-#    clangSerialization
-#    clangTooling
-#    clangCodeGen
-#    LLVMX86Disassembler
-#    LLVMX86AsmParser 
-#    LLVMX86CodeGen 
-#    LLVMX86Desc 
-#    LLVMX86Info)
+add_library(interop SHARED 
+  ${INTEROP_SOURCES}
+  ${INTEROP_HEADERS})
 
+set_target_properties(interop PROPERTIES PUBLIC_HEADER Interop.h)
 
-#TODO include all the libraries inside this one otherwise we have issues.
+target_link_libraries(interop PUBLIC
+  ${LIB_DEPENDENCIES})
