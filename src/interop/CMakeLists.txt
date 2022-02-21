@@ -63,8 +63,13 @@ target_link_libraries(verona-interop PRIVATE
 
 install(TARGETS verona-interop RUNTIME DESTINATION .)
 
-add_library(interop SHARED 
+add_library(interop SHARED)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--no-as-needed")
+
+target_sources(interop
+  PRIVATE
   ${INTEROP_SOURCES}
+  PUBLIC
   ${INTEROP_HEADERS})
 
 set_target_properties(interop PROPERTIES PUBLIC_HEADER Interop.h)

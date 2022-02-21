@@ -4,23 +4,15 @@ project(opsem-interpreter)
 
 set(CMAKE_CXX_STANDARD 20)
 
-set(ALL_SOURCE_FILES 
-  main.cc
-  lexer.cc
-  ir.cc
-  parser.cc
-  helpers.cc
-  visitors.cc
-  object.cc
-  notation.cc
-  interpreter.cc
-  interoperability.cc)
+FILE(GLOB SOURCES
+  "*.cc"
+  "*.h")
 
+include_directories("../interop/include")
 
 add_executable(opsem-interpreter 
-  ${ALL_SOURCE_FILES})
+  ${SOURCES})
 
 target_link_libraries(opsem-interpreter 
-  verona_rt)
-
-#  interop)
+  verona_rt
+  interop)
