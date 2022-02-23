@@ -245,8 +245,9 @@ namespace interpreter {
     auto storage = dynamic_pointer_cast<ir::StorageLoc>(f);
     ObjectId oid = storage->objectid->name;
     Id id = storage->id->name;
-    CHECK(state.objects.contains(oid), E_OID_NOT_DEF(oid));
-    CHECK(state.fields.contains(oid) && state.fields[oid].contains(id),
+    CHECK(state.objects.find(oid) != state.objects.end(), E_OID_NOT_DEF(oid));
+    CHECK((state.fields.find(oid) != state.fields.end()) 
+        && (state.fields[oid].find(id) != state.fields[oid].end()),
         E_MISSING_FIELD(oid, id));
     
     auto value = state.fields[oid][id]; 
@@ -280,15 +281,17 @@ namespace interpreter {
     //f = σ(y)
     CHECK(state.isDefinedInFrame(y->objectid->name), E_NAME_NOT_DEF(y->objectid->name));
     auto yoid = dynamic_pointer_cast<ir::ObjectID>(state.getValueByName(y->objectid->name)); 
-    CHECK(state.fields.contains(yoid->name), E_OID_NOT_DEF(yoid->name));
-    CHECK(state.fields[yoid->name].contains(y->id->name), E_MISSING_FIELD(yoid->name, y->id->name));
+    CHECK(state.fields.find(yoid->name) != state.fields.end(), E_OID_NOT_DEF(yoid->name));
+    CHECK(state.fields[yoid->name].find(y->id->name) != state.fields[y->id->name].end(),
+        E_MISSING_FIELD(yoid->name, y->id->name));
     auto f = state.fields[yoid->name][y->id->name];
 
     // Check the field is storable
     // TODO find a better way to implement that.
     auto ytypeName = state.getObjectByName(y->objectid->name)->type; 
     auto ytypeDecl = state.getTypeByName(ytypeName);
-    CHECK(ytypeDecl->members.contains(y->id->name), E_MISSING_FIELD(ytypeName, y->id->name));
+    CHECK(ytypeDecl->members.find(y->id->name) != ytypeDecl->members.end(),
+        E_MISSING_FIELD(ytypeName, y->id->name));
     auto _field = ytypeDecl->members[y->id->name];
     CHECK(_field->kind() == ir::Kind::Field, E_WRONG_KIND(ir::Kind::Field, _field->kind()));
     auto field = dynamic_pointer_cast<ir::Field>(_field);
@@ -336,8 +339,8 @@ namespace interpreter {
     
     // m = σ(ι)(z)
     // v = (ι, m)
-    CHECK(state.fields.contains(l->name), E_OID_NOT_DEF(l->name));
-    CHECK(state.fields[l->name].contains(z), E_MISSING_FIELD(l->name, z));
+    CHECK(state.fields.find(l->name) != state.fields.end(), E_OID_NOT_DEF(l->name));
+    CHECK(state.fields[l->name].find(z) != state.fields[l->name].end(), E_MISSING_FIELD(l->name, z));
     auto m = state.fields[l->name][z];
 
     // v = (ι, m) if m ∈ Id
@@ -400,7 +403,7 @@ namespace interpreter {
       goto end;
     }
     oid = dynamic_pointer_cast<ir::ObjectID>(l);
-    if (!state.objects.contains(oid->name))
+    if (state.objects.find(oid->name) == state.objects.end())
     {
       goto end;
     }
@@ -789,7 +792,7 @@ end:
     CHECK(value->kind() == ir::Kind::ObjectID,
         E_WRONG_KIND(ir::Kind::ObjectID, value->kind()));
     auto oid = dynamic_pointer_cast<ir::ObjectID>(value);
-    CHECK(state.objects.contains(oid->name), E_OID_NOT_DEF(oid->name));
+    CHECK(state.objects.find(oid->name) != state.objects.end(), E_OID_NOT_DEF(oid->name));
     // TODO ???
   }
 

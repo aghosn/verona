@@ -128,14 +128,14 @@ namespace mlexer
     Token result;
     result.text = word;
     // This is a keyword
-    if (keywords.contains(word))
+    if (keywords.find(word) != keywords.end())
     {
       result.kind = keywords[word];
       return result;
     }
 
     // Valid operations and symbols;
-    if (builtins.contains(word))
+    if (builtins.find(word) != builtins.end())
     {
       result.kind = builtins[word];
       return result;

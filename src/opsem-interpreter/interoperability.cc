@@ -1,5 +1,8 @@
 #include "interoperability.h"
 
+#include <process_sandbox/cxxsandbox.h>
+#include <process_sandbox/sandbox.h>
+
 #include <vector>
 #include <fstream>
 #include <iostream>

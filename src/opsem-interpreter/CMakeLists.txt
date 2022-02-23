@@ -47,20 +47,33 @@ link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 add_definitions(${CLANG_DEFINITIONS})
 
+set(SANDBOX_PATH "${CMAKE_SOURCE_DIR}/../experiments/process_sandbox")
+
+add_library(sandbox SHARED IMPORTED)
+set_target_properties(sandbox PROPERTIES
+  IMPORTED_LOCATION "${SANDBOX_PATH}/build/libsandbox.so"
+  INTERFACE_INCLUDE_DIRECTORIES "${SANDBOX_PATH}/include"
+)
+
 project(opsem-interpreter)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 
 FILE(GLOB SOURCES
   "*.cc"
   "*.h")
 
-include_directories("../interop/include")
-
 add_executable(opsem-interpreter 
   ${SOURCES})
+
+include_directories("../interop/include")
+include_directories("../../external/snmalloc/src")
 
 target_link_libraries(opsem-interpreter 
   verona_rt
   interop
+  sandbox
+  Threads::Threads
+  fmt
+  rt
   ${LIB_DEPENDENCIES})

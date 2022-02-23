@@ -189,15 +189,15 @@ namespace interpreter
     {
       case ir::Kind::ObjectID:
         oid = dynamic_pointer_cast<ir::ObjectID>(value);
-        assert(state.objects.contains(oid->name));
+        assert(state.objects.find(oid->name) != state.objects.end());
         obj = state.objects[oid->name];
         // TODO find how to test for imm?
         return (obj->obj->debug_is_iso() /*|| obj->obj->debug_is_imm()*/);
 
       case ir::Kind::StorageLoc:
         _v2 = dynamic_pointer_cast<ir::StorageLoc>(value);
-        assert(state.fields.contains(_v2->objectid->name));
-        assert(state.fields[_v2->objectid->name].contains(_v2->id->name));
+        assert(state.fields.find(_v2->objectid->name) != state.fields.end());
+        assert(state.fields[_v2->objectid->name].find(_v2->id->name) != state.fields[_v2->objectid->name].end());
         val2 = state.fields[_v2->objectid->name][_v2->id->name];
         return isIsoOrImm(state, val2);
 

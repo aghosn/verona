@@ -34,7 +34,7 @@ namespace interpreter
 
     bool containsName(Id name)
     {
-      return lookup.contains(name);
+      return (lookup.find(name) != lookup.end());
       // TODO check if we need to perform a check or not.
       // Probably will have to fix that.
       /*if (!lookup.contains(name))
@@ -50,7 +50,7 @@ namespace interpreter
 
     Shared<ir::Value> frameLookup(Id name)
     {
-      assert(lookup.contains(name));
+      assert(lookup.find(name) != lookup.end());
       auto value = lookup[name];
       return value;
     }
@@ -151,7 +151,7 @@ namespace interpreter
       assert(val->kind() == ir::Kind::ObjectID && "Value is not an ObjectID");
       Shared<ir::ObjectID> objid = dynamic_pointer_cast<ir::ObjectID>(val);
 
-      assert(objects.contains(objid->name) && "Object does not exist");
+      assert((objects.find(objid->name) != objects.end()) && "Object does not exist");
 
       return objects[objid->name];
     }
@@ -177,7 +177,7 @@ namespace interpreter
 
     bool containsType(TypeId name)
     {
-      return program.types.contains(name);
+      return (program.types.find(name) != program.types.end());
     }
 
     Shared<Type> getTypeByName(TypeId name)
@@ -187,7 +187,7 @@ namespace interpreter
 
     bool isFunction(Id name)
     {
-      return program.functions.contains(name);
+      return (program.functions.find(name) != program.functions.end());
     }
 
     ir::Node<ir::Function> getFunction(Id name)

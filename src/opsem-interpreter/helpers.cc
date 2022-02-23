@@ -27,7 +27,8 @@ namespace mlexer::helpers
 
   bool isDelimiter(char c)
   {
-    return delimiters.contains(c);
+    //return delimiters.contains(c);
+    return (delimiters.find(c) != delimiters.end());
   }
 
   bool isCharacter(char c)
