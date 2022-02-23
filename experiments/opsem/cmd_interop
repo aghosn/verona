@@ -1,0 +1,3 @@
+#!/bin/bash
+
+../../build/verona-prefix/src/verona-build/opsem-interpreter/opsem-interpreter $1 $2

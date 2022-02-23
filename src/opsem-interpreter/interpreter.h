@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "state.h"
 #include "parser.h"
+#include "interoperability.h"
 
 namespace interpreter {
 
@@ -18,6 +19,7 @@ namespace interpreter {
       bool evalOneStep();
       void eval();
       void visit(ir::NodeDef* node);
+      void addLibrary(interop::SandboxConfig& config);
     private:
       State state;
       ir::Parser* parser;

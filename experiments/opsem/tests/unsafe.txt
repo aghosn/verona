@@ -1,0 +1,15 @@
+class Int {
+}
+
+
+fn proxy() {
+  y = new Int
+  release y
+  return
+}
+
+
+fn main() {
+  create GC proxy()
+  return
+}

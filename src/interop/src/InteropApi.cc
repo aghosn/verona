@@ -52,7 +52,7 @@ namespace verona::interop::api
   // Generate a dynamic library from the compiled code.
   cl::opt<string> dyntarget(
       "dyntarget",
-      cl::desc("<name.so> The name (with path) of the final .so library generated from this code. Default to /tmp/libsandboxed.so"),
+      cl::desc("<name.so> The name (with path) of the final .so library generated from this code. Defaults to /tmp/libsandboxed.so"),
       cl::Optional,
       cl::value_desc(dyntarget),
       cl::init("/tmp/libsandboxed.so"));
@@ -137,6 +137,8 @@ namespace verona::interop::api
       if (!file.good())
       {
         cerr << "Error opening targets file " << targets << endl;
+        cerr << "Current directory is '" << filesystem::current_path() << "'" << endl;
+        cerr << "its lenght is " << targets.size() << endl;
         exit(1);
       }
 

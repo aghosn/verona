@@ -161,6 +161,32 @@ namespace verona::ir
         return call;
       }
         assert(0);
+      case TokenKind::Region:
+      {
+        // A region without return value
+        auto region = make_shared<Region>();
+        auto apply = parseApply();
+        assert(apply.second.size() >= 1);
+        region->function = apply.first;
+        region->args = apply.second;
+        parseEOL();
+        region->tok = t;
+        return region;
+      }
+        assert(0);
+      case TokenKind::Create:
+      {
+        // A create without return value
+        auto create = make_shared<Create>();
+        create->strategy = parseStrategy();
+        auto apply = parseApply();
+        create->function = apply.first;
+        create->args = apply.second;
+        parseEOL();
+        create->tok = t;
+        return create;
+      }
+
       default:
         // No match
         std::cerr << "Unrecognized kind " << t.kind << std::endl;

@@ -17,27 +17,32 @@ namespace interpreter {
   static const int64_t _PC_RESET = -1;
   static const int64_t _PC_START = 0;
 
-Interpreter::Interpreter(ir::Parser* parser) {
-  this->parser = parser;
-  state.init(parser->classes, parser->functions);
-  //TODO set up the entry point?
-  if (state.isFunction(ENTRY_POINT)) {
-    auto entry = state.getFunction(ENTRY_POINT);
-    state.exec_state = {entry->exprs, _PC_START};
+  Interpreter::Interpreter(ir::Parser* parser) {
+    this->parser = parser;
+    state.init(parser->classes, parser->functions);
+    //TODO set up the entry point?
+    if (state.isFunction(ENTRY_POINT)) {
+      auto entry = state.getFunction(ENTRY_POINT);
+      state.exec_state = {entry->exprs, _PC_START};
+    }
+    // Setup the fake first frame and the main frame.
+    // TODO: figure out whether we need more info in there.
+    auto fakeframe = make_shared<Frame>();
+    auto mainframe = make_shared<Frame>();
+    state.frames.push_back(fakeframe);
+    state.frames.push_back(mainframe);
+  
+    // Create original region
+    auto mainRegion = new (rt::RegionType::Arena) Region;
+    state.regions[mainRegion] = ir::AllocStrategy::Arena;
+    mainframe->regions.push_back(mainRegion);
+    rt::api::open_region(mainRegion);
   }
-  // Setup the fake first frame and the main frame.
-  // TODO: figure out whether we need more info in there.
-  auto fakeframe = make_shared<Frame>();
-  auto mainframe = make_shared<Frame>();
-  state.frames.push_back(fakeframe);
-  state.frames.push_back(mainframe);
 
-  // Create original region
-  auto mainRegion = new (rt::RegionType::Arena) Region;
-  state.regions[mainRegion] = ir::AllocStrategy::Arena;
-  mainframe->regions.push_back(mainRegion);
-  rt::api::open_region(mainRegion);
-}
+  void Interpreter::addLibrary(interop::SandboxConfig& config)
+  {
+    //TODO  do something
+  }
 
   bool Interpreter::evalOneStep() {
     static int counter = 0;

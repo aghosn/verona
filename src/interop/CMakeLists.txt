@@ -72,6 +72,8 @@ target_sources(interop
   PUBLIC
   ${INTEROP_HEADERS})
 
+llvm_update_compile_flags(interop)
+
 set_target_properties(interop PROPERTIES PUBLIC_HEADER Interop.h)
 
 target_link_libraries(interop PUBLIC

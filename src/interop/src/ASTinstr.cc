@@ -80,6 +80,10 @@ namespace verona::interop
     for (auto target: target_functions)
     {
       clang::FunctionDecl* decl = query->getFunction(target);
+      if (decl == nullptr)
+      {
+        cerr << "Error: could not find function " << target << endl;
+      }
       assert(decl != nullptr);
       builder->generateDispatcher(decl);
     }

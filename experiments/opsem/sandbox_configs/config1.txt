@@ -1,0 +1,7 @@
+--dump
+--sandbox
+--includes=../llvm_sandboxing/dispatch_test/includes.txt
+--targets=../llvm_sandboxing/dispatch_test/targets.txt
+--gendispatch
+--dyntarget=/tmp/dispatch_test.so
+../llvm_sandboxing/dispatch_test/main.cc
