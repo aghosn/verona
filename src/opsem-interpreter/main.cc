@@ -45,7 +45,7 @@ int main(int argc, const char** argv)
   if (!libsandbox.empty())
   {
     //FIXME do something cleaner, check how to pass that to the interpreter. 
-    interop::initializeLibrary("mylib", libsandbox);
+    auto sandbox = interop::initializeLibrary("mylib", libsandbox);
   }
   Interpreter interp(&parser);
   interp.eval();

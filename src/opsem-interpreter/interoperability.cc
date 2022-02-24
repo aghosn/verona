@@ -1,15 +1,16 @@
 #include "interoperability.h"
 
-#include <process_sandbox/cxxsandbox.h>
-#include <process_sandbox/sandbox.h>
-
 #include <vector>
 #include <fstream>
 #include <iostream>
 #include <Interop.h>
 #include <filesystem> // C++17
 
+//TODO for some reason this does not compile
+#include <process_sandbox/cxxsandbox.h>
+#include <process_sandbox/sandbox.h>
 
+using namespace std;
 namespace interpreter::interop
 {
 
@@ -43,8 +44,8 @@ namespace interpreter::interop
       args[i] = (char*)calloc(sizeof(char), arguments[i].size()+1);
       strcpy(args[i], arguments[i].c_str());
     }
-    verona::interop::api::run(arguments.size(), args);
-    
+    auto library = verona::interop::api::run(arguments.size(), args);
+    std::cout << "The dynamic library is in " << library << std::endl;
 
     // Free everything, hopefully the arguments have been copied...
     for (int i = 0; i < arguments.size(); i++)

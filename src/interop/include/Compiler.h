@@ -97,7 +97,8 @@ namespace verona::interop
               "/usr/local/include/",
               "-Wno-invalid-constexpr",
               "-std=gnu++17",
-              "-mcx16"};
+              "-mcx16",
+              "-fPIC"};
       // Add user include paths
       for (auto& dir : includePath)
       {

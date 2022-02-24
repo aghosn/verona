@@ -337,7 +337,7 @@ namespace verona::interop::api
     builder->createReturn(fourLiteral, func);
   }
 
-  void run(int argc, char** argv)
+  std::string run(int argc, char** argv)
   {
      // Parse cmd-line options
      vector<string> includePath;
@@ -362,6 +362,7 @@ namespace verona::interop::api
      if (sandbox)
      {
        generate_dispatchers(interface);
+       specialize_export_function(interface);
      }
     
      // Dumps the AST before trying to emit LLVM for debugging purposes
@@ -391,8 +392,9 @@ namespace verona::interop::api
      if (codegen::generateObjCode(*mod, objname) != 0)
      {
       cerr << "Error generating the object." << endl;
-      return;
+      exit(1);
      }
      codegen::linkObject(objname, dyntarget);
+     return dyntarget;
   }
 } // namespace verona::interop::api

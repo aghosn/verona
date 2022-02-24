@@ -11,9 +11,7 @@
 #include <verona.h>
 #include <iostream>
 
-using namespace std;
-
-using ObjectId = string;
+using ObjectId = std::string;
 
 namespace interpreter
 {
@@ -110,8 +108,8 @@ namespace interpreter
         program.types[c->id->name] = c;
       }
       // Create the artifical type Bool
-      auto boolClass = make_shared<ir::Class>();
-      boolClass->id = make_shared<ir::ClassID>();
+      auto boolClass = std::make_shared<ir::Class>();
+      boolClass->id = std::make_shared<ir::ClassID>();
       boolClass->id->name = "Bool";
       program.types["Bool"] = boolClass;
 
@@ -127,7 +125,7 @@ namespace interpreter
     }
 
     // Checks wheter a name is defined in the current scope.
-    bool isDefinedInFrame(string name)
+    bool isDefinedInFrame(std::string name)
     {
       assert(frames.size() > 0);
       return frames.back()->containsName(name);
@@ -144,19 +142,19 @@ namespace interpreter
       return frames.back()->frameLookup(name);
     }
 
-    Shared<Object> getObjectByName(string name)
+    Shared<Object> getObjectByName(std::string name)
     {
       assert(frames.size() > 0);
       auto val = frames.back()->frameLookup(name);
       assert(val->kind() == ir::Kind::ObjectID && "Value is not an ObjectID");
-      Shared<ir::ObjectID> objid = dynamic_pointer_cast<ir::ObjectID>(val);
+      Shared<ir::ObjectID> objid = std::dynamic_pointer_cast<ir::ObjectID>(val);
 
       assert((objects.find(objid->name) != objects.end()) && "Object does not exist");
 
       return objects[objid->name];
     }
 
-    Shared<ir::Value> getValueByName(string name)
+    Shared<ir::Value> getValueByName(std::string name)
     {
       assert(frames.size() > 0);
       return frames.back()->frameLookup(name);

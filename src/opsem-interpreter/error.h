@@ -8,11 +8,9 @@
 #include <cstdio>
 
 
-using namespace std;
-
 namespace interpreter
 {
-  struct InterpreterException : public exception
+  struct InterpreterException : public std::exception
   {
     const char* what() const throw () 
     {

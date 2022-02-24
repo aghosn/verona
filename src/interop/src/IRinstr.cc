@@ -5,6 +5,8 @@
 #include "ASTinstr.h"
 #include "IRinstr.h"
 
+using namespace std;
+using namespace llvm;
 
 namespace verona::interop
 {

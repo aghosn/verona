@@ -6,6 +6,8 @@
 #include <cassert>
 #include <cstdarg>
 
+using namespace std;
+
 namespace interpreter
 {
   // newframe(σ, ρ*, x*, y, z*, e*) =

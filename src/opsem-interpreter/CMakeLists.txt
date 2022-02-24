@@ -72,8 +72,10 @@ include_directories("../../external/snmalloc/src")
 target_link_libraries(opsem-interpreter 
   verona_rt
   interop
-  sandbox
   Threads::Threads
   fmt
   rt
+  sandbox
+  z
+  bsd
   ${LIB_DEPENDENCIES})
