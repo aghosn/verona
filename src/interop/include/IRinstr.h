@@ -10,4 +10,6 @@ namespace verona::interop
   // It contains a switch to dispatch a call to the correct target.
   void generate_dispatch_function(llvm::Module& mod);
 
+  void generate_fake_sandbox_init(llvm::Module& mod);
+
 } // namespace verona::interop

@@ -68,6 +68,20 @@ namespace verona::interop
     return nullptr;
   }
 
+  void generate_fake_sandbox_init(Module& mod)
+  {
+    IRBuilder<> builder(mod.getContext());
+    auto voidtpe = Type::getVoidTy(mod.getContext());
+    vector <Type*> types;
+    FunctionType* FT = 
+      FunctionType::get(voidtpe, types, false);
+    Function* proto = 
+      Function::Create(FT, Function::ExternalLinkage, "sandbox_init", mod);
+    BasicBlock *body = BasicBlock::Create(mod.getContext(), "body", proto);
+    builder.SetInsertPoint(body);
+    builder.CreateRet(nullptr);
+  }
+
   void generate_dispatch_function(Module& mod) 
   {
     IRBuilder<> builder(mod.getContext());

@@ -362,7 +362,7 @@ namespace verona::interop::api
      if (sandbox)
      {
        generate_dispatchers(interface);
-       specialize_export_function(interface);
+       //specialize_export_function(interface);
      }
     
      // Dumps the AST before trying to emit LLVM for debugging purposes
@@ -380,6 +380,7 @@ namespace verona::interop::api
      // LLVM IR instrumentation
      if (sandbox && gendispatch)
      {
+       //generate_fake_sandbox_init(*mod);
        generate_dispatch_function(*mod);    
      }
      // Dump LLVM IR for debugging purposes

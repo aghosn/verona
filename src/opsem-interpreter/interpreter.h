@@ -19,7 +19,6 @@ namespace interpreter {
       bool evalOneStep();
       void eval();
       void visit(ir::NodeDef* node);
-      void addLibrary(interop::SandboxConfig& config);
     private:
       State state;
       ir::Parser* parser;

@@ -6,10 +6,6 @@
 #include <Interop.h>
 #include <filesystem> // C++17
 
-//TODO for some reason this does not compile
-#include <process_sandbox/cxxsandbox.h>
-#include <process_sandbox/sandbox.h>
-
 using namespace std;
 namespace interpreter::interop
 {
@@ -60,5 +56,4 @@ namespace interpreter::interop
     sbconfig->name = name;
     return sbconfig;
   }
-
 } // namespace interpreter::interop

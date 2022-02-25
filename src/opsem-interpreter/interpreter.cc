@@ -39,24 +39,19 @@ namespace interpreter {
     rt::api::open_region(mainRegion);
   }
 
-  void Interpreter::addLibrary(interop::SandboxConfig& config)
-  {
-    //TODO  do something
-  }
-
   bool Interpreter::evalOneStep() {
     static int counter = 0;
 
-    CHECK(state.exec_state.offset >= 0, "Invalid PC offset");
+    CHECK(state.exec_state.offset >= 0, E_FMT2("Invalid PC offset"));
     CHECK((state.exec_state.offset == 0 || 
         state.exec_state.offset < state.exec_state.exprs.size()),
-        "PC incompatible with the set of expressions available");
+        E_FMT2("PC incompatible with the set of expressions available"));
 
     // Stopping condition.
     if (state.exec_state.exprs.size() == 0)
     {
       // Check that the only frame available is the fake one.
-      CHECK(state.frames.size() == 1, "Cannot stop with more than 1 frame");
+      CHECK(state.frames.size() == 1, E_FMT2("Cannot stop with more than 1 frame"));
       return true;
     }
 
@@ -158,7 +153,7 @@ namespace interpreter {
       case ir::Kind::Merge:
         evalMerge(node->as<ir::Merge>());
       default:
-        CHECK(0, "Unknown node being evaluated");
+        CHECK(0, E_FMT2("Unknown node being evaluated"));
     }
   }
 
@@ -168,7 +163,7 @@ namespace interpreter {
   // σ, x = var; e* → σ[ι↦(σ.frame.regions, τᵩ)][x↦(ι, x)], acquire x; e*
   void Interpreter::evalVar(verona::ir::Var& node)
   {
-    CHECK(node.left.size() == 1, "Need exactly one x");
+    CHECK(node.left.size() == 1, E_FMT2("Need exactly one x"));
     string x = node.left[0]->name;
 
     // x ∉ σ

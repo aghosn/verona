@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 
@@ -10,6 +11,7 @@ namespace interpreter::interop
   {
     std::string config;
     std::string name;
+    std::string dynpath;
   };
 
   /**
@@ -18,5 +20,4 @@ namespace interpreter::interop
    * a sandbox.
    */
   std::unique_ptr<SandboxConfig> initializeLibrary(std::string name, std::string config);
-
 } // namespace interpreter::interop
