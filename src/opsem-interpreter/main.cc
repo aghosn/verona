@@ -41,13 +41,12 @@ int main(int argc, const char** argv)
 
   Parser parser(lexer);
   parser.parse();
-  
- /* if (!libsandbox.empty())
-  {
-    //FIXME do something cleaner, check how to pass that to the interpreter. 
-    //auto sandbox = interop::initializeLibrary("mylib", libsandbox);
-  }*/
+
   Interpreter interp(&parser);
+  if (!libsandbox.empty())
+  {
+    interp.addSandbox(interop::initializeLibrary(libsandbox));
+  }
   interp.eval();
   return 0;
 }

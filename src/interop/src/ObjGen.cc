@@ -40,9 +40,8 @@ namespace codegen
     auto cpu = "generic";
     auto features = "";
     TargetOptions opt;
-    //auto rm = Optional<Reloc::Model>(); 
     auto targetMachine = target->createTargetMachine(targetTriple, cpu, 
-        features, opt, Reloc::Model::PIC_/*rm*/);
+        features, opt, Reloc::Model::PIC_);
     mod.setDataLayout(targetMachine->createDataLayout());
     
     std::error_code ec;
@@ -70,7 +69,7 @@ namespace codegen
   //FIXME David wanted a prototype fast, so we directly invoke ld. 
   void linkObject(std::string objname, std::string target)
   {
-    std::string command = "clang -shared -o "+ target + " " + objname; 
+    std::string command = "clang++ -shared -o "+ target + " " + objname; 
     system(command.c_str());
   }
 

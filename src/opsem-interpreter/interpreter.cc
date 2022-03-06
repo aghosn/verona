@@ -20,7 +20,6 @@ namespace interpreter {
   Interpreter::Interpreter(ir::Parser* parser) {
     this->parser = parser;
     state.init(parser->classes, parser->functions);
-    //TODO set up the entry point?
     if (state.isFunction(ENTRY_POINT)) {
       auto entry = state.getFunction(ENTRY_POINT);
       state.exec_state = {entry->exprs, _PC_START};
@@ -33,10 +32,34 @@ namespace interpreter {
     state.frames.push_back(mainframe);
   
     // Create original region
-    auto mainRegion = new (rt::RegionType::Arena) Region;
+    auto mainRegion = new Region(ir::AllocStrategy::Arena);
     state.regions[mainRegion] = ir::AllocStrategy::Arena;
     mainframe->regions.push_back(mainRegion);
-    rt::api::open_region(mainRegion);
+    rt::api::open_region(mainRegion->rt_region);
+  }
+
+  void Interpreter::addSandbox(std::shared_ptr<interop::SandboxConfig> sb)
+  {
+    state.program.sandbox = sb;
+    // Generate a wrapper for each sandboxed function.
+    for (auto f: sb->targets)
+    {
+      CHECK(state.program.functions.find(f.first) == state.program.functions.end(),
+          E_FMT2("Overriding verona function with sandboxed one"));
+      auto func = make_shared<ir::Function>();
+      func->function = make_shared<verona::ir::ID>(); 
+      func->function->name = f.first;
+      func->tok = {f.first, mlexer::Autogen, -1, -1};
+      auto body = make_shared<verona::ir::SandboxTrampoline>();
+      body->function = f.first;
+      body->idx = f.second;
+      body->tok = {"SANDBOX TRAMPOLINE", mlexer::Autogen, -1, -1};
+      auto ret = make_shared<verona::ir::Return>();
+      ret->tok = {"SANDBOX_RETURN", mlexer::Autogen, -1, -1};
+      func->exprs.push_back(body); 
+      func->exprs.push_back(ret);
+      state.program.functions[f.first] = func;
+    }
   }
 
   bool Interpreter::evalOneStep() {
@@ -57,8 +80,8 @@ namespace interpreter {
 
     auto pc = state.exec_state.offset;
     auto instr = state.exec_state.exprs[pc];
-    cout << "[EVAL]: ";
-    this->parser->lexer.dump(instr->tok.la, instr->tok.pos, 0, false);
+    cout << "[EVAL] ";
+    this->parser->lexer.dump(instr->tok, 0, false);
 
     try
     {
@@ -66,7 +89,7 @@ namespace interpreter {
     } catch (InterpreterException& e)
     {
       cerr << "[DUMP]: Error line " << instr->tok.la << endl;
-      this->parser->lexer.dump(instr->tok.la, instr->tok.pos, 3, true); 
+      this->parser->lexer.dump(instr->tok, 3, true); 
       return true;
     }
 
@@ -150,8 +173,13 @@ namespace interpreter {
         break;
       case ir::Kind::Freeze:
         evalFreeze(node->as<ir::Freeze>());
+        break;
       case ir::Kind::Merge:
         evalMerge(node->as<ir::Merge>());
+        break;
+      case ir::Kind::SBTrampoline:
+        evalSandboxTrampoline(node->as<ir::SandboxTrampoline>());
+        break;
       default:
         CHECK(0, E_FMT2("Unknown node being evaluated"));
     }
@@ -175,7 +203,7 @@ namespace interpreter {
     Shared<Object> obj = make_shared<Object>();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
-    obj->obj = new VObject(); 
+    obj->obj = state.newObject();
     // Setting the object's regions
     for (auto r: state.frames.back()->regions) {
       obj->regions.push_back(r);
@@ -434,7 +462,7 @@ end:
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
     //TODO figure out the descriptor.
-    obj->obj = new VObject(); 
+    obj->obj = state.newObject();
     // Set up regions
     for (auto r: state.frames.back()->regions) {
       obj->regions.push_back(r);
@@ -474,7 +502,7 @@ end:
     Shared<Object> obj = make_shared<Object>();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
-    obj->obj = new VObject(); 
+    obj->obj = state.newObject();
     // Set up regions
     for (auto r: state.frames.back()->regions) {
       obj->regions.push_back(r);
@@ -588,36 +616,14 @@ end:
     state.exec_state = {expr2, _PC_RESET};
   } 
 
-
-  // Converts a strategy to a region type if the strategy is NOT unsafe.
-  static rt::RegionType strategyToRegionType(ir::AllocStrategy strat)
-  {
-    CHECK(strat < ir::AllocStrategy::Unsafe, E_STRAT_TO_REGION_TYPE);
-    switch(strat)
-    {
-      case ir::AllocStrategy::Trace:
-        return rt::RegionType::Trace;
-      case ir::AllocStrategy::Arena:
-        return rt::RegionType::Arena;
-      case ir::AllocStrategy::Rc:
-        return rt::RegionType::Rc;
-      default:
-        CHECK(0, E_MISSING_CASE); 
-    }
-
-    // Should never get here.
-    return rt::RegionType::Trace;
-  }
-
-  static Region* createRegion(ir::AllocStrategy strat)
+  static Region* createRegion(ir::AllocStrategy strat, 
+      std::shared_ptr<interop::SandboxConfig> sb)
   {
     if (strat < ir::AllocStrategy::Unsafe)
     {
-      auto type = strategyToRegionType(strat);
-      return new (type) Region;
+      return new Region(strat);
     }
-    // TODO handle the case for unsafe.
-    return nullptr;
+    return new Region(sb);
   }
 
   // Create a new heap region.
@@ -638,7 +644,7 @@ end:
   
     // ρ ∉ σ
     //TODO I have to find out what to do here, typecast to my own type?
-    Region* region = createRegion(node.strategy); 
+    Region* region = createRegion(node.strategy, state.program.sandbox); 
     
     // σ₁[ρ↦Σ]
     state.regions[region] = node.strategy;
@@ -843,6 +849,26 @@ end:
     //rt::Object* res = rt::api::merge(target);
     //TODO is that correct?
     //state.addVar(x, res);
+  }
+
+  void Interpreter::evalSandboxTrampoline(verona::ir::SandboxTrampoline& node)
+  {
+    // Check that the currently opened region is an unsafe one with an associated
+    // sandbox.
+    CHECK(state.frames.size() > 0, E_WRONG_NB_AT_LEAST(0, state.frames.size()));
+    auto frame = state.frames.back();
+    CHECK(frame->regions.size() > 0, E_WRONG_NB_AT_LEAST(0, frame->regions.size()));
+    auto region = frame->regions.back();
+    CHECK(region->strategy == ir::AllocStrategy::Unsafe,
+        E_WRONG_KIND(ir::AllocStrategy::Unsafe, region->strategy));
+    CHECK(region->sb != nullptr, E_NULL);
+    auto sb = region->sb;
+
+    // FIXME  for the moment do empty allocation as argument frame.
+    auto args = sb->lib->alloc_in_sandbox(4, 1);
+    CHECK(sb->targets.find(node.function) != sb->targets.end(), E_UNEXPECTED_VALUE);
+    auto idx = sb->targets[node.function];
+    sb->lib->send(idx, args);
   }
 
 

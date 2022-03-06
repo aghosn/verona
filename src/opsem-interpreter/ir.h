@@ -65,6 +65,9 @@ namespace verona::ir
     // Values
     Object,
 
+    // Internal
+    SBTrampoline,
+
     End,
 
   };
@@ -624,6 +627,20 @@ namespace verona::ir
     Kind kind() override
     {
       return Kind::Undef;
+    }
+  };
+
+  // Internal nodes used to generate trampolines to the sandbox
+
+  struct SandboxTrampoline : Expr 
+  {
+    std::string function; 
+    int idx;
+    // TODO add also the arguments
+
+    Kind kind() override
+    {
+      return Kind::SBTrampoline;
     }
   };
 

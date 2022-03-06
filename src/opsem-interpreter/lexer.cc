@@ -317,8 +317,16 @@ namespace mlexer
     return nullptr;
   }
 
-  void Lexer::dump(int la, int col, int lines, bool error)
+  void Lexer::dump(Token tok, int lines, bool error)
   {
+    auto la = tok.la;
+    auto col = tok.pos;
+    // Sandbox code
+    if (la == -1)
+    {
+      std::cerr << tok.text << std::endl;
+      return;
+    }
     if (la < 0 || la >= content.size())
     {
       std::cerr << "------------ No valid source info -------------" << std::endl;

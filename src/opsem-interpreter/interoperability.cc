@@ -5,12 +5,15 @@
 #include <iostream>
 #include <Interop.h>
 #include <filesystem> // C++17
+#include <cassert>
+
+#include <process_sandbox/cxxsandbox.h>
+#include <process_sandbox/sandbox.h>
 
 using namespace std;
 namespace interpreter::interop
 {
-
-  std::unique_ptr<SandboxConfig> initializeLibrary(std::string name, std::string config)
+  std::shared_ptr<SandboxConfig> initializeLibrary(std::string config)
   {
     // Nothing to do
     if (config.empty())
@@ -41,7 +44,7 @@ namespace interpreter::interop
       strcpy(args[i], arguments[i].c_str());
     }
     auto library = verona::interop::api::run(arguments.size(), args);
-    std::cout << "The dynamic library is in " << library << std::endl;
+    std::cout << "[EVAL] Sandbox: " << library << std::endl;
 
     // Free everything, hopefully the arguments have been copied...
     for (int i = 0; i < arguments.size(); i++)
@@ -51,9 +54,33 @@ namespace interpreter::interop
     free(args);
 
     // create the return value;
-    auto sbconfig = std::make_unique<SandboxConfig>();
+    auto sbconfig = std::make_shared<SandboxConfig>();
     sbconfig->config = config;
-    sbconfig->name = name;
+    sbconfig->lib = std::make_unique<sandbox::Library>(library.c_str());
+    int i = 0; 
+    for (auto target: verona::interop::target_functions)
+    {
+      sbconfig->targets[target] = i;
+      i++;
+    }
     return sbconfig;
   }
+
+//  // TODO remove afterwards, I'm just testing that things work;
+//  void test_sandbox() {
+//    lib = std::make_unique<sandbox::Library>("/tmp/sandboxed-basic.so");
+//  }
+//  void invoke_target()
+//  {
+//    assert(lib != nullptr); 
+//    struct {
+//      int a;
+//      int b;
+//      int ret;
+//    } args;
+//    args.a = 1;
+//    args.b = 2;
+//    args.ret = 0;
+//    lib->send(0, (void*) &args);
+//  }
 } // namespace interpreter::interop

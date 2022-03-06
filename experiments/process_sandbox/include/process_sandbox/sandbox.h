@@ -513,11 +513,6 @@ namespace sandbox
     SharedAllocConfig::LocalState memory_provider;
 
     /**
-     * Allocate some memory in the sandbox.  Returns `nullptr` if the
-     * allocation failed.
-     */
-    void* alloc_in_sandbox(size_t bytes, size_t count);
-    /**
      * Deallocate an allocation in the sandbox.
      */
     void dealloc_in_sandbox(void* ptr);
@@ -560,6 +555,12 @@ namespace sandbox
     std::unique_ptr<CallbackDispatcher> callback_dispatcher;
 
   public:
+
+    /**
+     * Allocate some memory in the sandbox.  Returns `nullptr` if the
+     * allocation failed.
+     */
+    void* alloc_in_sandbox(size_t bytes, size_t count);
     /**
      * Returns the next vtable entry to use, incrementing the counter so
      * subsequent calls will always return a fresh value.
@@ -709,6 +710,14 @@ namespace sandbox
       return memory_provider.contains(ptr, sz);
     }
 
+    /**
+     * Sends a message to the child process, containing a vtable index and a
+     * pointer to the argument frame (a tuple of arguments and space for the
+     * return value).
+     */
+    // (@aghosn) made this public for convenience
+    void send(int idx, void* ptr);
+
   private:
     /**
      * Is this the first time that we've invoked a sandbox?  If so, we will
@@ -720,12 +729,6 @@ namespace sandbox
      */
     template<typename Ret, typename... Args>
     friend class Function;
-    /**
-     * Sends a message to the child process, containing a vtable index and a
-     * pointer to the argument frame (a tuple of arguments and space for the
-     * return value).
-     */
-    void send(int idx, void* ptr);
     /**
      * Instruct the child to exit and block until it does.  The return value is
      * the exit code of the child process.  If the child has already exited,

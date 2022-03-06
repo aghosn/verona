@@ -5,6 +5,8 @@
 #include "parser.h"
 #include "interoperability.h"
 
+#include <memory>
+
 namespace interpreter {
 
   /**
@@ -19,6 +21,7 @@ namespace interpreter {
       bool evalOneStep();
       void eval();
       void visit(ir::NodeDef* node);
+      void addSandbox(std::shared_ptr<interop::SandboxConfig> sb);
     private:
       State state;
       ir::Parser* parser;
@@ -44,6 +47,7 @@ namespace interpreter {
     void evalFulfill(verona::ir::Fulfill& node);
     void evalFreeze(verona::ir::Freeze& node);
     void evalMerge(verona::ir::Merge& node);
+    void evalSandboxTrampoline(verona::ir::SandboxTrampoline& node);
   };
 
 } //namespace interpreter

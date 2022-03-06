@@ -272,10 +272,10 @@ namespace sandbox
       }
   };
 
-  extern "C" void sandbox_call(int idx, void* args)
-  {
+  extern "C" void sandbox_call(int idx, void* args);
+  /*{
     ExportedLibrary::call(idx, args);
-  }
+  }*/
 
   /**
    * Helpers that assist with type deduction for `Function` objects.

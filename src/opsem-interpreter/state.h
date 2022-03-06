@@ -3,10 +3,13 @@
 #include "object.h"
 #include "type.h"
 #include "utils.h"
+#include "interoperability.h"
+#include "error.h"
 
 #include <cassert>
 #include <map>
 #include <utility>
+#include <memory>
 #include <vector>
 #include <verona.h>
 #include <iostream>
@@ -20,6 +23,9 @@ namespace interpreter
   {
     Map<Id, ir::Node<ir::Function>> functions;
     Map<TypeId, Shared<Type>> types;
+
+    // sandboxed code, for the moment only one
+    std::shared_ptr<interop::SandboxConfig>  sandbox;
   };
 
   // ϕ ∈ Frame ::= Region* × (Id → Value) × Id* × Expression*
@@ -33,17 +39,6 @@ namespace interpreter
     bool containsName(Id name)
     {
       return (lookup.find(name) != lookup.end());
-      // TODO check if we need to perform a check or not.
-      // Probably will have to fix that.
-      /*if (!lookup.contains(name))
-      {
-        return false;
-      }
-      auto value = lookup[name];
-      if (!(value->kind() == ir::Kind::ObjectID)) {
-        cout << "The name " << name << " is not an object" << endl;
-      }
-      return (value->kind() == ir::Kind::ObjectID);*/
     }
 
     Shared<ir::Value> frameLookup(Id name)
@@ -192,6 +187,17 @@ namespace interpreter
     {
       assert(isFunction(name) && "Function is not defined");
       return program.functions[name];
+    }
+
+    VObject* newObject(void)
+    {
+      CHECK(frames.size() > 0, E_WRONG_NB_AT_LEAST(0, frames.size()));
+      auto frame = frames.back();
+
+      // Get the current region
+      CHECK(frame->regions.size() > 0, E_WRONG_NB_AT_LEAST(0, frame->regions.size()));
+      auto region = frame->regions.back();
+      return region->alloc();
     }
   };
 

@@ -2,9 +2,11 @@
 #include "ir.h"
 #include "type.h"
 #include "utils.h"
+#include "interoperability.h"
 
 #include <cassert>
 #include <verona.h>
+#include <memory>
 
 using ObjectId = std::string;
 
@@ -24,9 +26,27 @@ namespace interpreter
     }
   };
 
+  //TODO figure that out
+  struct Region {
+    ir::AllocStrategy strategy;
+
+    //TODO we need to surface the snmalloc region somehow.
+    //For the moment we either have a pointer to the SandboxConfig,
+    //or a verona runtime region, i.e., an object.
+    VObject* rt_region;
+    std::shared_ptr<interop::SandboxConfig> sb; 
+
+    Region(ir::AllocStrategy);
+    Region(std::shared_ptr<interop::SandboxConfig> s);
+
+    // Allocator for memory in the region
+    // FIXME Later add a size?
+    VObject* alloc(void);
+  };
+
   
   // A Region is just a verona object.
-  using Region = VObject;
+  //using Region = VObject;
 
   // ω ∈ Object ::= Region* × TypeId
   struct Object
@@ -49,4 +69,5 @@ namespace interpreter
   };
 
   std::string nextObjectId();
+  rt::RegionType strategyToRegionType(ir::AllocStrategy strat);
 } // namespace interpreter
