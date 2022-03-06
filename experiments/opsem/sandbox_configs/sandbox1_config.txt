@@ -1,0 +1,7 @@
+--dump
+--sandbox
+--includes=sandboxes/sandbox1/includes.txt
+--targets=sandboxes/sandbox1/targets.txt
+--gendispatch
+--dyntarget=/tmp/sandbox1.so
+sandboxes/sandbox1/main.cc
