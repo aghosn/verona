@@ -9,6 +9,7 @@
 
 #include <iostream>
 #include <string>
+#include <cassert>
 
 namespace verona::interop
 {
@@ -379,47 +380,63 @@ namespace verona::interop
       return callStmt;
     }
 
-    // TODO For the moment we do not have a return value ...
+    clang::RecordDecl* generateArgStruct(std::vector<clang::QualType> types, 
+        clang::SourceLocation loc,
+        std::string sname,
+        bool hasReturn) const
+    {
+      //clang::IdentifierInfo& structName = ast->Idents.get("tmp_struct");
+      auto record = ast->buildImplicitRecord(sname);
+      record->startDefinition();
+      //std::vector<clang::FieldDecl*> fields;
+      int counter = 0;
+      for (auto type: types)
+      {
+        auto name = "a"+std::to_string(counter);
+        if (hasReturn && counter == types.size() -1)
+        {
+          name = "ret";
+        }
+        clang::IdentifierInfo& fieldName = ast->Idents.get(name);
+        auto field = clang::FieldDecl::Create(*ast, record, loc, loc, 
+            &fieldName, type, ast->getTrivialTypeSourceInfo(type), nullptr, 
+            true, clang::ICIS_NoInit); 
+        field->setAccess(clang::AS_public);
+        record->addDecl(field);
+        //fields.push_back(field);
+        counter++;
+      }
+      record->completeDefinition();
+      return record;
+    }
+
     void generateDispatcher(clang::FunctionDecl* target) const
     {
-      // TODO add void  to the query thing 
       clang::QualType voidQual = ast->VoidTy; 
       auto voidStar = ast->getPointerType(voidQual);
       llvm::SmallVector<clang::QualType, 0> args{voidStar};
       std::string name = DISP_PREFIX + target->getName().str();
 
       // All proxies have `void` return type.
-      auto proxy = buildFunction(name, args, voidQual/*target->getReturnType()*/);
+      auto proxy = buildFunction(name, args, voidQual);
       
       // Generate a struct that corresponds to target arguments.
       auto loc = proxy->getLocation(); 
-      clang::IdentifierInfo& structName = ast->Idents.get("tmp_struct");
-      auto record = ast->buildImplicitRecord("tmp_struct");
-      record->startDefinition();
-      std::vector<clang::FieldDecl*> fields;
-      int counter = 0;
+      std::vector<clang::QualType> types;
       for (auto p: target->parameters())
       {
-        auto type = p->getType();
-        clang::IdentifierInfo& fieldName = ast->Idents.get("a"+std::to_string(counter));
-        auto field = clang::FieldDecl::Create(*ast, record, loc, loc, &fieldName, type, ast->getTrivialTypeSourceInfo(type), nullptr, true, clang::ICIS_NoInit); 
-        field->setAccess(clang::AS_public);
-        record->addDecl(field);
-        fields.push_back(field);
-        counter++;
+        if (p->getType() == voidQual)
+          continue;
+        types.push_back(p->getType());
       }
-      
-      // Handle return type:
-      if (target->getReturnType() != voidQual)
-      {
-        auto type = target->getReturnType();
-        clang::IdentifierInfo& retName = ast->Idents.get("ret");
-        auto field = clang::FieldDecl::Create(*ast, record, loc, loc, &retName, type, ast->getTrivialTypeSourceInfo(type), nullptr, true, clang::ICIS_NoInit);
-        field->setAccess(clang::AS_public);
-        record->addDecl(field);
-        fields.push_back(field);
-      }
-      record->completeDefinition();
+
+      // Handle return type.
+      bool hasReturn = false;
+      if (target->getReturnType() != voidQual) {
+        hasReturn = true;
+        types.push_back(target->getReturnType());
+      } 
+      auto record = generateArgStruct(types, loc, "tmp_struct", hasReturn); 
      
       auto &sema = Clang->getSema();
       auto groupPtr = sema.ConvertDeclToDeclGroup(record);
@@ -483,10 +500,22 @@ namespace verona::interop
       
       // Create arguments and type cast.
       std::vector<clang::Expr*> memberArgs;
-      int i = 0;
-      for (auto p: target->parameters())
+      std::vector<clang::FieldDecl*> fields;
+      for (auto f: record->fields())
       {
+        fields.push_back(f);
+      }
+
+      // Check that we have the correct sizes.
+      assert((target->getReturnType() == voidQual && 
+            target->getNumParams() == fields.size()) ||
+            (target->getNumParams() == (fields.size() -1)));
+      for (unsigned i = 0; i < target->getNumParams(); i++)
+      {
+        auto p = target->getParamDecl(i);
+        auto field = fields[i];
         clang::NestedNameSpecifierLoc spec;
+
         // Reference to the local variable.
         auto declRef = clang::DeclRefExpr::Create(
             *ast,
@@ -503,13 +532,13 @@ namespace verona::interop
             clang::CK_LValueToRValue,
             declRef,
             nullptr,
-            /*clang::VK_LValue*/clang::VK_PRValue,
+            clang::VK_PRValue,
             clang::FPOptionsOverride());
         auto member = clang::MemberExpr::CreateImplicit(
             *ast,
             implicit,
             true,
-            fields[i]/*member??*/,
+            field,
             p->getOriginalType(),
             clang::VK_LValue,
             clang::OK_BitField);
@@ -519,11 +548,10 @@ namespace verona::interop
             clang::CK_LValueToRValue,
             member,
             nullptr,
-            /*clang::VK_LValue*/clang::VK_PRValue,
+            clang::VK_PRValue,
             clang::FPOptionsOverride());
         // Add the argument.
         memberArgs.push_back(arg);
-        i++;
       }
 
       // Create the function call.
