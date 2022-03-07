@@ -1,4 +1,3 @@
---dump
 --sandbox
 --includes=sandboxes/sandbox1/includes.txt
 --targets=sandboxes/sandbox1/targets.txt

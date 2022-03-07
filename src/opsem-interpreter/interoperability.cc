@@ -30,6 +30,8 @@ namespace interpreter::interop
 
     // We read the file line by line, there should be one argument per line.
     vector<std::string> arguments;
+    // Fake the program name as first argument
+    arguments.push_back("begin");
     std::string line;
     while(std::getline(file, line))
     {
