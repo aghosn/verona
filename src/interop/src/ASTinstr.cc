@@ -89,6 +89,25 @@ namespace verona::interop
     }
   }
 
+  void generate_trusted_senders(CXXInterface& interface)
+  {
+    const CXXQuery* query = interface.getQuery();
+    const CXXBuilder* builder = interface.getBuilder();
+    assert(query != nullptr);
+    assert(builder != nullptr);
+
+    for (auto target: target_functions)
+    {
+      clang::FunctionDecl* decl = query->getFunction(target);
+      if (decl == nullptr)
+      {
+        cerr << "Error: could not find function " << target << endl;
+      }
+      assert(decl != nullptr);
+      builder->generateTrustedSender(decl);
+    }
+  }
+
   void specialize_export_function(CXXInterface& interface)
   {
     const CXXQuery* query = interface.getQuery();
@@ -148,5 +167,4 @@ namespace verona::interop
     sbInit->setBody(compStmt);
     builder->markAsUsed(sbInit);
   }
-
 } // namespace verona::interop;

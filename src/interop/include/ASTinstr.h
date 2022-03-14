@@ -24,4 +24,6 @@ namespace verona::interop
 
   void specialize_export_function(CXXInterface& interface);
 
+  void generate_trusted_senders(CXXInterface& interface);
+
 } // namespace verona::interop;

@@ -410,6 +410,60 @@ namespace verona::interop
       return record;
     }
 
+    void generateTrustedSender(clang::FunctionDecl* target) const {
+      assert(target != nullptr);
+      clang::FunctionDecl* sender = nullptr;
+      std::vector<clang::Stmt*>lines;
+
+      std::vector<clang::QualType> args;
+      for (auto p: target->parameters())
+      {
+        args.push_back(p->getType());
+      }
+      sender = buildFunction(target->getName().str(), args,
+          target->getReturnType());
+      sender->setPreviousDecl(target);
+
+      auto loc = sender->getLocation();
+
+      // Build the structural type.
+      bool hasReturn = target->getReturnType() != ast->VoidTy;
+      if (hasReturn)
+        args.push_back(target->getReturnType());
+
+      auto record = generateArgStruct(args, loc, "tmp_struct", hasReturn);
+      clang::QualType strctType = ast->getRecordType(record);
+      clang::IdentifierInfo& strctId = ast->Idents.get("_a_");
+
+      auto &sema = Clang->getSema();
+      auto groupPtr = sema.ConvertDeclToDeclGroup(record);
+      auto recDecl = sema.ActOnDeclStmt(groupPtr, loc, loc);
+      auto strct = clang::VarDecl::Create(
+          *ast,
+          sender,
+          loc,
+          loc,
+          &strctId,
+          strctType,
+          ast->getTrivialTypeSourceInfo(strctType),
+          clang::StorageClass::SC_None);
+      markAsUsed(strct);
+      strct->markUsed(*ast);
+
+      groupPtr = sema.ConvertDeclToDeclGroup(strct);
+      auto varDecl = sema.ActOnDeclStmt(groupPtr, loc, loc);
+
+      // Add the lines
+      lines.push_back(recDecl.get());
+      lines.push_back(varDecl.get());
+
+
+      // Set the body
+      auto compStmt = clang::CompoundStmt::Create(*ast, lines, loc, loc);
+      sender->setBody(compStmt);
+      markAsUsed(sender);
+    }
+
     void generateDispatcher(clang::FunctionDecl* target) const
     {
       clang::QualType voidQual = ast->VoidTy; 
@@ -496,7 +550,7 @@ namespace verona::interop
       strct->setInit(cCast);
 
       groupPtr = sema.ConvertDeclToDeclGroup(strct);
-      auto varDecl = sema.ActOnDeclStmt(groupPtr, loc, loc); //clang::DeclStmt(groupPtr.get(), loc, loc);
+      auto varDecl = sema.ActOnDeclStmt(groupPtr, loc, loc);
       
       // Create arguments and type cast.
       std::vector<clang::Expr*> memberArgs;

@@ -56,6 +56,12 @@ namespace verona::interop::api
       cl::Optional,
       cl::value_desc(dyntarget),
       cl::init("/tmp/libsandboxed.so"));
+  // Shortcircuit
+  cl::opt<bool> explore(
+      "explore",
+      cl::desc("shortcircuit to call some internal func. FIXME remove"),
+      cl::Optional,
+      cl::init(false));
 
   // For help's sake, will never be parsed, as we intercept
   cl::opt<string> config(
@@ -356,6 +362,11 @@ namespace verona::interop::api
      if (testFunction)
      {
        test_function("verona_wrapper_fn_1", interface);
+     }
+
+     if (explore)
+     {
+        generate_trusted_senders(interface);
      }
     
      //  Generate the sandbox instrumentation.

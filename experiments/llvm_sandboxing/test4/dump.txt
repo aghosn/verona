@@ -1,0 +1,193 @@
+TranslationUnitDecl 0x5c81b68 <<invalid sloc>> <invalid sloc>
+|-TypedefDecl 0x5c82470 <<invalid sloc>> <invalid sloc> implicit __int128_t '__int128'
+| `-BuiltinType 0x5c82110 '__int128'
+|-TypedefDecl 0x5c824e0 <<invalid sloc>> <invalid sloc> implicit __uint128_t 'unsigned __int128'
+| `-BuiltinType 0x5c82130 'unsigned __int128'
+|-TypedefDecl 0x5c82858 <<invalid sloc>> <invalid sloc> implicit __NSConstantString '__NSConstantString_tag'
+| `-RecordType 0x5c825d0 '__NSConstantString_tag'
+|   `-CXXRecord 0x5c82538 '__NSConstantString_tag'
+|-TypedefDecl 0x5c828f0 <<invalid sloc>> <invalid sloc> implicit __builtin_ms_va_list 'char *'
+| `-PointerType 0x5c828b0 'char *'
+|   `-BuiltinType 0x5c81c10 'char'
+|-TypedefDecl 0x5cfb4c8 <<invalid sloc>> <invalid sloc> implicit __builtin_va_list '__va_list_tag [1]'
+| `-ConstantArrayType 0x5cfb470 '__va_list_tag [1]' 1 
+|   `-RecordType 0x5c829e0 '__va_list_tag'
+|     `-CXXRecord 0x5c82948 '__va_list_tag'
+|-CXXRecordDecl 0x5cfb520 <./main.cc:1:1, line:4:1> line:1:8 referenced struct Library definition
+| |-DefinitionData pass_in_registers empty aggregate standard_layout trivially_copyable pod trivial literal has_constexpr_non_copy_move_ctor can_const_default_init
+| | |-DefaultConstructor exists trivial constexpr needs_implicit defaulted_is_constexpr
+| | |-CopyConstructor simple trivial has_const_param needs_implicit implicit_has_const_param
+| | |-MoveConstructor exists simple trivial needs_implicit
+| | |-CopyAssignment simple trivial has_const_param needs_implicit implicit_has_const_param
+| | |-MoveAssignment exists simple trivial needs_implicit
+| | `-Destructor simple irrelevant trivial needs_implicit
+| |-CXXRecordDecl 0x5cfb638 <col:1, col:8> col:8 implicit struct Library
+| `-CXXMethodDecl 0x5cfb868 <line:3:3, col:33> col:8 used send 'void (int, void *)'
+|   |-ParmVarDecl 0x5cfb6e0 <col:13, col:17> col:17 idx 'int'
+|   |-ParmVarDecl 0x5cfb760 <col:22, col:28> col:28 ptr 'void *'
+|   `-CompoundStmt 0x5cfb930 <col:32, col:33>
+|-VarDecl 0x5cfb950 <line:6:1, col:10> col:10 used lib 'Library *'
+|-LinkageSpecDecl 0x5cfba98 <line:8:1, col:32> col:8 C
+| `-FunctionDecl 0x5cfbc60 <col:12, col:32> col:16 used foo 'int (int, int)'
+|   |-ParmVarDecl 0x5cfbb00 <col:20, col:24> col:24 a 'int'
+|   `-ParmVarDecl 0x5cfbb80 <col:27, col:31> col:31 b 'int'
+|-LinkageSpecDecl 0x5cfbd30 <line:11:1, col:22> col:8 C
+| `-FunctionDecl 0x5cfbdc8 <col:12, col:22> col:17 food 'void ()'
+|-FunctionDecl 0x5cfbec0 <line:13:1, line:16:1> line:13:5 bar 'int ()'
+| `-CompoundStmt 0x5cfbf90 <line:14:1, line:16:1>
+|   `-ReturnStmt 0x5cfbf80 <line:15:3, col:10>
+|     `-IntegerLiteral 0x5cfbf60 <col:10> 'int' 3
+|-FunctionDecl 0x5cfc0e0 <line:18:1, line:30:1> line:18:5 food 'int (int, int)'
+| |-ParmVarDecl 0x5cfbfc0 <col:10, col:14> col:14 used a 'int'
+| |-ParmVarDecl 0x5cfc040 <col:17, col:21> col:21 used b 'int'
+| `-CompoundStmt 0x5cbbfe8 <col:24, line:30:1>
+|   |-DeclStmt 0x5cbb550 <line:19:3, line:24:4>
+|   | `-CXXRecordDecl 0x5cfc1a0 <line:19:3, line:24:3> line:19:10 referenced struct Argument definition
+|   |   |-DefinitionData pass_in_registers aggregate standard_layout trivially_copyable pod trivial literal
+|   |   | |-DefaultConstructor exists trivial
+|   |   | |-CopyConstructor simple trivial has_const_param implicit_has_const_param
+|   |   | |-MoveConstructor exists simple trivial
+|   |   | |-CopyAssignment simple trivial has_const_param needs_implicit implicit_has_const_param
+|   |   | |-MoveAssignment exists simple trivial needs_implicit
+|   |   | `-Destructor simple irrelevant trivial needs_implicit
+|   |   |-CXXRecordDecl 0x5cfc2b8 <col:3, col:10> col:10 implicit struct Argument
+|   |   |-FieldDecl 0x5cfc360 <line:21:5, col:9> col:9 referenced a 'int'
+|   |   |-FieldDecl 0x5cbb480 <line:22:5, col:9> col:9 referenced b 'int'
+|   |   |-FieldDecl 0x5cbb4e8 <line:23:5, col:9> col:9 referenced ret 'int'
+|   |   |-CXXConstructorDecl 0x5cbb5f8 <line:19:10> col:10 implicit used Argument 'void () noexcept' inline default trivial
+|   |   | `-CompoundStmt 0x5cbba78 <col:10>
+|   |   |-CXXConstructorDecl 0x5cbb6f8 <col:10> col:10 implicit constexpr Argument 'void (const Argument &)' inline default trivial noexcept-unevaluated 0x5cbb6f8
+|   |   | `-ParmVarDecl 0x5cbb808 <col:10> col:10 'const Argument &'
+|   |   `-CXXConstructorDecl 0x5cbb8b8 <col:10> col:10 implicit constexpr Argument 'void (Argument &&)' inline default trivial noexcept-unevaluated 0x5cbb8b8
+|   |     `-ParmVarDecl 0x5cbb9c8 <col:10> col:10 'Argument &&'
+|   |-DeclStmt 0x5cbbbc8 <line:25:3, col:16>
+|   | `-VarDecl 0x5cbb578 <col:3, col:12> col:12 used zoob 'Argument' callinit
+|   |   `-CXXConstructExpr 0x5cbbba0 <col:12> 'Argument' 'void () noexcept'
+|   |-BinaryOperator 0x5cbbc68 <line:26:3, col:12> 'int' lvalue '='
+|   | |-MemberExpr 0x5cbbc00 <col:3, col:8> 'int' lvalue .a 0x5cfc360
+|   | | `-DeclRefExpr 0x5cbbbe0 <col:3> 'Argument' lvalue Var 0x5cbb578 'zoob' 'Argument'
+|   | `-ImplicitCastExpr 0x5cbbc50 <col:12> 'int' <LValueToRValue>
+|   |   `-DeclRefExpr 0x5cbbc30 <col:12> 'int' lvalue ParmVar 0x5cfbfc0 'a' 'int'
+|   |-BinaryOperator 0x5cbbd10 <line:27:3, col:12> 'int' lvalue '='
+|   | |-MemberExpr 0x5cbbca8 <col:3, col:8> 'int' lvalue .b 0x5cbb480
+|   | | `-DeclRefExpr 0x5cbbc88 <col:3> 'Argument' lvalue Var 0x5cbb578 'zoob' 'Argument'
+|   | `-ImplicitCastExpr 0x5cbbcf8 <col:12> 'int' <LValueToRValue>
+|   |   `-DeclRefExpr 0x5cbbcd8 <col:12> 'int' lvalue ParmVar 0x5cfc040 'b' 'int'
+|   |-CXXMemberCallExpr 0x5cbbe70 <line:28:3, col:28> 'void'
+|   | |-MemberExpr 0x5cbbd68 <col:3, col:8> '<bound member function type>' ->send 0x5cfb868
+|   | | `-ImplicitCastExpr 0x5cbbd50 <col:3> 'Library *' <LValueToRValue>
+|   | |   `-DeclRefExpr 0x5cbbd30 <col:3> 'Library *' lvalue Var 0x5cfb950 'lib' 'Library *'
+|   | |-IntegerLiteral 0x5cbbd98 <col:13> 'int' 0
+|   | `-CStyleCastExpr 0x5cbbe48 <col:16, col:24> 'void *' <NoOp>
+|   |   `-ImplicitCastExpr 0x5cbbe30 <col:23, col:24> 'void *' <BitCast> part_of_explicit_cast
+|   |     `-UnaryOperator 0x5cbbdd8 <col:23, col:24> 'Argument *' prefix '&' cannot overflow
+|   |       `-DeclRefExpr 0x5cbbdb8 <col:24> 'Argument' lvalue Var 0x5cbb578 'zoob' 'Argument'
+|   `-ReturnStmt 0x5cbbfd8 <line:29:3, col:15>
+|     `-ImplicitCastExpr 0x5cbbfc0 <col:10, col:15> 'int' <LValueToRValue>
+|       `-MemberExpr 0x5cbbf90 <col:10, col:15> 'int' lvalue .ret 0x5cbb4e8
+|         `-DeclRefExpr 0x5cbbf70 <col:10> 'Argument' lvalue Var 0x5cbb578 'zoob' 'Argument'
+|-NamespaceDecl 0x5cbc028 <verona_interface.cc:2:1, line:3:2> line:2:11 verona
+| `-NamespaceDecl 0x5cbc098 <col:20, line:3:1> line:2:30 __ffi_internal
+`-FunctionDecl 0x5cbc140 prev 0x5cfbc60 <line:4:1> col:1 used foo 'int (int, int)'
+  |-ParmVarDecl 0x5cbc1e0 <col:1> col:1 arg0 'int'
+  |-ParmVarDecl 0x5cbc248 <col:1> col:1 arg1 'int'
+  |-CompoundStmt 0x5d72c00 <col:1>
+  | |-DeclStmt 0x5d72b00 <col:1>
+  | | `-CXXRecordDecl 0x5cbc2d0 <<invalid sloc>> <invalid sloc> implicit struct tmp_struct definition
+  | |   |-DefinitionData pass_in_registers aggregate standard_layout trivially_copyable pod trivial literal has_mutable_fields can_const_default_init
+  | |   | |-DefaultConstructor exists trivial needs_implicit
+  | |   | |-CopyConstructor simple trivial has_const_param needs_implicit implicit_has_const_param
+  | |   | |-MoveConstructor exists simple trivial needs_implicit
+  | |   | |-CopyAssignment simple trivial has_const_param needs_implicit implicit_has_const_param
+  | |   | |-MoveAssignment exists simple trivial needs_implicit
+  | |   | `-Destructor simple irrelevant trivial needs_implicit
+  | |   |-TypeVisibilityAttr 0x5cbc380 <<invalid sloc>> Implicit Default
+  | |   |-FieldDecl 0x5d729e0 <col:1> col:1 a0 'int' mutable
+  | |   |-FieldDecl 0x5d72a48 <col:1> col:1 a1 'int' mutable
+  | |   `-FieldDecl 0x5d72ab0 <col:1> col:1 ret 'int' mutable
+  | `-DeclStmt 0x5d72be8 <col:1>
+  |   `-VarDecl 0x5d72b28 <col:1> col:1 used _a_ 'tmp_struct'
+  |     `-UsedAttr 0x5d72b90 <<invalid sloc>>
+  `-UsedAttr 0x5d72c20 <<invalid sloc>>
+; ModuleID = 'verona_interface.cc'
+source_filename = "verona_interface.cc"
+target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-unknown-linux-gnu"
+
+%struct.Library = type { i8 }
+%struct.Argument = type { i32, i32, i32 }
+%struct.tmp_struct = type { i32, i32, i32 }
+
+$_ZN7Library4sendEiPv = comdat any
+
+@lib = global %struct.Library* null, align 8
+@llvm.compiler.used = appending global [1 x i8*] [i8* bitcast (i32 (i32, i32)* @foo to i8*)], section "llvm.metadata"
+
+; Function Attrs: mustprogress noinline nounwind optnone uwtable
+define i32 @_Z3barv() #0 {
+entry:
+  ret i32 3
+}
+
+; Function Attrs: mustprogress noinline optnone uwtable
+define i32 @_Z4foodii(i32 %a, i32 %b) #1 {
+entry:
+  %a.addr = alloca i32, align 4
+  %b.addr = alloca i32, align 4
+  %zoob = alloca %struct.Argument, align 4
+  store i32 %a, i32* %a.addr, align 4
+  store i32 %b, i32* %b.addr, align 4
+  %0 = load i32, i32* %a.addr, align 4
+  %a1 = getelementptr inbounds %struct.Argument, %struct.Argument* %zoob, i32 0, i32 0
+  store i32 %0, i32* %a1, align 4
+  %1 = load i32, i32* %b.addr, align 4
+  %b2 = getelementptr inbounds %struct.Argument, %struct.Argument* %zoob, i32 0, i32 1
+  store i32 %1, i32* %b2, align 4
+  %2 = load %struct.Library*, %struct.Library** @lib, align 8
+  %3 = bitcast %struct.Argument* %zoob to i8*
+  call void @_ZN7Library4sendEiPv(%struct.Library* nonnull align 1 dereferenceable(1) %2, i32 0, i8* %3)
+  %ret = getelementptr inbounds %struct.Argument, %struct.Argument* %zoob, i32 0, i32 2
+  %4 = load i32, i32* %ret, align 4
+  ret i32 %4
+}
+
+; Function Attrs: mustprogress noinline nounwind optnone uwtable
+define linkonce_odr void @_ZN7Library4sendEiPv(%struct.Library* nonnull align 1 dereferenceable(1) %this, i32 %idx, i8* %ptr) #0 comdat align 2 {
+entry:
+  %this.addr = alloca %struct.Library*, align 8
+  %idx.addr = alloca i32, align 4
+  %ptr.addr = alloca i8*, align 8
+  store %struct.Library* %this, %struct.Library** %this.addr, align 8
+  store i32 %idx, i32* %idx.addr, align 4
+  store i8* %ptr, i8** %ptr.addr, align 8
+  %this1 = load %struct.Library*, %struct.Library** %this.addr, align 8
+  ret void
+}
+
+; Function Attrs: mustprogress noinline nounwind optnone uwtable
+define i32 @foo(i32 %arg0, i32 %arg1) #0 {
+entry:
+  %arg0.addr = alloca i32, align 4
+  %arg1.addr = alloca i32, align 4
+  %_a_ = alloca %struct.tmp_struct, align 4
+  store i32 %arg0, i32* %arg0.addr, align 4
+  store i32 %arg1, i32* %arg1.addr, align 4
+  call void @llvm.trap()
+  unreachable
+}
+
+; Function Attrs: cold noreturn nounwind
+declare void @llvm.trap() #2
+
+attributes #0 = { mustprogress noinline nounwind optnone uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx16,+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
+attributes #1 = { mustprogress noinline optnone uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx16,+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
+attributes #2 = { cold noreturn nounwind }
+
+!llvm.module.flags = !{!0, !1, !2, !3}
+!llvm.ident = !{!4}
+
+!0 = !{i32 1, !"wchar_size", i32 4}
+!1 = !{i32 7, !"PIC Level", i32 2}
+!2 = !{i32 7, !"uwtable", i32 1}
+!3 = !{i32 7, !"frame-pointer", i32 2}
+!4 = !{!"clang version 14.0.0 (https://github.com/llvm/llvm-project a19747ea7395dd470345e4703f13bbb74647b019)"}
