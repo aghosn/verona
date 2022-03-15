@@ -457,6 +457,80 @@ namespace verona::interop
       lines.push_back(recDecl.get());
       lines.push_back(varDecl.get());
 
+      // Get a reference to all the structure fields
+      std::vector<clang::FieldDecl*> fields;
+      for (auto f: record->fields())
+      {
+        fields.push_back(f);
+      }
+
+      // Check that the sizes match
+      assert((target->getReturnType() == ast->VoidTy &&
+            target->getNumParams() == fields.size()) ||
+          (target->getNumParams() == (fields.size()-1)));
+
+      // Assign structure fields to values of the call
+      for (unsigned i = 0; i < target->getNumParams(); i++)
+      {
+        auto p = sender->getParamDecl(i);
+        auto field = fields[i];
+        clang::NestedNameSpecifierLoc spec;
+
+        // Necessary, otherwise codegen fails.
+        p->markUsed(*ast);
+
+        // Right side of the binary operation
+        auto rdeclRef = clang::DeclRefExpr::Create(
+          *ast,
+          spec,
+          loc,
+          p,
+          false,
+          loc,
+          p->getType(),
+          clang::VK_LValue);
+        auto implicit = clang::ImplicitCastExpr::Create(
+            *ast,
+            p->getType(),
+            clang::CK_LValueToRValue,
+            rdeclRef,
+            nullptr,
+            clang::VK_PRValue,
+            clang::FPOptionsOverride());
+        implicit->setIsPartOfExplicitCast(true);
+
+        // Left side of the binary operation
+        auto ldeclRef = clang::DeclRefExpr::Create(
+            *ast,
+            spec,
+            loc,
+            strct,
+            false,
+            loc,
+            strctType,
+            clang::VK_LValue);
+        auto member = clang::MemberExpr::CreateImplicit(
+            *ast,
+            ldeclRef,
+            false,
+            field,
+            p->getOriginalType(),
+            clang::VK_LValue,
+            clang::OK_BitField); 
+        auto binop = clang::BinaryOperator::Create(
+            *ast, 
+            member,
+            implicit,
+            clang::BO_Assign,
+            member->getType(),
+            clang::VK_LValue,
+            clang::OK_BitField,
+            loc,
+            clang::FPOptionsOverride());
+        // Add the line
+        lines.push_back(binop);
+      }
+
 
       // Set the body
       auto compStmt = clang::CompoundStmt::Create(*ast, lines, loc, loc);

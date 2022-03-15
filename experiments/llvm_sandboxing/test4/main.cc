@@ -15,7 +15,7 @@ int bar()
   return 3;
 }
 
-int food(int a, int b) {
+int food(int c, int d) {
   struct Argument
   {
     int a;
@@ -23,8 +23,8 @@ int food(int a, int b) {
     int ret;
   };
   Argument zoob;
-  zoob.a = a;
-  zoob.b = b;
+  zoob.a = c;
+  zoob.b = d;
   lib->send(0, (void*)&zoob); 
   return zoob.ret;
 }
