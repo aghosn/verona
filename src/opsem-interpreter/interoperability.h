@@ -22,7 +22,7 @@ namespace interpreter::interop
    * for the C/C++ library we need to compile, link, and import to run inside
    * a sandbox.
    */
-  std::shared_ptr<SandboxConfig> initializeLibrary(std::string config);
+  SandboxConfig* initializeLibrary(std::string config);
   void test_sandbox();
   void invoke_target();
 } // namespace interpreter::interop

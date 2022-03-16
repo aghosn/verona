@@ -194,7 +194,7 @@ namespace interpreter
         assert(state.objects.find(oid->name) != state.objects.end());
         obj = state.objects[oid->name];
         // TODO find how to test for imm?
-        return (obj->obj->debug_is_iso() /*|| obj->obj->debug_is_imm()*/);
+        return (obj->debug_is_iso() /*|| obj->debug_is_imm()*/);
 
       case ir::Kind::StorageLoc:
         _v2 = dynamic_pointer_cast<ir::StorageLoc>(value);

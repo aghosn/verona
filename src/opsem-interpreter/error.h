@@ -62,6 +62,7 @@ std::string string_format( const std::string& format, Args ... args )
 #define E_LIVELINESS E_FMT2("Problem with the liveliness.")
 #define E_UNEXPECTED_VALUE E_FMT2("Unexpected value.")
 #define E_STRAT_TO_REGION_TYPE E_FMT2("Unsafe strategy cannot be converted to Region Type.")
+#define E_UNSAFE_NEW_REGION E_FMT2("Unsafe regions cannot be instantiated with this constructor")
 #define E_NULL E_FMT2("Value should not be null")
 #define E_NON_NULL E_FMT2("Value should be null");
 }

@@ -21,7 +21,7 @@ namespace interpreter {
       bool evalOneStep();
       void eval();
       void visit(ir::NodeDef* node);
-      void addSandbox(std::shared_ptr<interop::SandboxConfig> sb);
+      void addSandbox(interop::SandboxConfig* sb);
     private:
       State state;
       ir::Parser* parser;

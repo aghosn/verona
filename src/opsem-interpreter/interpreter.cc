@@ -35,10 +35,10 @@ namespace interpreter {
     auto mainRegion = new Region(ir::AllocStrategy::Arena);
     state.regions[mainRegion] = ir::AllocStrategy::Arena;
     mainframe->regions.push_back(mainRegion);
-    rt::api::open_region(mainRegion->rt_region);
+    mainRegion->open();
   }
 
-  void Interpreter::addSandbox(std::shared_ptr<interop::SandboxConfig> sb)
+  void Interpreter::addSandbox(interop::SandboxConfig* sb)
   {
     state.program.sandbox = sb;
     // Generate a wrapper for each sandboxed function.
@@ -203,7 +203,6 @@ namespace interpreter {
     Shared<Object> obj = make_shared<Object>();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
-    obj->obj = state.newObject();
     // Setting the object's regions
     for (auto r: state.frames.back()->regions) {
       obj->regions.push_back(r);
@@ -236,7 +235,7 @@ namespace interpreter {
     CHECK(state.isDefinedInFrame(y), E_NAME_NOT_DEF(y));
     auto yvalue = state.frameLookup(y);
     Shared<Object> target = state.getObjectByName(y);
-    CHECK(!target->obj->debug_is_iso(), E_CANNOT_BE_ISO);
+    CHECK(!target->debug_is_iso(), E_CANNOT_BE_ISO);
     
     // σ[x↦σ(y)]
     state.addInFrame(x, state.getValueByName(y));
@@ -377,7 +376,7 @@ namespace interpreter {
         v = m;
         break;
       case ir::Kind::StorageLoc:
-        CHECK(state.objects[l->name]->obj->debug_is_iso(), E_MUST_BE_ISO);
+        CHECK(state.objects[l->name]->debug_is_iso(), E_MUST_BE_ISO);
         CHECK(node.type == ir::LookupType::Loc,
             E_WRONG_LOOKUP(node.type, ir::LookupType::Loc));
         v = m;
@@ -461,8 +460,6 @@ end:
     Shared<Object> obj = make_shared<Object>();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
-    //TODO figure out the descriptor.
-    obj->obj = state.newObject();
     // Set up regions
     for (auto r: state.frames.back()->regions) {
       obj->regions.push_back(r);
@@ -502,7 +499,6 @@ end:
     Shared<Object> obj = make_shared<Object>();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
-    obj->obj = state.newObject();
     // Set up regions
     for (auto r: state.frames.back()->regions) {
       obj->regions.push_back(r);
@@ -607,7 +603,7 @@ end:
     auto regions = l->regions;
 
     // iso(σ, ι)
-    CHECK(l->obj->debug_is_iso(), E_MUST_BE_ISO);
+    CHECK(l->debug_is_iso(), E_MUST_BE_ISO);
 
     // TODO (unpin(σ₁, z*))
     auto conts = state.exec_state.getContinuation();
@@ -617,7 +613,7 @@ end:
   } 
 
   static Region* createRegion(ir::AllocStrategy strat, 
-      std::shared_ptr<interop::SandboxConfig> sb)
+      interop::SandboxConfig* sb)
   {
     if (strat < ir::AllocStrategy::Unsafe)
     {
@@ -832,7 +828,7 @@ end:
     string y = node.target->name;
     CHECK(state.isDefinedInFrame(y), E_NAME_NOT_DEF(y));
     Shared<Object> target = state.getObjectByName(y);
-    CHECK(target->obj->debug_is_iso(), E_MUST_BE_ISO);
+    CHECK(target->debug_is_iso(), E_MUST_BE_ISO);
     
     //rt::Object* res = rt::api::freeze(target);
     //TODO THE HELL IS V? Should be l
@@ -844,7 +840,7 @@ end:
     string y = node.target->name;
     CHECK(state.isDefinedInFrame(y), E_NAME_NOT_DEF(y));
     Shared<Object> target = state.getObjectByName(y);
-    CHECK(target->obj->debug_is_iso(), E_MUST_BE_ISO);
+    CHECK(target->debug_is_iso(), E_MUST_BE_ISO);
     //TODO something with the frame.
     //rt::Object* res = rt::api::merge(target);
     //TODO is that correct?
@@ -861,8 +857,8 @@ end:
     auto region = frame->regions.back();
     CHECK(region->strategy == ir::AllocStrategy::Unsafe,
         E_WRONG_KIND(ir::AllocStrategy::Unsafe, region->strategy));
-    CHECK(region->sb != nullptr, E_NULL);
-    auto sb = region->sb;
+    CHECK(region->sandbox() != nullptr, E_NULL);
+    auto sb = region->sandbox();
 
     // FIXME  for the moment do empty allocation as argument frame.
     auto args = sb->lib->alloc_in_sandbox(4, 1);

@@ -13,7 +13,7 @@
 using namespace std;
 namespace interpreter::interop
 {
-  std::shared_ptr<SandboxConfig> initializeLibrary(std::string config)
+  SandboxConfig* initializeLibrary(std::string config)
   {
     // Nothing to do
     if (config.empty())
@@ -56,7 +56,7 @@ namespace interpreter::interop
     free(args);
 
     // create the return value;
-    auto sbconfig = std::make_shared<SandboxConfig>();
+    auto sbconfig = new SandboxConfig();
     sbconfig->config = config;
     sbconfig->lib = std::make_unique<sandbox::Library>(library.c_str());
     int i = 0; 

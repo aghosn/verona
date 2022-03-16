@@ -25,7 +25,7 @@ namespace interpreter
     Map<TypeId, Shared<Type>> types;
 
     // sandboxed code, for the moment only one
-    std::shared_ptr<interop::SandboxConfig>  sandbox;
+    interop::SandboxConfig* sandbox;
   };
 
   // ϕ ∈ Frame ::= Region* × (Id → Value) × Id* × Expression*
@@ -189,7 +189,7 @@ namespace interpreter
       return program.functions[name];
     }
 
-    VObject* newObject(void)
+    Object* newObject(void)
     {
       CHECK(frames.size() > 0, E_WRONG_NB_AT_LEAST(0, frames.size()));
       auto frame = frames.back();
