@@ -183,7 +183,7 @@ namespace interpreter
   bool isIsoOrImm(State& state, Shared<ir::Value> value)
   {
     Shared<ir::ObjectID> oid = nullptr;
-    Shared<Object> obj = nullptr;
+    Object* obj = nullptr;
     Shared<ir::StorageLoc> _v2 = nullptr;
     Shared<ir::Value> val2 = nullptr;
 

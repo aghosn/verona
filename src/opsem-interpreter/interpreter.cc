@@ -200,7 +200,7 @@ namespace interpreter {
 
     // ι ∉ σ
     //σ[ι↦(σ.frame.regions, τᵩ)]
-    Shared<Object> obj = make_shared<Object>();
+    Object* obj = new Object();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
     // Setting the object's regions
@@ -234,7 +234,7 @@ namespace interpreter {
     // ¬iso(σ, σ(y))
     CHECK(state.isDefinedInFrame(y), E_NAME_NOT_DEF(y));
     auto yvalue = state.frameLookup(y);
-    Shared<Object> target = state.getObjectByName(y);
+    Object* target = state.getObjectByName(y);
     CHECK(!target->debug_is_iso(), E_CANNOT_BE_ISO);
     
     // σ[x↦σ(y)]
@@ -418,7 +418,7 @@ namespace interpreter {
 
     // v = σ(ι) <: τ if ι ∈ ObjectId where ι = σ(y)
     Shared<ir::Value> res = make_shared<ir::False>();
-    Shared<Object> yobj = nullptr;
+    Object* yobj = nullptr;
     Shared<ir::ObjectID> oid = nullptr;
     auto l = state.frameLookup(y);
     if (l->kind() != ir::Kind::ObjectID) {
@@ -457,7 +457,7 @@ end:
     
     // ι ∉ σ
     // σ[ι↦(ρ, τ)]
-    Shared<Object> obj = make_shared<Object>();
+    Object* obj = new Object();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
     // Set up regions
@@ -496,7 +496,7 @@ end:
 
     // ι ∉ σ
     //σ[ι↦(σ.frame.regions, τᵩ)]
-    Shared<Object> obj = make_shared<Object>();
+    Object* obj = new Object();
     obj->id = nextObjectId(); 
     obj->type = node.type->name;
     // Set up regions
@@ -827,7 +827,7 @@ end:
     CHECK(!state.isDefinedInFrame(x), E_NAME_DEF(x));
     string y = node.target->name;
     CHECK(state.isDefinedInFrame(y), E_NAME_NOT_DEF(y));
-    Shared<Object> target = state.getObjectByName(y);
+    Object* target = state.getObjectByName(y);
     CHECK(target->debug_is_iso(), E_MUST_BE_ISO);
     
     //rt::Object* res = rt::api::freeze(target);
@@ -839,7 +839,7 @@ end:
     CHECK(!state.isDefinedInFrame(x), E_NAME_DEF(x));
     string y = node.target->name;
     CHECK(state.isDefinedInFrame(y), E_NAME_NOT_DEF(y));
-    Shared<Object> target = state.getObjectByName(y);
+    Object* target = state.getObjectByName(y);
     CHECK(target->debug_is_iso(), E_MUST_BE_ISO);
     //TODO something with the frame.
     //rt::Object* res = rt::api::merge(target);

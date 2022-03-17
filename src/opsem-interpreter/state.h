@@ -79,7 +79,7 @@ namespace interpreter
 
     // TODO not sure why this is needed.
     // This really needs to be an ObjectID
-    Map<ObjectId, Shared<Object>> objects;
+    Map<ObjectId, Object*> objects;
 
     Map<ObjectId, Map<Id, Shared<ir::Value>>> fields;
 
@@ -126,7 +126,7 @@ namespace interpreter
       return frames.back()->containsName(name);
     }
 
-    void addObject(ObjectId oid, Shared<Object> obj)
+    void addObject(ObjectId oid, Object* obj)
     {
       objects[oid] = obj;
     }
@@ -137,7 +137,7 @@ namespace interpreter
       return frames.back()->frameLookup(name);
     }
 
-    Shared<Object> getObjectByName(std::string name)
+    Object* getObjectByName(std::string name)
     {
       assert(frames.size() > 0);
       auto val = frames.back()->frameLookup(name);
