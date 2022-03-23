@@ -13,6 +13,8 @@
 #include <clang/Sema/TemplateDeduction.h>
 #include <llvm/Support/SmallVectorMemoryBuffer.h>
 
+#include <iostream>
+
 // Makes matcher syntax so much clearer
 using namespace clang::ast_matchers;
 
@@ -445,7 +447,7 @@ namespace verona::interop
      * It is however potentially less efficient.
      */
     template<typename DeclType>
-    DeclType* find(clang::DeclContext* parent, const char* name)
+    DeclType* find(clang::DeclContext* parent, std::string name) const
     {
       for (auto decl : RangeOf<DeclType>(parent))
       {
@@ -497,6 +499,19 @@ namespace verona::interop
     {
       auto matcher = classTemplateDecl(hasName(name)).bind("id");
       return getDeclByMatch<clang::ClassTemplateDecl>(matcher);
+    }
+    
+    // FIXME: the matcher does not work on vardecl...
+    // Doing it in a dirty way in the meantime, we might not even need it in the
+    // end;
+    clang::VarDecl* getVarDecl(std::string name) const
+    {
+      auto translationUnit = ast->getTranslationUnitDecl();
+      assert(translationUnit != nullptr);
+      return find<clang::VarDecl>(translationUnit, name);
+      /*//auto matcher = varDecl(matchesName(name));
+      //auto matcher = varDecl(hasName(name)).bind("id");
+      return getDeclByMatch<clang::VarDecl>(matcher);*/
     }
   };
 } // namespace verona::interop

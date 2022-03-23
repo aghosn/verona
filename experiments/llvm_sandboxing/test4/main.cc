@@ -3,7 +3,7 @@ struct Library
   void send(int idx, void* ptr){}
 };
 
-Library* lib;
+Library* _sandbox_libraries;
 
 extern "C" int foo(int a, int b);
 
@@ -25,6 +25,6 @@ int food(int c, int d) {
   Argument zoob;
   zoob.a = c;
   zoob.b = d;
-  lib->send(0, (void*)&zoob); 
+  _sandbox_libraries->send(0, (void*)&zoob); 
   return zoob.ret;
 }

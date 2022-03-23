@@ -10,6 +10,7 @@ namespace verona::interop
 {
   static const char* SANDBOX_INIT = "sandbox_init";
   const char* METHOD_NAME = "export_function";
+  const char* LIB_DISPATCH = "_sandbox_libraries";
 
   vector<string> target_functions;
   string exporter_class_name;
@@ -96,15 +97,20 @@ namespace verona::interop
     assert(query != nullptr);
     assert(builder != nullptr);
 
-    for (auto target: target_functions)
+    // Find the library dispatcher
+    auto dispatcher = query->getVarDecl(LIB_DISPATCH);
+    assert(dispatcher != nullptr);
+
+    for (int i = 0; i < target_functions.size(); i++)
     {
+      auto target = target_functions[i];
       clang::FunctionDecl* decl = query->getFunction(target);
       if (decl == nullptr)
       {
         cerr << "Error: could not find function " << target << endl;
       }
       assert(decl != nullptr);
-      builder->generateTrustedSender(decl);
+      builder->generateTrustedSender(dispatcher, i, decl);
     }
   }
 

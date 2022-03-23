@@ -410,7 +410,7 @@ namespace verona::interop
       return record;
     }
 
-    void generateTrustedSender(clang::FunctionDecl* target) const {
+    void generateTrustedSender(clang::VarDecl* dispatcher, int idx, clang::FunctionDecl* target) const {
       assert(target != nullptr);
       clang::FunctionDecl* sender = nullptr;
       std::vector<clang::Stmt*>lines;
@@ -530,8 +530,101 @@ namespace verona::interop
         // Add the line
         lines.push_back(binop);
       }
+        clang::NestedNameSpecifierLoc spec;
+        // Construct the call:
+        // 1. Take the stack structure argument address and cast it to a void*.
+        // 2. Create a call to the library with the correct index.
+        auto argDeclRef = clang::DeclRefExpr::Create(
+            *ast,
+            spec,
+            loc,
+            strct,
+            false,
+            loc,
+            strctType,
+            clang::VK_LValue);
+        auto strctPtrType = ast->getPointerType(strctType);
+        auto unary = clang::UnaryOperator::Create(
+            *ast,
+            argDeclRef,
+            clang::UO_AddrOf,
+            strctPtrType,
+            clang::VK_PRValue,
+            clang::OK_Ordinary,
+            loc,
+            false,
+            clang::FPOptionsOverride());
+        auto voidPtr = ast->getPointerType(ast->VoidTy);
+        auto argCast = clang::ImplicitCastExpr::Create(
+            *ast,
+            voidPtr,
+            clang::CK_BitCast,
+            unary,
+            nullptr,
+            clang::VK_PRValue,
+            clang::FPOptionsOverride());
+        // Required to avoid failing at codegen.
+        argCast->setIsPartOfExplicitCast(true);
+        auto cCast = clang::CStyleCastExpr::Create(
+            *ast,
+            voidPtr,
+            clang::VK_PRValue,
+            clang::CK_NoOp,
+            argCast,
+            nullptr,
+            clang::FPOptionsOverride(),
+            ast->getTrivialTypeSourceInfo(voidPtr),
+            strct->getLocation(),
+            loc);
+      // Build the call to the library
+      // Start by getting the send field. 
+      auto recPtrType = clang::dyn_cast<clang::PointerType>(dispatcher->getType());
+      assert(recPtrType != nullptr);
+      auto recType = clang::dyn_cast<clang::RecordType>(recPtrType->getPointeeType());
+      assert(recType != nullptr);
+      auto recDeclLib = recType->getDecl();
+      assert(recDeclLib != nullptr);
+      clang::CXXMethodDecl* sendMethod = query->find<clang::CXXMethodDecl>(recDeclLib, "send");
+      assert(sendMethod != nullptr);
+      auto index = createIntegerLiteral(32, idx);
+      auto sbLibRef = clang::DeclRefExpr::Create(
+          *ast,
+          spec,
+          loc,
+          dispatcher,
+          false,
+          loc,
+          dispatcher->getType(),
+          clang::VK_LValue);
+      auto libCast = clang::ImplicitCastExpr::Create(
+            *ast,
+            dispatcher->getType(),
+            clang::CK_LValueToRValue,
+            sbLibRef,
+            nullptr,
+            clang::VK_LValue,
+            clang::FPOptionsOverride());
+      auto sendMember = clang::MemberExpr::CreateImplicit(
+            *ast,
+            libCast,
+            true,
+            sendMethod,
+            sendMethod->getType(),
+            clang::VK_LValue,
+            clang::OK_Ordinary);
+      std::vector<clang::Expr*> args2;
+      args2.push_back(index);
+      args2.push_back(cCast);
 
-
+      auto callMemb = clang::CXXMemberCallExpr::Create(
+          *ast,
+          sendMember,
+          args2,
+          sendMethod->getReturnType(),
+          clang::VK_PRValue,
+          loc, 
+          clang::FPOptionsOverride());
+      lines.push_back(callMemb);
       // Set the body
       auto compStmt = clang::CompoundStmt::Create(*ast, lines, loc, loc);
       sender->setBody(compStmt);
