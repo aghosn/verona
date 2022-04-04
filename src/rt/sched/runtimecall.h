@@ -6,6 +6,8 @@ namespace verona::rt {
   // TODO can we merge that into the class?
   thread_local static bool in_runtime_call = false;
 
+#define ENABLE_PREEMPTION true
+
 #ifdef ENABLE_PREEMPTION
 #define MARK_RT_FUNCTION RuntimeCall __verona_rt_marker;
 #else
