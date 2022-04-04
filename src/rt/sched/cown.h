@@ -11,6 +11,8 @@
 #include "multimessage.h"
 #include "schedulerthread.h"
 
+#include "runtimecall.h"
+
 #include <algorithm>
 
 namespace verona::rt
@@ -79,6 +81,9 @@ namespace verona::rt
 
     Cown(bool initialise = true)
     {
+      //@aghosn
+      MARK_RT_FUNCTION
+
       make_cown();
 
       if (initialise)
@@ -146,6 +151,8 @@ namespace verona::rt
 
     static Cown* create_token_cown()
     {
+      MARK_RT_FUNCTION
+
       static constexpr Descriptor desc = {
         vsizeof<Cown>, nullptr, nullptr, nullptr};
       auto p = ThreadAlloc::get().alloc<desc.size>();
@@ -161,22 +168,27 @@ namespace verona::rt
 
     void set_owning_thread(SchedulerThread<Cown>* owner)
     {
+      MARK_RT_FUNCTION
+
       thread_status = (uintptr_t)owner;
     }
 
     void mark_collected()
     {
+      MARK_RT_FUNCTION
       thread_status |= 1;
     }
 
     bool is_collected()
     {
+      MARK_RT_FUNCTION
       return (thread_status.load(std::memory_order_relaxed) & collected_mask) !=
         0;
     }
 
     SchedulerThread<Cown>* owning_thread()
     {
+      MARK_RT_FUNCTION
       return (
         SchedulerThread<
           Cown>*)(thread_status.load(std::memory_order_relaxed) & thread_mask);
@@ -188,6 +200,7 @@ namespace verona::rt
 
     void flush_all(Alloc& alloc)
     {
+      MARK_RT_FUNCTION
       for (auto b : noticeboards)
       {
         b->flush_all(alloc);
@@ -196,6 +209,7 @@ namespace verona::rt
 
     void flush_some(Alloc& alloc)
     {
+      MARK_RT_FUNCTION
       for (auto b : noticeboards)
       {
         b->flush_some(alloc);
@@ -204,6 +218,7 @@ namespace verona::rt
 
     void register_noticeboard(BaseNoticeboard* nb)
     {
+      MARK_RT_FUNCTION
       noticeboards.push_back(nb);
     }
 
@@ -211,6 +226,7 @@ namespace verona::rt
 
     void reschedule()
     {
+      MARK_RT_FUNCTION
       if (queue.wake())
       {
         Cown::acquire(this);
@@ -227,11 +243,13 @@ namespace verona::rt
 
     void wake()
     {
+      MARK_RT_FUNCTION
       queue.wake();
     }
 
     static void acquire(Object* o)
     {
+      MARK_RT_FUNCTION
       Logging::cout() << "Cown " << o << " acquire" << Logging::endl;
       assert(o->debug_is_cown());
       o->incref();
@@ -239,6 +257,7 @@ namespace verona::rt
 
     static void release(Alloc& alloc, Cown* o)
     {
+      MARK_RT_FUNCTION
       Logging::cout() << "Cown " << o << " release" << Logging::endl;
       assert(o->debug_is_cown());
       Cown* a = ((Cown*)o);
@@ -294,6 +313,7 @@ namespace verona::rt
      **/
     void weak_release(Alloc& alloc)
     {
+      MARK_RT_FUNCTION
       Logging::cout() << "Cown " << this << " weak release" << Logging::endl;
       if (weak_count.fetch_sub(1) == 1)
       {
@@ -322,6 +342,7 @@ namespace verona::rt
 
     void weak_acquire()
     {
+      MARK_RT_FUNCTION
       Logging::cout() << "Cown " << this << " weak acquire" << Logging::endl;
       assert(weak_count > 0);
       weak_count++;
@@ -336,11 +357,13 @@ namespace verona::rt
      **/
     bool acquire_strong_from_weak()
     {
+      MARK_RT_FUNCTION
       return Object::acquire_strong_from_weak();
     }
 
     static void mark_for_scan(Object* o, EpochMark epoch)
     {
+      MARK_RT_FUNCTION
       Cown* cown = (Cown*)o;
 
       if (cown->cown_marked_for_scan(epoch))
@@ -363,6 +386,7 @@ namespace verona::rt
 
     void mark_notify()
     {
+      MARK_RT_FUNCTION
       if (queue.mark_notify())
       {
         Cown::acquire(this);
@@ -374,6 +398,7 @@ namespace verona::rt
   protected:
     void schedule()
     {
+      MARK_RT_FUNCTION
       // This should only be called if the cown is known to have been
       // unscheduled, for example when detecting a previously empty message
       // queue on send, or when rescheduling after a multi-message.
@@ -396,6 +421,7 @@ namespace verona::rt
   private:
     bool in_epoch(EpochMark epoch)
     {
+      MARK_RT_FUNCTION
       bool result = Object::in_epoch(epoch);
       yield();
       return result;
@@ -403,17 +429,20 @@ namespace verona::rt
 
     void dealloc(Alloc& alloc)
     {
+      MARK_RT_FUNCTION
       Object::dealloc(alloc);
       yield();
     }
 
     bool scanned(EpochMark epoch)
     {
+      MARK_RT_FUNCTION
       return in_epoch(epoch);
     }
 
     void scan(Alloc& alloc, EpochMark epoch)
     {
+      MARK_RT_FUNCTION
       // Scan our data for cown references.
       if (!cown_scanned(epoch))
       {
@@ -427,6 +456,7 @@ namespace verona::rt
 
     static void scan_stack(Alloc& alloc, EpochMark epoch, ObjectStack& f)
     {
+      MARK_RT_FUNCTION
       while (!f.empty())
       {
         Object* o = f.pop();
@@ -459,6 +489,7 @@ namespace verona::rt
 
     void cown_notified()
     {
+      MARK_RT_FUNCTION
       // This is not a message make sure we know that.
       // TODO: Back pressure.  This means that a notification that sends to
       // an overloaded cown will not mute this cown.  We could set up a fake
@@ -493,6 +524,7 @@ namespace verona::rt
      **/
     static void fast_send(MultiMessage::MultiMessageBody* body, EpochMark epoch)
     {
+      MARK_RT_FUNCTION
       auto& alloc = ThreadAlloc::get();
       const auto last = body->count - 1;
       assert(body->index <= last);
@@ -596,6 +628,7 @@ namespace verona::rt
      **/
     bool try_fast_send(MultiMessage* m)
     {
+      MARK_RT_FUNCTION
 #ifdef USE_SYSTEMATIC_TESTING_WEAK_NOTICEBOARDS
       flush_all(ThreadAlloc::get());
       yield();
@@ -623,6 +656,7 @@ namespace verona::rt
      **/
     bool run_step(MultiMessage* m)
     {
+      MARK_RT_FUNCTION
       MultiMessage::MultiMessageBody& body = *(m->get_body());
       Alloc& alloc = ThreadAlloc::get();
 #ifndef ACQUIRE_ALL
@@ -769,6 +803,7 @@ namespace verona::rt
       typename... Args>
     static void schedule(Cown* cown, Args&&... args)
     {
+      MARK_RT_FUNCTION
       schedule<Behaviour, transfer, Args...>(
         1, &cown, std::forward<Args>(args)...);
     }
@@ -786,6 +821,7 @@ namespace verona::rt
       typename... Args>
     static void schedule(size_t count, Cown** cowns, Args&&... args)
     {
+      MARK_RT_FUNCTION
       static_assert(std::is_base_of_v<Behaviour, Be>);
       Logging::cout() << "Schedule behaviour of type: " << typeid(Be).name()
                       << Logging::endl;
@@ -847,6 +883,7 @@ namespace verona::rt
      **/
     bool run(Alloc& alloc, ThreadState::State)
     {
+      MARK_RT_FUNCTION
       auto until = queue.peek_back();
       yield(); // Reading global state in peek_back().
 
@@ -954,6 +991,7 @@ namespace verona::rt
 
     bool try_collect(Alloc& alloc, EpochMark epoch)
     {
+      MARK_RT_FUNCTION
       Logging::cout() << "try_collect: " << this << " (" << get_epoch_mark()
                       << ")" << Logging::endl;
 
@@ -985,6 +1023,7 @@ namespace verona::rt
 
     inline bool is_live(EpochMark send_epoch)
     {
+      MARK_RT_FUNCTION
       return in_epoch(EpochMark::SCHEDULED_FOR_SCAN) || in_epoch(send_epoch);
     }
 
@@ -995,6 +1034,7 @@ namespace verona::rt
      **/
     void queue_collect(Alloc& alloc)
     {
+      MARK_RT_FUNCTION
       thread_local ObjectStack* work_list = nullptr;
 
       // If there is a already a queue, use it
@@ -1026,6 +1066,7 @@ namespace verona::rt
 
     void collect(Alloc& alloc)
     {
+      MARK_RT_FUNCTION
       // If this was collected by leak detector, then don't double dealloc
       // cown body, when the ref count drops.
       if (is_collected())
@@ -1087,6 +1128,7 @@ namespace verona::rt
 
     bool release_early()
     {
+      MARK_RT_FUNCTION
       auto* body = Scheduler::local()->message_body;
       auto* senders = body->cowns;
       const size_t senders_count = body->count;
@@ -1117,6 +1159,7 @@ namespace verona::rt
      */
     static MultiMessage* stub_msg(Alloc& alloc)
     {
+      MARK_RT_FUNCTION
       return MultiMessage::make_message(alloc, nullptr, EpochMark::EPOCH_NONE);
     }
 
@@ -1128,6 +1171,7 @@ namespace verona::rt
     static MultiMessage*
     unmute_msg(Alloc& alloc, size_t count, Cown** cowns, EpochMark epoch)
     {
+      MARK_RT_FUNCTION
       auto* body =
         MultiMessage::make_body(alloc, count, cowns, &unmute_behaviour);
       return MultiMessage::make_message(alloc, body, epoch);
@@ -1138,11 +1182,13 @@ namespace verona::rt
   {
     inline void release(Alloc& alloc, Cown* o)
     {
+      MARK_RT_FUNCTION
       Cown::release(alloc, o);
     }
 
     inline void mark_for_scan(Object* o, EpochMark epoch)
     {
+      MARK_RT_FUNCTION
       Cown::mark_for_scan(o, epoch);
     }
   } // namespace cown
