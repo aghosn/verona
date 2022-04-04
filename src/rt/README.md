@@ -52,7 +52,7 @@ build\Debug\func-sys-diningphilosophers.exe
 ```
 will run a unit test with systematic testing. And
 ```
-build\Debug\func-sys-diningphilosophers.exe
+build\Debug\func-con-diningphilosophers.exe
 ```
 will run it with an actually concurrent runtime. 
 
