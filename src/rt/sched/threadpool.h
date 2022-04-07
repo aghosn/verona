@@ -348,6 +348,8 @@ namespace verona::rt
           builder.add_thread(&T::run, t, startup, args...);
           t = t->next;
         } while (t != first_thread);
+        
+        builder.startSysMonitor<T>();
       }
       Logging::cout() << "All threads stopped" << Logging::endl;
 
@@ -379,19 +381,17 @@ namespace verona::rt
 
     void incrementServed(size_t affinity)
     {
-      //TODO change this to use thread affinity
-      MonitorInfo* moninfo = MonitorInfo::get();
-      if (affinity >= moninfo->size)
+      if (affinity >= MonitorInfo::get().size)
       {
-        std::cout << "About to fail " << affinity << " " << moninfo->size << std::endl;
+        std::cout << "About to fail " << affinity << " " << MonitorInfo::get().size << std::endl;
         abort();
       }
-      if (moninfo->per_core_counters[affinity] == SIZE_MAX-1)
+      if (MonitorInfo::get().per_core_counters[affinity] == SIZE_MAX-1)
       {
-        moninfo->per_core_counters[affinity] = 1;
+        MonitorInfo::get().per_core_counters[affinity] = 1;
         return;
       }
-      moninfo->per_core_counters[affinity]++;
+      MonitorInfo::get().per_core_counters[affinity]++;
     }
 
   private:

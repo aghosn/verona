@@ -46,19 +46,32 @@ namespace verona::rt
       body(args...);
     }
 
+    template<typename T>
     void monitor()
     {
       using namespace std::chrono_literals;
-      MonitorInfo* moninfo = MonitorInfo::get();
+      assert(MonitorInfo::get().size == thread_count+1);
       while(true)
       {
+        size_t count[thread_count+1];
+        for (size_t i = 0; i < thread_count+1; i++)
+        {
+          count[i] = MonitorInfo::get().per_core_counters[i];
+        }
         std::this_thread::sleep_for(10ms);
-        if (moninfo->done) {
+        if (MonitorInfo::get().done) {
           return;
         }
 
-        // TODO check progress
-        // TODO if no progress, spawn new thread with affinity to that core.
+        for (size_t i = 0; i < thread_count+1; i++)
+        {
+          // No progress on that core.
+          if (count[i] == MonitorInfo::get().per_core_counters[i])
+          {
+            // TODO check if there is work to do, if the thread on that core
+            // is busy, and if so, spawn a new one.
+          }
+        }
       }
     }
 
@@ -68,13 +81,12 @@ namespace verona::rt
       this->thread_count = thread_count - 1;
 
       // Bookkeeping information for the sysmonitor thread.
-      MonitorInfo* moninfo = MonitorInfo::get();
-      moninfo->done = false;
-      moninfo->size = thread_count;
-      moninfo->per_core_counters = (atomic_counter*)calloc(thread_count, sizeof(atomic_counter));
-      for (size_t i = 0; i < moninfo->size; i++)
+      MonitorInfo::get().done = false;
+      MonitorInfo::get().size = thread_count;
+      MonitorInfo::get().per_core_counters = (atomic_counter*)calloc(thread_count, sizeof(atomic_counter));
+      for (size_t i = 0; i < MonitorInfo::get().size; i++)
       {
-        moninfo->per_core_counters[i] = 0;
+        MonitorInfo::get().per_core_counters[i] = 0;
       }
     }
 
@@ -116,21 +128,27 @@ namespace verona::rt
     ~ThreadPoolBuilder()
     {
       assert(index == thread_count + 1);
-      sysmonitor = new PlatformThread(run_sysmonitor, this);
-      MonitorInfo* moninfo = MonitorInfo::get();
+      //sysmonitor = new PlatformThread(run_sysmonitor, this);
       while (!threads.empty())
       {
         auto& thread = threads.front();
         thread.join();
         threads.pop_front();
       }
-      moninfo->done = true;
+      MonitorInfo::get().done = true;
       sysmonitor->join();
     }
 
+    template<typename T>
+    void startSysMonitor()
+    {
+      sysmonitor = new PlatformThread(run_sysmonitor<T>, this);
+    }
+
+    template<typename T>
     static void run_sysmonitor(ThreadPoolBuilder* builder)
     {
-      builder->monitor();
+      builder->monitor<T>();
     }
   };
 }

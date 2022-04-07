@@ -5,10 +5,10 @@
 namespace verona::rt
 {
 
-  using atomic_counter = std::atomic<size_t>;
+  using atomic_counter = std::atomic<std::size_t>;
   class MonitorInfo {
     public:
-      size_t size;
+      std::size_t size;
       atomic_counter *per_core_counters;
       std::atomic<bool> done;
     
@@ -16,10 +16,8 @@ namespace verona::rt
       static MonitorInfo *instance;
 
     public:
-      static MonitorInfo* get() {
-        static MonitorInfo* instance = nullptr;
-        if (instance == nullptr)
-          instance = new MonitorInfo();
+      static MonitorInfo& get() {
+        static MonitorInfo instance;
         return instance;
       }
     private:
@@ -27,5 +25,9 @@ namespace verona::rt
         size = 0;
         done = false;
       }
+    public:
+      MonitorInfo(MonitorInfo const&) = delete;
+      void operator=(MonitorInfo const&) = delete;
+
   };
 } // namespace verona::rt
