@@ -10,7 +10,10 @@
 #include "threadpool.h"
 
 #include <snmalloc.h>
+#include <atomic>
 
+
+#include "pal/sysmonitor.h"
 namespace verona::rt
 {
   /**
@@ -55,7 +58,7 @@ namespace verona::rt
 
     MPMCQ<T> q;
     Alloc* alloc = nullptr;
-    SchedulerThread<T>* next = nullptr;
+    std::atomic<SchedulerThread<T>*> next = nullptr;
     SchedulerThread<T>* victim = nullptr;
 
     bool running = true;
@@ -83,6 +86,7 @@ namespace verona::rt
 
     /// The scheduler affinity of this thread
     size_t affinity = 0;
+    bool original = false;
 
     T* get_token_cown()
     {
@@ -315,6 +319,11 @@ namespace verona::rt
       // Reset the local thread pointer as this physical thread could be reused
       // for a different SchedulerThread later.
       Scheduler::local() = nullptr;
+
+      MonitorInfo::get().m.lock();
+      MonitorInfo::get().threads--;
+      MonitorInfo::get().m.unlock();
+      MonitorInfo::get().cv.notify_one();
     }
 
     bool fast_steal(T*& result)

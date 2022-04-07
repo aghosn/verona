@@ -6,7 +6,7 @@
 #include "sysmonitor.h"
 
 #include <list>
-#include <chrono>
+#include <iostream>
 
 /**
  * This constructs a platforms affinitised set of threads.
@@ -25,9 +25,9 @@ namespace verona::rt
     size_t index = 0;
 
     template<typename... Args>
-    void add_thread_impl(void (*body)(Args...), Args... args)
+    void add_thread_impl(bool skip, void (*body)(Args...), Args... args)
     {
-      if (index < thread_count)
+      if (skip || index < thread_count)
       {
         threads.emplace_back(body, args...);
       }
@@ -44,35 +44,6 @@ namespace verona::rt
     {
       cpu::set_affinity(affinity);
       body(args...);
-    }
-
-    template<typename T>
-    void monitor()
-    {
-      using namespace std::chrono_literals;
-      assert(MonitorInfo::get().size == thread_count+1);
-      while(true)
-      {
-        size_t count[thread_count+1];
-        for (size_t i = 0; i < thread_count+1; i++)
-        {
-          count[i] = MonitorInfo::get().per_core_counters[i];
-        }
-        std::this_thread::sleep_for(10ms);
-        if (MonitorInfo::get().done) {
-          return;
-        }
-
-        for (size_t i = 0; i < thread_count+1; i++)
-        {
-          // No progress on that core.
-          if (count[i] == MonitorInfo::get().per_core_counters[i])
-          {
-            // TODO check if there is work to do, if the thread on that core
-            // is busy, and if so, spawn a new one.
-          }
-        }
-      }
     }
 
   public:
@@ -100,12 +71,24 @@ namespace verona::rt
       // Don't use affinity with systematic testing.  We're only ever running
       // one thread at a time in systematic testing mode and by pinning each
       // thread to a core we massively increase contention.
-      add_thread_impl(body, args...);
+      add_thread_impl(false, body, args...);
 #else
       add_thread_impl(
+        false,
         &run_with_affinity, topology.get().get(index), body, args...);
 #endif
       index++;
+    }
+
+    /**
+     * Add a thread to run in this thread pool with specified affinity.
+     */
+    template<typename... Args>
+    void add_thread_extra(size_t affinity, void (*body)(Args...), Args... args)
+    {
+      add_thread_impl(
+        true,
+        &run_with_affinity, affinity, body, args...);
     }
 
     size_t getIndex()
@@ -128,7 +111,15 @@ namespace verona::rt
     ~ThreadPoolBuilder()
     {
       assert(index == thread_count + 1);
-      //sysmonitor = new PlatformThread(run_sysmonitor, this);
+
+      std::unique_lock lk(MonitorInfo::get().m);
+      while(MonitorInfo::get().threads > 0)
+      {
+        MonitorInfo::get().cv.wait(lk, []{return MonitorInfo::get().threads==0;});
+      }
+      lk.unlock();
+ 
+
       while (!threads.empty())
       {
         auto& thread = threads.front();
@@ -139,16 +130,10 @@ namespace verona::rt
       sysmonitor->join();
     }
 
-    template<typename T>
-    void startSysMonitor()
+    template<typename... Args>
+    void startSysMonitor(void (*body)(Args...), Args... args)
     {
-      sysmonitor = new PlatformThread(run_sysmonitor<T>, this);
-    }
-
-    template<typename T>
-    static void run_sysmonitor(ThreadPoolBuilder* builder)
-    {
-      builder->monitor<T>();
+      sysmonitor = new PlatformThread(body, args...);
     }
   };
 }

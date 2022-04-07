@@ -1,6 +1,8 @@
 #pragma once
 
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
 
 namespace verona::rt
 {
@@ -12,6 +14,10 @@ namespace verona::rt
       atomic_counter *per_core_counters;
       std::atomic<bool> done;
     
+      // For gracefull termination, TODO implement
+      std::mutex m;
+      std::condition_variable cv;
+      std::atomic<std::size_t> threads;
     private:
       static MonitorInfo *instance;
 
@@ -28,6 +34,5 @@ namespace verona::rt
     public:
       MonitorInfo(MonitorInfo const&) = delete;
       void operator=(MonitorInfo const&) = delete;
-
   };
 } // namespace verona::rt

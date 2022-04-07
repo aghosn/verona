@@ -19,6 +19,7 @@
 
 #include <iostream>
 
+#include <chrono>
 namespace verona::rt
 {
   /// Used for default prerun for a thread.
@@ -344,12 +345,14 @@ namespace verona::rt
         Logging::cout() << "Starting all threads" << Logging::endl;
         do
         {
-          t->affinity = builder.getAffinity(builder.getIndex());
+          t->affinity = builder.getAffinity(builder.getIndex()); 
+          t->original = true;
+          MonitorInfo::get().threads++;
           builder.add_thread(&T::run, t, startup, args...);
           t = t->next;
         } while (t != first_thread);
         
-        builder.startSysMonitor<T>();
+        builder.startSysMonitor(run_sysmonitor<T>, this, &builder);
       }
       Logging::cout() << "All threads stopped" << Logging::endl;
 
@@ -372,6 +375,77 @@ namespace verona::rt
       state.reset<ThreadState::NotInLD>();
 
       Epoch::flush(ThreadAlloc::get());
+    }
+
+    // Monitor progress on each core.
+    // If a core is not making progress, we either create an extra
+    // scheduler thread on that core or wake up one of the ones previously
+    // created.
+    void monitor(ThreadPoolBuilder* builder)
+    {
+      using namespace std::chrono_literals;
+      assert(MonitorInfo::get().size == thread_count);
+      while(true)
+      {
+        size_t count[thread_count];
+        for (size_t i = 0; i < thread_count; i++)
+        {
+          count[i] = MonitorInfo::get().per_core_counters[i];
+        }
+        std::this_thread::sleep_for(10ms);
+        if (MonitorInfo::get().done) {
+          return;
+        }
+        for (size_t i = 0; i < thread_count; i++)
+        {
+          // No progress on that core.
+          if (count[i] == MonitorInfo::get().per_core_counters[i])
+          {
+            T* t = first_thread;
+            do
+            {
+              if (t->affinity == i)
+              {
+                assert(t->original);
+                wake_or_create(builder, i, t);
+              }
+            } while(t != first_thread);
+          }
+        }
+      }
+    }
+
+    // Checks whether there are extra scheduler threads sleeping for that core.
+    // If not, it creates a new one.
+    void wake_or_create(ThreadPoolBuilder* builder, size_t affinity, T* main)
+    {
+      assert(main != nullptr);
+      assert(main->affinity == affinity);
+      assert(builder != nullptr);
+      
+     MonitorInfo::get().m.lock();
+      if (MonitorInfo::get().threads == 0)
+      {
+        // We need to bail
+        MonitorInfo::get().m.unlock();
+        return;
+      }
+
+      T* extra = new T;
+      extra->affinity = affinity;
+      extra->original = false;
+      extra->next = main->next.load();
+      main->next.store(extra);
+
+      MonitorInfo::get().threads++;
+      MonitorInfo::get().m.unlock();
+      builder->add_thread_extra(extra->affinity, &T::run, extra, &nop);
+    }
+
+    template<typename A>
+    static void run_sysmonitor(ThreadPool<A>* pool, ThreadPoolBuilder* builder)
+    {
+      pool->monitor(builder);
     }
 
     static bool debug_not_running()
