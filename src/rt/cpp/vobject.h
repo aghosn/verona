@@ -4,6 +4,8 @@
 
 #include "../region/region_api.h"
 
+#include "../sched/runtimecall.h"
+
 #include <new>
 #include <type_traits>
 
@@ -51,11 +53,13 @@ namespace verona::rt
   private:
     static void gc_trace(const Object* o, ObjectStack& st)
     {
+      MARK_RT_FUNCTION
       ((T*)o)->trace(st);
     }
 
     static void gc_notified(Object* o)
     {
+      MARK_RT_FUNCTION
       if constexpr (has_notified<T>::value)
         ((T*)o)->notified(o);
       else
@@ -66,6 +70,7 @@ namespace verona::rt
 
     static void gc_final(Object* o, Object* region, ObjectStack& sub_regions)
     {
+      MARK_RT_FUNCTION
       if constexpr (has_finaliser<T>::value)
         ((T*)o)->finaliser(region, sub_regions);
       else
@@ -88,6 +93,7 @@ namespace verona::rt
 
     static Descriptor* desc()
     {
+      MARK_RT_FUNCTION
       static Descriptor desc = {vsizeof<T>,
                                 gc_trace,
                                 has_finaliser<T>::value ? gc_final : nullptr,
@@ -158,11 +164,13 @@ namespace verona::rt
 
     void* operator new(size_t)
     {
+      MARK_RT_FUNCTION
       return api::create_object(VBase<T, Object>::desc());
     }
 
     void* operator new(size_t, RegionType rt)
     {
+      MARK_RT_FUNCTION
       return api::create_fresh_region<V>(rt, V::desc());
     }
   };
@@ -180,12 +188,14 @@ namespace verona::rt
 
     void* operator new(size_t)
     {
+      MARK_RT_FUNCTION
       return Object::register_object(
         ThreadAlloc::get().alloc<vsizeof<T>>(), VBase<T, Cown>::desc());
     }
 
     void* operator new(size_t, Alloc& alloc)
     {
+      MARK_RT_FUNCTION
       return Object::register_object(
         alloc.alloc<vsizeof<T>>(), VBase<T, Cown>::desc());
     }

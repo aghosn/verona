@@ -15,10 +15,16 @@
 #include <mutex>
 #include <snmalloc.h>
 
+#include "pal/sysmonitor.h"
+
+#include <iostream>
+
 namespace verona::rt
 {
   /// Used for default prerun for a thread.
   inline void nop() {}
+
+  using atomic_counter = std::atomic<size_t>;
 
   using namespace snmalloc;
   template<class T>
@@ -338,6 +344,7 @@ namespace verona::rt
         Logging::cout() << "Starting all threads" << Logging::endl;
         do
         {
+          t->affinity = builder.getAffinity(builder.getIndex());
           builder.add_thread(&T::run, t, startup, args...);
           t = t->next;
         } while (t != first_thread);
@@ -368,6 +375,23 @@ namespace verona::rt
     static bool debug_not_running()
     {
       return get().active_thread_count == 0;
+    }
+
+    void incrementServed(size_t affinity)
+    {
+      //TODO change this to use thread affinity
+      MonitorInfo* moninfo = MonitorInfo::get();
+      if (affinity >= moninfo->size)
+      {
+        std::cout << "About to fail " << affinity << " " << moninfo->size << std::endl;
+        abort();
+      }
+      if (moninfo->per_core_counters[affinity] == SIZE_MAX-1)
+      {
+        moninfo->per_core_counters[affinity] = 1;
+        return;
+      }
+      moninfo->per_core_counters[affinity]++;
     }
 
   private:

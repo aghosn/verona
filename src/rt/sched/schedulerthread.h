@@ -81,6 +81,9 @@ namespace verona::rt
     /// The MessageBody of a running behaviour.
     typename T::MessageBody* message_body = nullptr;
 
+    /// The scheduler affinity of this thread
+    size_t affinity = 0;
+
     T* get_token_cown()
     {
       assert(token_cown);
@@ -221,6 +224,9 @@ namespace verona::rt
         ld_protocol();
 
         Logging::cout() << "Running cown " << cown << Logging::endl;
+
+        /// Increment the number of served behaviours
+        Scheduler::get().incrementServed(affinity);
 
         bool reschedule = cown->run(*alloc, state);
 
