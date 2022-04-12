@@ -453,21 +453,6 @@ namespace verona::rt
       return get().active_thread_count == 0;
     }
 
-    void incrementServed(size_t affinity)
-    {
-      if (affinity >= MonitorInfo::get().size)
-      {
-        std::cout << "About to fail " << affinity << " " << MonitorInfo::get().size << std::endl;
-        abort();
-      }
-      if (MonitorInfo::get().per_core_counters[affinity] == SIZE_MAX-1)
-      {
-        MonitorInfo::get().per_core_counters[affinity] = 1;
-        return;
-      }
-      MonitorInfo::get().per_core_counters[affinity]++;
-    }
-
   private:
     inline ThreadState::State next_state(ThreadState::State s)
     {

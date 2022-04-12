@@ -230,7 +230,7 @@ namespace verona::rt
         Logging::cout() << "Running cown " << cown << Logging::endl;
 
         /// Increment the number of served behaviours
-        Scheduler::get().incrementServed(affinity);
+        MonitorInfo::incrementServed(affinity);
 
         bool reschedule = cown->run(*alloc, state);
 
@@ -320,10 +320,7 @@ namespace verona::rt
       // for a different SchedulerThread later.
       Scheduler::local() = nullptr;
 
-      MonitorInfo::get().m.lock();
-      MonitorInfo::get().threads--;
-      MonitorInfo::get().m.unlock();
-      MonitorInfo::get().cv.notify_one();
+      MonitorInfo::threadExit();
     }
 
     bool fast_steal(T*& result)

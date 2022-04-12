@@ -112,7 +112,9 @@ namespace verona::rt
     {
       assert(index == thread_count + 1);
 
+      // The constructor acquires the lock.
       std::unique_lock lk(MonitorInfo::get().m);
+      // Required while loop due to spurious wake-ups.
       while(MonitorInfo::get().threads > 0)
       {
         MonitorInfo::get().cv.wait(lk, []{return MonitorInfo::get().threads==0;});
