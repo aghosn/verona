@@ -346,7 +346,6 @@ namespace verona::rt
         do
         {
           t->affinity = builder.getAffinity(builder.getIndex()); 
-          t->original = true;
           MonitorInfo::get().threads++;
           builder.add_thread(&T::run, t, startup, args...);
           t = t->next;
@@ -406,7 +405,6 @@ namespace verona::rt
             {
               if (t->affinity == i)
               {
-                assert(t->original);
                 wake_or_create(builder, i, t);
               }
             } while(t != first_thread);
@@ -433,7 +431,6 @@ namespace verona::rt
 
       T* extra = new T;
       extra->affinity = affinity;
-      extra->original = false;
       extra->next = main->next.load();
       main->next.store(extra);
 

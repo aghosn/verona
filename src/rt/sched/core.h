@@ -12,7 +12,7 @@
 #include <snmalloc.h>
 #include <atomic>
 
-
+#include "workerthread.h"
 #include "pal/sysmonitor.h"
 namespace verona::rt
 {
@@ -86,7 +86,7 @@ namespace verona::rt
 
     /// The scheduler affinity of this thread
     size_t affinity = 0;
-    bool original = false;
+    WorkerThread<Core<T>, T>* first_worker = nullptr;
 
     T* get_token_cown()
     {
@@ -96,12 +96,13 @@ namespace verona::rt
 
     Core() : token_cown{T::create_token_cown()}, q{token_cown}
     {
+      first_worker = new WorkerThread<Core<T>, T>;
       token_cown->set_owning_thread(this);
     }
 
     ~Core() {}
 
-    inline void stop()
+  inline void stop()
     {
       running = false;
     }
