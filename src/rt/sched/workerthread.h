@@ -203,7 +203,6 @@ namespace verona::rt
 
       GlobalEpoch::advance();
 
-      //TODO fix that, for some reason it doesn't compile
       core->template collect_cown_stubs<true>();
 
       Logging::cout() << "End teardown (phase 2)" << Logging::endl;
