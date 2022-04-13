@@ -5,7 +5,7 @@
 #include "../ds/forward_list.h"
 #include "../region/region.h"
 #include "../sched/epoch.h"
-#include "../sched/schedulerthread.h"
+#include "../sched/core.h"
 #include "../test/logging.h"
 
 #include <queue>
@@ -13,7 +13,7 @@
 namespace verona::rt
 {
   class Cown;
-  using CownThread = SchedulerThread<Cown>;
+  using CownThread = Core<Cown>;
   using Scheduler = ThreadPool<CownThread>;
 
   class BaseNoticeboard

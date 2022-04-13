@@ -30,14 +30,14 @@ namespace verona::rt
    * the scheduler thread.
    */
   template<class T>
-  class SchedulerThread
+  class Core
   {
   public:
     /// Friendly thread identifier for logging information.
     size_t systematic_id = 0;
 
   private:
-    using Scheduler = ThreadPool<SchedulerThread<T>>;
+    using Scheduler = ThreadPool<Core<T>>;
     friend Scheduler;
     friend T;
 
@@ -49,17 +49,17 @@ namespace verona::rt
     T* token_cown = nullptr;
 
 #ifdef USE_SYSTEMATIC_TESTING
-    friend class ThreadSyncSystematic<SchedulerThread>;
+    friend class ThreadSyncSystematic<Core>;
     Systematic::Local* local_systematic{nullptr};
 #else
-    friend class ThreadSync<SchedulerThread>;
+    friend class ThreadSync<Core>;
     LocalSync local_sync{};
 #endif
 
     MPMCQ<T> q;
     Alloc* alloc = nullptr;
-    std::atomic<SchedulerThread<T>*> next = nullptr;
-    SchedulerThread<T>* victim = nullptr;
+    std::atomic<Core<T>*> next = nullptr;
+    Core<T>* victim = nullptr;
 
     bool running = true;
 
@@ -94,12 +94,12 @@ namespace verona::rt
       return token_cown;
     }
 
-    SchedulerThread() : token_cown{T::create_token_cown()}, q{token_cown}
+    Core() : token_cown{T::create_token_cown()}, q{token_cown}
     {
       token_cown->set_owning_thread(this);
     }
 
-    ~SchedulerThread() {}
+    ~Core() {}
 
     inline void stop()
     {
@@ -141,7 +141,7 @@ namespace verona::rt
     }
 
     template<typename... Args>
-    static void run(SchedulerThread* t, void (*startup)(Args...), Args... args)
+    static void run(Core* t, void (*startup)(Args...), Args... args)
     {
       t->run_inner(startup, args...);
     }
@@ -317,7 +317,7 @@ namespace verona::rt
       Systematic::finished_thread();
 
       // Reset the local thread pointer as this physical thread could be reused
-      // for a different SchedulerThread later.
+      // for a different Core later.
       Scheduler::local() = nullptr;
 
       MonitorInfo::threadExit();
@@ -448,12 +448,12 @@ namespace verona::rt
      **/
     bool prerun(T* cown)
     {
-      // See if this is a SchedulerThread enqueued as a cown LD marker.
+      // See if this is a Core enqueued as a cown LD marker.
       // It may not be this one.
       if (has_thread_bit(cown))
       {
         auto unmasked = clear_thread_bit(cown);
-        SchedulerThread* sched = unmasked->owning_thread();
+        Core* sched = unmasked->owning_thread();
 
         if (sched == this)
         {

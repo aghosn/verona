@@ -9,7 +9,7 @@
 #include "../test/systematic.h"
 #include "base_noticeboard.h"
 #include "multimessage.h"
-#include "schedulerthread.h"
+#include "core.h"
 
 #include "runtimecall.h"
 
@@ -19,7 +19,7 @@ namespace verona::rt
 {
   using namespace snmalloc;
   class Cown;
-  using CownThread = SchedulerThread<Cown>;
+  using CownThread = Core<Cown>;
   using Scheduler = ThreadPool<CownThread>;
 
   static void yield()
@@ -166,7 +166,7 @@ namespace verona::rt
     static constexpr uintptr_t collected_mask = 1;
     static constexpr uintptr_t thread_mask = ~collected_mask;
 
-    void set_owning_thread(SchedulerThread<Cown>* owner)
+    void set_owning_thread(Core<Cown>* owner)
     {
       MARK_RT_FUNCTION
 
@@ -186,11 +186,11 @@ namespace verona::rt
         0;
     }
 
-    SchedulerThread<Cown>* owning_thread()
+    Core<Cown>* owning_thread()
     {
       MARK_RT_FUNCTION
       return (
-        SchedulerThread<
+        Core<
           Cown>*)(thread_status.load(std::memory_order_relaxed) & thread_mask);
     }
 
