@@ -14,6 +14,7 @@
 
 
 #include "pal/sysmonitor.h"
+#include "core.h"
 namespace verona::rt
 {
   /**
@@ -56,10 +57,11 @@ namespace verona::rt
     LocalSync local_sync{};
 #endif
 
-    MPMCQ<T> q;
+    Core<SchedulerThread, T>* core = nullptr; 
     Alloc* alloc = nullptr;
     std::atomic<SchedulerThread<T>*> next = nullptr;
-    SchedulerThread<T>* victim = nullptr;
+    //SchedulerThread<T>* victim = nullptr;
+    Core<SchedulerThread, T>* victim = nullptr;
 
     bool running = true;
 
@@ -94,8 +96,16 @@ namespace verona::rt
       return token_cown;
     }
 
-    SchedulerThread() : token_cown{T::create_token_cown()}, q{token_cown}
+    SchedulerThread() : token_cown{T::create_token_cown()}
     {
+      core = new Core<SchedulerThread, T>(token_cown);
+      token_cown->set_owning_thread(this);
+    }
+
+    SchedulerThread(Core<SchedulerThread, T>* c) : token_cown{T::create_token_cown()}
+    {
+      core = c;
+      /// TODO is that correct? Do we need to recreate one?
       token_cown->set_owning_thread(this);
     }
 
@@ -118,7 +128,7 @@ namespace verona::rt
         scheduled_unscanned_cown = true;
       }
       assert(!a->queue.is_sleeping());
-      q.enqueue(*alloc, a);
+      core->q.enqueue(*alloc, a);
 
       if (Scheduler::get().unpause())
         stats.unpause();
@@ -130,7 +140,7 @@ namespace verona::rt
       // asynchronous I/O.
       Logging::cout() << "LIFO scheduling cown " << a << " onto "
                       << systematic_id << Logging::endl;
-      q.enqueue_front(ThreadAlloc::get(), a);
+      core->q.enqueue_front(ThreadAlloc::get(), a);
       Logging::cout() << "LIFO scheduled cown " << a << " onto "
                       << systematic_id << Logging::endl;
 
@@ -159,7 +169,7 @@ namespace verona::rt
 
       Scheduler::local() = this;
       alloc = &ThreadAlloc::get();
-      victim = next;
+      victim = core->next;
       T* cown = nullptr;
 
 #ifdef USE_SYSTEMATIC_TESTING
@@ -187,7 +197,7 @@ namespace verona::rt
 
         if (cown == nullptr)
         {
-          cown = q.dequeue(*alloc);
+          cown = core->q.dequeue(*alloc);
           if (cown != nullptr)
             Logging::cout()
               << "Pop cown " << clear_thread_bit(cown) << Logging::endl;
@@ -248,7 +258,7 @@ namespace verona::rt
             // otherwise run this cown again. Don't push to the queue
             // immediately to avoid another thread stealing our only cown.
 
-            T* n = q.dequeue(*alloc);
+            T* n = core->q.dequeue(*alloc);
 
             if (n != nullptr)
             {
@@ -257,7 +267,7 @@ namespace verona::rt
             }
             else
             {
-              if (q.nothing_old())
+              if (core->q.nothing_old())
               {
                 Logging::cout() << "Queue empty" << Logging::endl;
                 // We have effectively reached token cown.
@@ -312,7 +322,7 @@ namespace verona::rt
 
       Logging::cout() << "End teardown (phase 2)" << Logging::endl;
 
-      q.destroy(*alloc);
+      core->q.destroy(*alloc);
 
       Systematic::finished_thread();
 
@@ -329,7 +339,7 @@ namespace verona::rt
       T* cown;
 
       // Try to steal from the victim thread.
-      if (victim != this)
+      if (victim != core)
       {
         cown = victim->q.dequeue(*alloc);
 
@@ -337,7 +347,7 @@ namespace verona::rt
         {
           // stats.steal();
           Logging::cout() << "Fast-steal cown " << clear_thread_bit(cown)
-                          << " from " << victim->systematic_id << Logging::endl;
+                          << " from " << victim->affinity << Logging::endl;
           result = cown;
           return true;
         }
@@ -365,7 +375,7 @@ namespace verona::rt
       {
         yield();
 
-        if (q.nothing_old())
+        if (core->q.nothing_old())
         {
           n_ld_tokens = 0;
         }
@@ -374,13 +384,13 @@ namespace verona::rt
         ld_protocol();
 
         // Check if some other thread has pushed work on our queue.
-        cown = q.dequeue(*alloc);
+        cown = core->q.dequeue(*alloc);
 
         if (cown != nullptr)
           return cown;
 
         // Try to steal from the victim thread.
-        if (victim != this)
+        if (victim != core)
         {
           cown = victim->q.dequeue(*alloc);
 
@@ -389,7 +399,7 @@ namespace verona::rt
             stats.steal();
             Logging::cout()
               << "Stole cown " << clear_thread_bit(cown) << " from "
-              << victim->systematic_id << Logging::endl;
+              << victim->affinity << Logging::endl;
             return cown;
           }
         }
@@ -477,7 +487,7 @@ namespace verona::rt
         }
 
         // Put back the token
-        sched->q.enqueue(*alloc, cown);
+        sched->core->q.enqueue(*alloc, cown);
         return false;
       }
 
