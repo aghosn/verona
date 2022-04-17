@@ -57,11 +57,11 @@ namespace verona::rt
     LocalSync local_sync{};
 #endif
 
-    Core<SchedulerThread, T>* core = nullptr; 
+    Core<T>* core = nullptr; 
     Alloc* alloc = nullptr;
     std::atomic<SchedulerThread<T>*> next = nullptr;
     //SchedulerThread<T>* victim = nullptr;
-    Core<SchedulerThread, T>* victim = nullptr;
+    Core<T>* victim = nullptr;
 
     bool running = true;
 
@@ -98,11 +98,11 @@ namespace verona::rt
 
     SchedulerThread() : token_cown{T::create_token_cown()}
     {
-      core = new Core<SchedulerThread, T>(token_cown);
+      core = new Core<T>(token_cown);
       token_cown->set_owning_thread(this);
     }
 
-    SchedulerThread(Core<SchedulerThread, T>* c) : token_cown{T::create_token_cown()}
+    SchedulerThread(Core<T>* c) : token_cown{T::create_token_cown()}
     {
       core = c;
       /// TODO is that correct? Do we need to recreate one?
