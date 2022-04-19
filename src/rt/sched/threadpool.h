@@ -314,13 +314,14 @@ namespace verona::rt
         if (count > 1)
         {
           t->next = new T;
+          t->core->next.store(t->next.load()->core);
           t = t->next;
           count--;
         }
         else
         {
           t->next = first_thread;
-
+          t->core->next = first_thread->core; 
           Logging::cout() << "Runtime initialised" << Logging::endl;
           break;
         }

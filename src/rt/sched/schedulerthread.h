@@ -241,6 +241,8 @@ namespace verona::rt
 
         /// Increment the number of served behaviours
         MonitorInfo::incrementServed(affinity);
+        assert(core != nullptr);
+        core->incrementServed();
 
         bool reschedule = cown->run(*alloc, state);
 
