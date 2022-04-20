@@ -1,8 +1,9 @@
 #pragma once
 
-#include <vector>
 #include "core.h"
 #include "pal/threading.h"
+
+#include <vector>
 
 namespace verona::rt
 {

@@ -72,6 +72,13 @@ namespace verona::rt
         //TODO logging
         return false;
       }
+
+      Core<Cown>* first_core()
+      {
+        if (core_pool.cores.size() == 0)
+          abort();
+        return core_pool.cores[0]; 
+      }
   };
 
 } // namespace verona::rt

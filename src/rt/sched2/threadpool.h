@@ -15,6 +15,7 @@
 
 #include "schedulerthread.h"
 #include "threadpoolbuilder.h"
+#include "core.h"
 
 namespace verona::rt
 {
@@ -186,21 +187,21 @@ namespace verona::rt
       return get().teardown_in_progress;
     }
 
-    static T*& local()
+    static WorkerThread*& local()
     {
-      static thread_local T* local;
+      static thread_local WorkerThread* local;
       return local;
     }
 
-    static T* round_robin()
+    static Core<T>* round_robin()
     {
       static thread_local size_t incarnation;
-      static thread_local T* nonlocal;
+      static thread_local Core<T>* nonlocal;
 
       if (incarnation != get().incarnation)
       {
         incarnation = get().incarnation;
-        nonlocal = get().first_thread;
+        nonlocal = Runtime::get().first_core();
       }
       else
       {
@@ -212,7 +213,7 @@ namespace verona::rt
 
     static EpochMark epoch()
     {
-      T* t = local();
+      WorkerThread* t = local();
 
       if (t != nullptr)
         return t->send_epoch;
@@ -222,7 +223,7 @@ namespace verona::rt
 
     static EpochMark alloc_epoch()
     {
-      T* t = local();
+      WorkerThread* t = local();
 
       // TODO Review what epoch should external participants use?
       if (t == nullptr)
@@ -240,7 +241,7 @@ namespace verona::rt
 
     static bool should_scan()
     {
-      T* t = local();
+      WorkerThread* t = local();
 
       if (t == nullptr)
         return false;
@@ -264,7 +265,7 @@ namespace verona::rt
 
     static bool in_prescan()
     {
-      T* t = local();
+      WorkerThread* t = local();
 
       if (t == nullptr)
         return false;
@@ -278,7 +279,7 @@ namespace verona::rt
      **/
     static bool debug_in_prescan()
     {
-      T* t = local();
+      WorkerThread* t = local();
 
       if (t == nullptr)
         return false;
@@ -289,7 +290,7 @@ namespace verona::rt
 
     static void want_ld()
     {
-      T* t = local();
+      WorkerThread* t = local();
 
       if (t != nullptr)
         t->want_ld();
@@ -362,26 +363,6 @@ namespace verona::rt
     {
       return state.next(s, thread_count);
     }
-
-    /*bool check_for_work()
-    {
-      // TODO: check for pending async IO
-      T* t = first_thread;
-      do
-      {
-        Logging::cout() << "Checking for pending work on thread "
-                        << t->systematic_id << Logging::endl;
-        if (!t->core->q.nothing_old())
-        {
-          Logging::cout() << "Found pending work!" << Logging::endl;
-          return true;
-        }
-        t = t->next;
-      } while (t != first_thread);
-
-      Logging::cout() << "No pending work!" << Logging::endl;
-      return false;
-    }*/
 
     bool pause()
     {
@@ -526,9 +507,6 @@ namespace verona::rt
         h.unpause_all();
       }
     }
-
-
-
   };
 
 } // namespace verona::rt
