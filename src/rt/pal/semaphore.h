@@ -1,6 +1,7 @@
 // Copyright Microsoft and Project Verona Contributors.
 // SPDX-License-Identifier: MIT
 #pragma once
+#include <cassert>
 
 /**
  * This file provides a mechanism for threads to sleep and be woken.

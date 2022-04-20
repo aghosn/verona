@@ -4,6 +4,8 @@
 #include "corepool.h"
 #include "threadpool.h"
 
+#include <cassert>
+
 namespace verona::rt
 {
   class Runtime
@@ -13,7 +15,8 @@ namespace verona::rt
       CorePool<Runtime, Cown> core_pool;
 
       // The pool of threads managed by this runtime.
-      ThreadPool<Cown> thread_pool;
+      using Scheduler = ThreadPool<Runtime, Cown>;
+      friend Scheduler;
 
       //TODO system monitor here with statistics held inside the CorePool;
     public:
@@ -36,19 +39,38 @@ namespace verona::rt
         core_pool.init(count);
 
         // Create the threads
-        thread_pool.init(count); 
+        Scheduler::get().init(count); 
 
         // Assign a thread per core.
         for (size_t i = 0; i < count; i++)
         {
           auto* core = core_pool.cores[i]; 
-          thread_pool.assign_thread_to_core(core);
+          Scheduler::get().assign_thread_to_core(core);
         }
 
         //TODO system monitor stuff here;
 
         /// Let's run now.
-        thread_pool.run();
+        Scheduler::get().run();
+      }
+
+      ///TODO aghosn moved this here from threadpool. 
+      //Need to implement all the logging.
+      bool check_for_work()
+      {
+        for(auto* core: core_pool.cores)
+        {
+          assert(core != nullptr);
+          //TODO fix this once we merge with core logic
+          //Just trying to see if stuff compiles
+          if (/*core->q.nothing_old()*/ true)
+          {
+            //TODO logging
+            return true;
+          }
+        }
+        //TODO logging
+        return false;
       }
   };
 

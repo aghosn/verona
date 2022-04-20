@@ -1,5 +1,7 @@
 #pragma once
 
+#include "test/systematic.h"
+
 namespace verona::rt
 {
   /// FIXME Just to keep the compiler happy for now.
