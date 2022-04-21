@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "schedulerthread.h"
 #include "../pal/threadpoolbuilder.h"
 #include "test/logging.h"
 #include "threadstate.h"
@@ -15,11 +16,6 @@
 #include <mutex>
 #include <snmalloc.h>
 
-#include "pal/sysmonitor.h"
-
-#include <iostream>
-
-#include <chrono>
 namespace verona::rt
 {
   /// Used for default prerun for a thread.
@@ -28,11 +24,14 @@ namespace verona::rt
   using atomic_counter = std::atomic<size_t>;
 
   using namespace snmalloc;
-  template<class T>
+  template<class P, class T>
   class ThreadPool
   {
   private:
-    friend T;
+    using Runtime = P;
+    using WorkerThread = SchedulerThread<ThreadPool<P,T>, T>;
+    friend ThreadPoolBuilder<ThreadPool>;
+    friend WorkerThread;
     friend void verona::rt::yield();
 
     static constexpr uint64_t TSC_PAUSE_SLOP = 1'000'000;
@@ -63,15 +62,13 @@ namespace verona::rt
     std::atomic<uint64_t> unpause_epoch{0};
 
 #ifdef USE_SYSTEMATIC_TESTING
-    ThreadSyncSystematic<T> sync;
+    ThreadSyncSystematic<WorkerThread> sync;
 #else
-    ThreadSync<T> sync;
+    ThreadSync<WorkerThread> sync;
 #endif
 
     std::atomic_uint64_t barrier_count = 0;
     uint64_t barrier_incarnation = 0;
-
-    T* first_thread = nullptr;
 
     /// How many threads are being managed by this pool
     size_t thread_count = 0;
@@ -89,10 +86,19 @@ namespace verona::rt
 
     ThreadState state;
 
+    //TODO aghosn Probably will need these two to be atomic/locked?
+    std::list<WorkerThread*> free_pool;
+    std::list<WorkerThread*> active_pool;
+
+    /// Internal state to synchronize threads and allow graceful termination
+    std::atomic<bool> flag_done = false;
+    std::mutex mut;
+    std::condition_variable cv;
+
   public:
-    static ThreadPool<T>& get()
+    static ThreadPool<P,T>& get()
     {
-      SNMALLOC_REQUIRE_CONSTINIT static ThreadPool<T> global_thread_pool;
+      /*SNMALLOC_REQUIRE_CONSTINIT*/ static ThreadPool<P,T> global_thread_pool;
       return global_thread_pool;
     }
 
@@ -181,21 +187,21 @@ namespace verona::rt
       return get().teardown_in_progress;
     }
 
-    static T*& local()
+    static WorkerThread*& local()
     {
-      static thread_local T* local;
+      static thread_local WorkerThread* local;
       return local;
     }
 
-    static T* round_robin()
+    static Core<T>* round_robin()
     {
       static thread_local size_t incarnation;
-      static thread_local T* nonlocal;
+      static thread_local Core<T>* nonlocal;
 
       if (incarnation != get().incarnation)
       {
         incarnation = get().incarnation;
-        nonlocal = get().first_thread;
+        nonlocal = Runtime::get().first_core();
       }
       else
       {
@@ -207,7 +213,7 @@ namespace verona::rt
 
     static EpochMark epoch()
     {
-      T* t = local();
+      WorkerThread* t = local();
 
       if (t != nullptr)
         return t->send_epoch;
@@ -217,7 +223,7 @@ namespace verona::rt
 
     static EpochMark alloc_epoch()
     {
-      T* t = local();
+      WorkerThread* t = local();
 
       // TODO Review what epoch should external participants use?
       if (t == nullptr)
@@ -235,7 +241,7 @@ namespace verona::rt
 
     static bool should_scan()
     {
-      T* t = local();
+      WorkerThread* t = local();
 
       if (t == nullptr)
         return false;
@@ -259,7 +265,7 @@ namespace verona::rt
 
     static bool in_prescan()
     {
-      T* t = local();
+      WorkerThread* t = local();
 
       if (t == nullptr)
         return false;
@@ -273,7 +279,7 @@ namespace verona::rt
      **/
     static bool debug_in_prescan()
     {
-      T* t = local();
+      WorkerThread* t = local();
 
       if (t == nullptr)
         return false;
@@ -284,7 +290,7 @@ namespace verona::rt
 
     static void want_ld()
     {
-      T* t = local();
+      WorkerThread* t = local();
 
       if (t != nullptr)
         t->want_ld();
@@ -299,35 +305,36 @@ namespace verona::rt
 
       thread_count = count;
 
-      // Build a circular linked list of scheduler threads.
-      first_thread = new T;
-      T* t = first_thread;
-      teardown_in_progress = false;
-
-      while (true)
+      for(size_t i = 0; i < count; i++)
       {
-        t->systematic_id = count;
+        WorkerThread* t = new WorkerThread();
+        t->systematic_id = i;
 #ifdef USE_SYSTEMATIC_TESTING
         t->local_systematic =
           Systematic::create_systematic_thread(t->systematic_id);
 #endif
-        if (count > 1)
-        {
-          t->next = new T;
-          t->core->next.store(t->next.load()->core);
-          t = t->next;
-          count--;
-        }
-        else
-        {
-          t->next = first_thread;
-          t->core->next = first_thread->core; 
-          Logging::cout() << "Runtime initialised" << Logging::endl;
-          break;
-        }
+        free_pool.emplace_back(t);
       }
-
       init_barrier();
+    }
+
+    void assign_thread_to_core(Core<T>* core)
+    {
+      if (core == nullptr)
+        abort();
+      WorkerThread* result = nullptr;
+      if (free_pool.size() != 0)
+      {
+        result = free_pool.front();
+        free_pool.pop_front();
+      }
+      else
+      {
+        result = new WorkerThread();
+      }
+      result->set_core(core);
+      /// Add the thread to the list of active threads
+      active_pool.emplace_back(result);
     }
 
     void run()
@@ -338,35 +345,25 @@ namespace verona::rt
     template<typename... Args>
     void run_with_startup(void (*startup)(Args...), Args... args)
     {
-      active_thread_count = thread_count;
-      T* t = first_thread;
       {
-        ThreadPoolBuilder builder(thread_count);
-
+        ThreadPoolBuilder<ThreadPool> builder(this);
         Logging::cout() << "Starting all threads" << Logging::endl;
-        do
+        for (auto* thread: active_pool)
         {
-          t->affinity = builder.getAffinity(builder.getIndex()); 
-          t->original = true;
-          MonitorInfo::get().threads++;
-          builder.add_thread(&T::run, t, startup, args...);
-          t = t->next;
-        } while (t != first_thread);
-        
-        builder.startSysMonitor(run_sysmonitor<T>, this, &builder);
-      }
-      Logging::cout() << "All threads stopped" << Logging::endl;
+          // All active threads should have been assigned a core by now.
+          if (thread->core == nullptr)
+          {
+            abort();
+          }
+          builder.add_thread(&WorkerThread::run, thread, startup, args...);
+        }
+        /// ThreadPoolBuilder will be destroyed here.
+      } 
 
-      assert(t == first_thread);
-      do
-      {
-        T* next = t->next;
-        delete t;
-        t = next;
-      } while (t != first_thread);
+      Logging::cout() << "All threads stopped" << Logging::endl;
+      //TODO cleanup
       Logging::cout() << "All threads deallocated" << Logging::endl;
 
-      first_thread = nullptr;
       incarnation++;
 #ifdef USE_SYSTEMATIC_TESTING
       Object::reset_ids();
@@ -378,77 +375,6 @@ namespace verona::rt
       Epoch::flush(ThreadAlloc::get());
     }
 
-    // Monitor progress on each core.
-    // If a core is not making progress, we either create an extra
-    // scheduler thread on that core or wake up one of the ones previously
-    // created.
-    void monitor(ThreadPoolBuilder* builder)
-    {
-      using namespace std::chrono_literals;
-      assert(MonitorInfo::get().size == thread_count);
-      while(true)
-      {
-        size_t count[thread_count];
-        for (size_t i = 0; i < thread_count; i++)
-        {
-          count[i] = MonitorInfo::get().per_core_counters[i];
-        }
-        std::this_thread::sleep_for(10ms);
-        if (MonitorInfo::get().done) {
-          return;
-        }
-        for (size_t i = 0; i < thread_count; i++)
-        {
-          // No progress on that core.
-          if (count[i] == MonitorInfo::get().per_core_counters[i])
-          {
-            T* t = first_thread;
-            do
-            {
-              if (t->affinity == i)
-              {
-                assert(t->original);
-                wake_or_create(builder, i, t);
-              }
-            } while(t != first_thread);
-          }
-        }
-      }
-    }
-
-    // Checks whether there are extra scheduler threads sleeping for that core.
-    // If not, it creates a new one.
-    void wake_or_create(ThreadPoolBuilder* builder, size_t affinity, T* main)
-    {
-      assert(main != nullptr);
-      assert(main->affinity == affinity);
-      assert(builder != nullptr);
-      
-     MonitorInfo::get().m.lock();
-      if (MonitorInfo::get().threads == 0)
-      {
-        // We need to bail
-        MonitorInfo::get().m.unlock();
-        return;
-      }
-
-      T* extra = new T;
-      extra->affinity = affinity;
-      extra->original = false;
-      extra->next = main->next.load();
-      main->next.store(extra);
-
-      MonitorInfo::get().threads++;
-      MonitorInfo::get().m.unlock();
-      builder->add_thread_extra(extra->affinity, &T::run, extra, &nop);
-    }
-
-    template<typename A>
-    static void run_sysmonitor(ThreadPool<A>* pool, ThreadPoolBuilder* builder)
-    {
-      pool->monitor(builder);
-    }
-
     static bool debug_not_running()
     {
       return get().active_thread_count == 0;
@@ -458,26 +384,6 @@ namespace verona::rt
     inline ThreadState::State next_state(ThreadState::State s)
     {
       return state.next(s, thread_count);
-    }
-
-    bool check_for_work()
-    {
-      // TODO: check for pending async IO
-      T* t = first_thread;
-      do
-      {
-        Logging::cout() << "Checking for pending work on thread "
-                        << t->systematic_id << Logging::endl;
-        if (!t->core->q.nothing_old())
-        {
-          Logging::cout() << "Found pending work!" << Logging::endl;
-          return true;
-        }
-        t = t->next;
-      } while (t != first_thread);
-
-      Logging::cout() << "No pending work!" << Logging::endl;
-      return false;
     }
 
     bool pause()
@@ -501,7 +407,7 @@ namespace verona::rt
 #endif
 
       // Work has become available, we shouldn't pause.
-      if (check_for_work())
+      if (Runtime::get().check_for_work())
         return false;
 
       yield();
@@ -539,12 +445,11 @@ namespace verona::rt
         teardown_in_progress = true;
 
         // Tell all threads to stop looking for work.
-        T* t = first_thread;
-        do
+        // TODO(aghosn) find out if we need to lock the list
+        for (auto* t: active_pool)
         {
           t->stop();
-          t = t->next;
-        } while (t != first_thread);
+        }
         Logging::cout() << "Teardown: all threads stopped" << Logging::endl;
 
         h.unpause_all();

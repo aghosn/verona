@@ -2,9 +2,9 @@
 
 #include <atomic>
 
+#include "ds/hashmap.h"
 #include "ds/mpscq.h"
-
-#include "sched/threadpool.h"
+#include "mpmcq.h"
 
 namespace verona::rt
 {
@@ -22,11 +22,20 @@ namespace verona::rt
       Core(T* token_cown) : q{token_cown}
       {}
 
+      Core() {}
+
       ~Core() {}
 
       void incrementServed()
       {
         progress_counter++;
+      }
+
+      inline void schedule_lifo(T* a)
+      {
+        //TODO some logging + update stats.
+        //I think we will need to put stats in here.
+        q.enqueue_front(ThreadAlloc::get(), a);
       }
   };
 } // namespace verona::rt

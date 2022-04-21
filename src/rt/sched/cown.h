@@ -9,7 +9,9 @@
 #include "../test/systematic.h"
 #include "base_noticeboard.h"
 #include "multimessage.h"
-#include "schedulerthread.h"
+#include "runtime.h"
+//#include "threadpool.h"
+//#include "schedulerthread.h"
 
 #include "runtimecall.h"
 
@@ -19,8 +21,8 @@ namespace verona::rt
 {
   using namespace snmalloc;
   class Cown;
-  using CownThread = SchedulerThread<Cown>;
-  using Scheduler = ThreadPool<CownThread>;
+  using Scheduler = ThreadPool<Runtime, Cown>;
+  using CownThread = SchedulerThread<Scheduler,Cown>;
 
   static void yield()
   {
@@ -166,7 +168,7 @@ namespace verona::rt
     static constexpr uintptr_t collected_mask = 1;
     static constexpr uintptr_t thread_mask = ~collected_mask;
 
-    void set_owning_thread(SchedulerThread<Cown>* owner)
+    void set_owning_thread(CownThread* owner)
     {
       MARK_RT_FUNCTION
 
@@ -186,12 +188,11 @@ namespace verona::rt
         0;
     }
 
-    SchedulerThread<Cown>* owning_thread()
+    CownThread* owning_thread()
     {
       MARK_RT_FUNCTION
       return (
-        SchedulerThread<
-          Cown>*)(thread_status.load(std::memory_order_relaxed) & thread_mask);
+        CownThread*)(thread_status.load(std::memory_order_relaxed) & thread_mask);
     }
 
   public:
@@ -414,8 +415,11 @@ namespace verona::rt
       // TODO Make this assertion pass.
       // assert(can_lifo_schedule() || Scheduler::debug_not_running());
 
-      t = Scheduler::round_robin();
-      t->schedule_lifo(this);
+      //TODO(aghosn) need fixing
+      //t = Scheduler::round_robin();
+      //t->schedule_lifo(this);
+      Core<Cown>* c = Scheduler::round_robin();
+      c->schedule_lifo(this);
     }
 
   private:

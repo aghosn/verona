@@ -1,13 +1,16 @@
 #pragma once
 #include "core.h"
-#include "cown.h"
+//#include "cown.h"
 #include "corepool.h"
 #include "threadpool.h"
+#include "test/logging.h"
 
 #include <cassert>
 
 namespace verona::rt
 {
+  // Forward declaration to avoid circular dependencies.
+  class Cown;
   class Runtime
   {
     private:
@@ -61,15 +64,15 @@ namespace verona::rt
         for(auto* core: core_pool.cores)
         {
           assert(core != nullptr);
-          //TODO fix this once we merge with core logic
-          //Just trying to see if stuff compiles
-          if (/*core->q.nothing_old()*/ true)
+          Logging::cout() << "Checking for pending work on thread "
+                        << core->affinity << Logging::endl;
+          if (core->q.nothing_old())
           {
-            //TODO logging
+            Logging::cout() << "Found pending work!" << Logging::endl;
             return true;
           }
         }
-        //TODO logging
+        Logging::cout() << "No pending work!" << Logging::endl;
         return false;
       }
 

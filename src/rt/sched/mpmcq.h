@@ -83,6 +83,12 @@ namespace verona::rt
       front.init(token);
     }
 
+    //TODO(aghosn) just for now
+    MPMCQ()
+    {
+      //TODO
+    }
+
     /**
      * Enqueue a node, this is not linearisable with respect
      * to dequeue.  That is a dequeue may not see this enqueue

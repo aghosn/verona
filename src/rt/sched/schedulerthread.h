@@ -7,11 +7,12 @@
 #include "mpmcq.h"
 #include "object/object.h"
 #include "schedulerstats.h"
-#include "threadpool.h"
+#include "sched/threadsync.h"
+#include "sched/threadstate.h"
+#include "sched/threadsyncsystematic.h"
 
 #include <snmalloc.h>
 #include <atomic>
-
 
 #include "pal/sysmonitor.h"
 #include "core.h"
@@ -30,7 +31,7 @@ namespace verona::rt
    * previous one has been dequeued or stolen, once more work is scheduled on
    * the scheduler thread.
    */
-  template<class T>
+  template<class P, class T>
   class SchedulerThread
   {
   public:
@@ -38,7 +39,7 @@ namespace verona::rt
     size_t systematic_id = 0;
 
   private:
-    using Scheduler = ThreadPool<SchedulerThread<T>>;
+    using Scheduler = P;
     friend Scheduler;
     friend T;
 
@@ -59,8 +60,6 @@ namespace verona::rt
 
     Core<T>* core = nullptr; 
     Alloc* alloc = nullptr;
-    std::atomic<SchedulerThread<T>*> next = nullptr;
-    //SchedulerThread<T>* victim = nullptr;
     Core<T>* victim = nullptr;
 
     bool running = true;
@@ -86,27 +85,15 @@ namespace verona::rt
     /// The MessageBody of a running behaviour.
     typename T::MessageBody* message_body = nullptr;
 
-    /// The scheduler affinity of this thread
-    size_t affinity = 0;
-    bool original = false;
-
     T* get_token_cown()
     {
       assert(token_cown);
       return token_cown;
     }
 
-    SchedulerThread() : token_cown{T::create_token_cown()}
+    SchedulerThread() 
     {
-      core = new Core<T>(token_cown);
-      token_cown->set_owning_thread(this);
-    }
-
-    SchedulerThread(Core<T>* c) : token_cown{T::create_token_cown()}
-    {
-      core = c;
-      /// TODO is that correct? Do we need to recreate one?
-      token_cown->set_owning_thread(this);
+      //TODO do we have anything else to do here?
     }
 
     ~SchedulerThread() {}
@@ -148,6 +135,16 @@ namespace verona::rt
 
       if (Scheduler::get().unpause())
         stats.unpause();
+    }
+
+    void set_core(Core<T>* c)
+    {
+      /// This thread is already pinned to a core or the supplied one is null
+      if (core != nullptr || c == nullptr)
+        abort();
+
+      core = c;
+      victim = core->next;
     }
 
     template<typename... Args>
@@ -240,7 +237,6 @@ namespace verona::rt
         Logging::cout() << "Running cown " << cown << Logging::endl;
 
         /// Increment the number of served behaviours
-        MonitorInfo::incrementServed(affinity);
         assert(core != nullptr);
         core->incrementServed();
 
@@ -332,7 +328,8 @@ namespace verona::rt
       // for a different SchedulerThread later.
       Scheduler::local() = nullptr;
 
-      MonitorInfo::threadExit();
+      //TODO do the exit of threads
+      //MonitorInfo::threadExit();
     }
 
     bool fast_steal(T*& result)
