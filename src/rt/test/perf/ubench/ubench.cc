@@ -256,7 +256,9 @@ int main(int argc, char** argv)
 #endif
   auto& sched = rt::Scheduler::get();
   sched.set_fair(true);
-  sched.init(cores);
+  //TODO aghosn unify this
+  rt::Runtime::get().init(cores);
+  //sched.init(cores);
 
   static vector<Pinger*> pinger_set;
   for (size_t p = 0; p < pingers; p++)

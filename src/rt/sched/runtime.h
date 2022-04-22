@@ -52,9 +52,6 @@ namespace verona::rt
         }
 
         //TODO system monitor stuff here;
-
-        /// Let's run now.
-        Scheduler::get().run();
       }
 
       ///TODO aghosn moved this here from threadpool. 
@@ -66,7 +63,7 @@ namespace verona::rt
           assert(core != nullptr);
           Logging::cout() << "Checking for pending work on thread "
                         << core->affinity << Logging::endl;
-          if (core->q.nothing_old())
+          if (!core->q.nothing_old())
           {
             Logging::cout() << "Found pending work!" << Logging::endl;
             return true;

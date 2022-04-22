@@ -117,7 +117,9 @@ public:
 #else
       UNUSED(seed);
 #endif
-      sched.init(cores);
+      //TODO aghosn unify the API all behind runtime instead.
+      Runtime::get().init(cores);
+      //sched.init(cores);
 
       f(std::forward<Args>(args)...);
 

@@ -42,8 +42,6 @@ namespace verona::rt
 
     static constexpr uint64_t TSC_QUIESCENCE_TIMEOUT = 1'000'000;
 
-    T* token_cown = nullptr;
-
 #ifdef USE_SYSTEMATIC_TESTING
     friend class ThreadSyncSystematic<SchedulerThread>;
     Systematic::Local* local_systematic{nullptr};
@@ -73,16 +71,15 @@ namespace verona::rt
     SchedulerStats stats;
 
     T* list = nullptr;
-    size_t total_cowns = 0;
-    std::atomic<size_t> free_cowns = 0;
-
+    
     /// The MessageBody of a running behaviour.
     typename T::MessageBody* message_body = nullptr;
 
     T* get_token_cown()
     {
-      assert(token_cown);
-      return token_cown;
+      assert(core != nullptr);
+      assert(core->token_cown != nullptr);
+      return core->token_cown;
     }
 
     SchedulerThread() 
@@ -131,6 +128,10 @@ namespace verona::rt
         stats.unpause();
     }
 
+    /**
+     * Assigns the schedulerthread to a core. 
+     * The thread enqueues its token_cown on the core's queue.
+     */
     void set_core(Core<T>* c)
     {
       /// This thread is already pinned to a core or the supplied one is null
@@ -170,7 +171,7 @@ namespace verona::rt
       while (true)
       {
         if (
-          (total_cowns < (free_cowns << 1))
+          (core->total_cowns < (core->free_cowns << 1))
 #ifdef USE_SYSTEMATIC_TESTING
           || Systematic::coin()
 #endif
@@ -456,9 +457,11 @@ namespace verona::rt
       if (has_thread_bit(cown))
       {
         auto unmasked = clear_thread_bit(cown);
-        SchedulerThread* sched = unmasked->owning_thread();
+        Core<T>* c = unmasked->owning_core();
+        if (c == nullptr)
+          abort();
 
-        if (sched == this)
+        if (c == core)
         {
           if (Scheduler::get().fair)
           {
@@ -476,24 +479,24 @@ namespace verona::rt
         else
         {
           Logging::cout() << "Reached token: stolen from "
-                          << sched->systematic_id << Logging::endl;
+                          << core->affinity << Logging::endl;
         }
 
         // Put back the token
-        sched->core->q.enqueue(*alloc, cown);
+        c->q.enqueue(*alloc, cown);
         return false;
       }
 
       // Register this cown with the scheduler thread if it is not currently
       // registered with a scheduler thread.
-      if (cown->owning_thread() == nullptr)
+      if (cown->owning_core() == nullptr)
       {
         Logging::cout() << "Bind cown to scheduler thread: " << this
                         << Logging::endl;
-        cown->set_owning_thread(this);
+        cown->set_owning_core(core);
         cown->next = list;
         list = cown;
-        total_cowns++;
+        core->total_cowns++;
       }
 
       return true;
@@ -746,7 +749,7 @@ namespace verona::rt
         p = &(c->next);
       }
 
-      free_cowns -= count;
+      core->free_cowns -= count;
     }
   };
 } // namespace verona::rt

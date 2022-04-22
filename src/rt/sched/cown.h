@@ -10,9 +10,7 @@
 #include "base_noticeboard.h"
 #include "multimessage.h"
 #include "runtime.h"
-//#include "threadpool.h"
-//#include "schedulerthread.h"
-
+#include "core.h"
 #include "runtimecall.h"
 
 #include <algorithm>
@@ -98,14 +96,16 @@ namespace verona::rt
 
         if (local != nullptr)
         {
-          set_owning_thread(local);
+          set_owning_core(local->core);
           next = local->list;
           local->list = this;
-          local->total_cowns++;
+          if (local->core == nullptr)
+            abort();
+          local->core->total_cowns++;
         }
         else
         {
-          set_owning_thread(nullptr);
+          set_owning_core(nullptr);
           next = nullptr;
         }
       }
@@ -115,6 +115,7 @@ namespace verona::rt
     friend class DLList<Cown>;
     friend class MultiMessage;
     friend CownThread;
+    friend Core<Cown>;
 
     template<typename T>
     friend class Noticeboard;
@@ -137,7 +138,7 @@ namespace verona::rt
     // Uses the bottom bit to indicate the cown has been collected
     // If the object is collected by the leak detector, we should not
     // collect again when the weak reference count hits 0.
-    std::atomic<uintptr_t> thread_status{0};
+    std::atomic<uintptr_t> core_status{0};
     Cown* next{nullptr};
 
     /**
@@ -168,31 +169,31 @@ namespace verona::rt
     static constexpr uintptr_t collected_mask = 1;
     static constexpr uintptr_t thread_mask = ~collected_mask;
 
-    void set_owning_thread(CownThread* owner)
+    void set_owning_core(Core<Cown>* owner)
     {
       MARK_RT_FUNCTION
 
-      thread_status = (uintptr_t)owner;
+      core_status = (uintptr_t)owner;
     }
 
     void mark_collected()
     {
       MARK_RT_FUNCTION
-      thread_status |= 1;
+      core_status |= 1;
     }
 
     bool is_collected()
     {
       MARK_RT_FUNCTION
-      return (thread_status.load(std::memory_order_relaxed) & collected_mask) !=
+      return (core_status.load(std::memory_order_relaxed) & collected_mask) !=
         0;
     }
 
-    CownThread* owning_thread()
+    Core<Cown>* owning_core()
     {
       MARK_RT_FUNCTION
       return (
-        CownThread*)(thread_status.load(std::memory_order_relaxed) & thread_mask);
+        Core<Cown>*)(core_status.load(std::memory_order_relaxed) & thread_mask);
     }
 
   public:
@@ -318,7 +319,7 @@ namespace verona::rt
       Logging::cout() << "Cown " << this << " weak release" << Logging::endl;
       if (weak_count.fetch_sub(1) == 1)
       {
-        auto* t = owning_thread();
+        Core<Cown>* t = owning_core();
         yield();
         if (!t)
         {

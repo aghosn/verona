@@ -99,7 +99,9 @@ int main()
 #else
   size_t cores = 2;
   Scheduler& sched = Scheduler::get();
-  sched.init(cores);
+  //TODO aghosn unify
+  Runtime::get().init(cores);
+  //sched.init(cores);
   sched.set_fair(true);
 
   auto& alloc = ThreadAlloc::get();

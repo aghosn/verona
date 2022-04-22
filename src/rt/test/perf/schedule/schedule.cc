@@ -85,7 +85,9 @@ int main(int argc, char** argv)
   sched.set_fair(true);
   for (int l = 0; l < 20; l++)
   {
-    sched.init(cores);
+    //TODO aghosn unify the API
+    rt::Runtime::get().init(cores);
+    //sched.init(cores);
 
     for (size_t i = 0; i < cowns; i++)
     {

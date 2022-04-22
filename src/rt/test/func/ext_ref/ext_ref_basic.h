@@ -118,7 +118,9 @@ namespace ext_ref_basic
   {
     Scheduler& sched = Scheduler::get();
     size_t cores = 1;
-    sched.init(cores);
+    //TODO aghosn try to unify this
+    Runtime::get().init(cores);
+    //sched.init(cores);
 
     auto& alloc = ThreadAlloc::get();
     (void)alloc;

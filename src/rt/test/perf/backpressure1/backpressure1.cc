@@ -152,7 +152,10 @@ int main(int argc, char** argv)
   Scheduler::set_detect_leaks(true);
   auto& sched = Scheduler::get();
   sched.set_fair(true);
-  sched.init(cores);
+  
+  //TODO aghosn unify API
+  Runtime::get().init(cores);
+  //sched.init(cores);
 
   Alloc& alloc = ThreadAlloc::get();
 

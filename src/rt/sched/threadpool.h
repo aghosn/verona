@@ -32,6 +32,7 @@ namespace verona::rt
     using WorkerThread = SchedulerThread<ThreadPool<P,T>, T>;
     friend ThreadPoolBuilder<ThreadPool>;
     friend WorkerThread;
+    friend Runtime;
     friend void verona::rt::yield();
 
     static constexpr uint64_t TSC_PAUSE_SLOP = 1'000'000;
@@ -94,6 +95,28 @@ namespace verona::rt
     std::atomic<bool> flag_done = false;
     std::mutex mut;
     std::condition_variable cv;
+
+    void init(size_t count)
+    {
+      Logging::cout() << "Init runtime" << Logging::endl;
+
+      if ((thread_count != 0) || (count == 0))
+        abort();
+
+      thread_count = count;
+
+      for(size_t i = 0; i < count; i++)
+      {
+        WorkerThread* t = new WorkerThread();
+        t->systematic_id = i;
+#ifdef USE_SYSTEMATIC_TESTING
+        t->local_systematic =
+          Systematic::create_systematic_thread(t->systematic_id);
+#endif
+        free_pool.emplace_back(t);
+      }
+      init_barrier();
+    }
 
   public:
     static ThreadPool<P,T>& get()
@@ -296,28 +319,6 @@ namespace verona::rt
         t->want_ld();
     }
 
-    void init(size_t count)
-    {
-      Logging::cout() << "Init runtime" << Logging::endl;
-
-      if ((thread_count != 0) || (count == 0))
-        abort();
-
-      thread_count = count;
-
-      for(size_t i = 0; i < count; i++)
-      {
-        WorkerThread* t = new WorkerThread();
-        t->systematic_id = i;
-#ifdef USE_SYSTEMATIC_TESTING
-        t->local_systematic =
-          Systematic::create_systematic_thread(t->systematic_id);
-#endif
-        free_pool.emplace_back(t);
-      }
-      init_barrier();
-    }
-
     void assign_thread_to_core(Core<T>* core)
     {
       if (core == nullptr)
@@ -345,6 +346,7 @@ namespace verona::rt
     template<typename... Args>
     void run_with_startup(void (*startup)(Args...), Args... args)
     {
+      active_thread_count = thread_count;
       {
         ThreadPoolBuilder<ThreadPool> builder(this);
         Logging::cout() << "Starting all threads" << Logging::endl;
@@ -355,7 +357,8 @@ namespace verona::rt
           {
             abort();
           }
-          builder.add_thread(&WorkerThread::run, thread, startup, args...);
+          builder.add_thread(thread->core->affinity,
+              &WorkerThread::run, thread, startup, args...);
         }
         /// ThreadPoolBuilder will be destroyed here.
       } 

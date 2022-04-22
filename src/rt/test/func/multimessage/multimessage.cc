@@ -53,7 +53,9 @@ void test_multimessage(size_t cores)
   };
 
   Scheduler& sched = Scheduler::get();
-  sched.init(cores);
+  //TODO aghosn unify
+  Runtime::get().init(cores);
+  //sched.init(cores);
 
   auto a1 = new CCown;
   a1->i = 3;

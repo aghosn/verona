@@ -20,27 +20,19 @@ namespace verona::rt
     T* pool = nullptr;
     std::list<PlatformThread> threads;
 
-    /*template<typename... Args>
-    void add_thread_impl(bool skip, void (*body)(Args...), Args... args)
+    template<typename... Args>
+    void add_thread_impl(void (*body)(Args...), Args... args)
     {
-      if (skip || index < thread_count)
-      {
-        threads.emplace_back(body, args...);
-      }
-      else
-      {
-        Systematic::start();
-        body(args...);
-      }
-    }*/
+      threads.emplace_back(body, args...);
+    }
 
-    /*template<typename... Args>
+    template<typename... Args>
     static void
     run_with_affinity(size_t affinity, void (*body)(Args...), Args... args)
     {
       cpu::set_affinity(affinity);
       body(args...);
-    }*/
+    }
 
   public:
     ThreadPoolBuilder(T* pool) : pool(pool)
@@ -52,7 +44,7 @@ namespace verona::rt
     ~ThreadPoolBuilder()
     {
       // The constructor acquires the lock.
-      std::unique_lock lk(pool->mut);
+      /*std::unique_lock lk(pool->mut);
       // Required loop due to spurious wake-ups.
       while(pool->active_thread_count > 0)
       {
@@ -61,7 +53,7 @@ namespace verona::rt
       lk.unlock();
 
       // TODO figure out if we should wake up all threads
-      pool->flag_done = true;
+      pool->flag_done = true;*/
 
       while(!threads.empty())
       {
@@ -70,17 +62,28 @@ namespace verona::rt
         threads.pop_front();
       }
       /// Debugging checks
-      assert(pool->active_thread_count == 0);
+      //assert(pool->active_thread_count == 0);
     }
 
     template<typename... Args>
-    void add_thread(void (*body)(Args...), Args... args)
+    void add_thread(size_t index, void (*body)(Args...), Args... args)
     {
       //TODO do the systematic thing.
-      pool->active_thread_count++;
-      threads.emplace_back(body, args...);
-      pool->active_thread_count--;
-      pool->cv.notify_one();
+      //TODO need to replace this with another counter
+      //pool->active_thread_count++;
+      //threads.emplace_back(body, args...);
+      //pool->active_thread_count--;
+      //pool->cv.notify_one();
+#ifdef USE_SYSTEMATIC_TESTING
+      // Don't use affinity with systematic testing.  We're only ever running
+      // one thread at a time in systematic testing mode and by pinning each
+      // thread to a core we massively increase contention.
+      UNUSED(index);
+      add_thread_impl(body, args...);
+#else
+    add_thread_impl(
+        &run_with_affinity, index, body, args...);
+#endif
     }
 
   };
