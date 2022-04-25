@@ -15,7 +15,7 @@ namespace verona::rt
   {
     private:
       // The pool of cores managed by this runtime
-      CorePool<Runtime, Cown> core_pool;
+      CorePool<Runtime, Cown>* core_pool = nullptr;
 
       // The pool of threads managed by this runtime.
       using Scheduler = ThreadPool<Runtime, Cown>;
@@ -39,7 +39,7 @@ namespace verona::rt
           abort();
         
         // Create cores
-        core_pool.init(count);
+        core_pool = new CorePool<Runtime, Cown>(count);
 
         // Create the threads
         Scheduler::get().init(count); 
@@ -47,7 +47,7 @@ namespace verona::rt
         // Assign a thread per core.
         for (size_t i = 0; i < count; i++)
         {
-          auto* core = core_pool.cores[i]; 
+          auto* core = core_pool->cores[i]; 
           Scheduler::get().assign_thread_to_core(core);
         }
 
@@ -58,7 +58,7 @@ namespace verona::rt
       //Need to implement all the logging.
       bool check_for_work()
       {
-        for(auto* core: core_pool.cores)
+        for(auto* core: core_pool->cores)
         {
           assert(core != nullptr);
           Logging::cout() << "Checking for pending work on thread "
@@ -75,10 +75,16 @@ namespace verona::rt
 
       Core<Cown>* first_core()
       {
-        if (core_pool.cores.size() == 0)
+        if (core_pool->cores.size() == 0)
           abort();
-        return core_pool.cores[0]; 
+        return core_pool->cores[0]; 
       }
+  private:
+      void cleanup()
+      {
+        delete core_pool; 
+        core_pool = nullptr;
+      };
   };
 
 } // namespace verona::rt

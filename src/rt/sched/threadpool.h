@@ -364,7 +364,19 @@ namespace verona::rt
       } 
 
       Logging::cout() << "All threads stopped" << Logging::endl;
-      //TODO cleanup
+      while (active_pool.size() != 0)
+      {
+        auto *t = active_pool.front();
+        active_pool.pop_front();
+        delete t; 
+      }
+      while (free_pool.size() != 0)
+      {
+        auto *t = free_pool.front();
+        free_pool.pop_front();
+        delete t;
+      }
+      Runtime::get().cleanup(); 
       Logging::cout() << "All threads deallocated" << Logging::endl;
 
       incarnation++;

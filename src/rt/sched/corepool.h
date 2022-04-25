@@ -21,17 +21,7 @@ namespace verona::rt
       std::vector<Core<T>*> cores;
       
     public:
-      CorePool()
-      {
-
-      }
-
-      ~CorePool()
-      {
-        //TODO collect everything
-      }
-
-      void init(size_t count)
+      CorePool(size_t count)
       {
         core_count = count;
         first_core = new Core<T>;
@@ -56,6 +46,44 @@ namespace verona::rt
           }
         }
       }
+
+      ~CorePool()
+      {
+        //TODO collect everything
+        core_count = 0;
+        first_core = nullptr;
+        for (auto c: cores)
+        {
+          delete c;
+        }
+        cores.clear();
+      }
+
+     /* void init(size_t count)
+      {
+        core_count = count;
+        first_core = new Core<T>;
+        Core<T>* t = first_core;
+        cores.emplace_back(first_core);
+
+        while (true)
+        {
+          t->affinity = topology.get().get(count);
+
+          if (count > 1)
+          {
+            t->next = new Core<T>;
+            t = t->next;
+            count--;
+            cores.emplace_back(t);
+          }
+          else
+          {
+            t->next = first_core;
+            break;
+          }
+        }
+      }*/
   };
 
 } // namespace verona::rt
