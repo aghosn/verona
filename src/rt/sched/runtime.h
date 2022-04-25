@@ -14,6 +14,7 @@ namespace verona::rt
   class Runtime
   {
     private:
+      size_t core_count = 0;
       // The pool of cores managed by this runtime
       CorePool<Runtime, Cown>* core_pool = nullptr;
 
@@ -34,9 +35,10 @@ namespace verona::rt
       // per core.
       void init(size_t count)
       {
-        static bool init = false;
-        if (init || count == 0)
+        if (count == 0 || core_count != 0 || core_pool != nullptr) 
           abort();
+
+        core_count = count;
         
         // Create cores
         core_pool = new CorePool<Runtime, Cown>(count);
@@ -84,6 +86,7 @@ namespace verona::rt
       {
         delete core_pool; 
         core_pool = nullptr;
+        core_count = 0;
       };
   };
 

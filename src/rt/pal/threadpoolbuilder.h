@@ -19,11 +19,21 @@ namespace verona::rt
   private:
     T* pool = nullptr;
     std::list<PlatformThread> threads;
+    size_t thread_count;
+    size_t index = 0;
 
     template<typename... Args>
     void add_thread_impl(void (*body)(Args...), Args... args)
     {
-      threads.emplace_back(body, args...);
+      if (index < thread_count)
+      {
+        threads.emplace_back(body, args...);
+      }
+      else
+      {
+        Systematic::start();
+        body(args...);
+      }
     }
 
     template<typename... Args>
@@ -35,56 +45,49 @@ namespace verona::rt
     }
 
   public:
-    ThreadPoolBuilder(T* pool) : pool(pool)
+    ThreadPoolBuilder(size_t thread_count, T* pool) : pool(pool)
     {
       if (pool == nullptr)
         abort();
+      this->thread_count = thread_count -1;
     }
 
+    /**
+     * Add a thread to run in this thread pool.
+     */
+    template<typename... Args>
+    void add_thread(size_t affinity, void (*body)(Args...), Args... args)
+    {
+#ifdef USE_SYSTEMATIC_TESTING
+      // Don't use affinity with systematic testing.  We're only ever running
+      // one thread at a time in systematic testing mode and by pinning each
+      // thread to a core we massively increase contention.
+      UNUSED(affinity);
+      add_thread_impl(body, args...);
+#else
+      add_thread_impl(
+        &run_with_affinity, affinity, body, args...);
+#endif
+      index++;
+    }
+
+    /**
+     * The destructor waits for all threads to finish, and
+     * then tidies up.
+     *
+     *  The number of executions is one larger than the number of threads
+     * created as there is also the main thread.
+     */
     ~ThreadPoolBuilder()
     {
-      // The constructor acquires the lock.
-      /*std::unique_lock lk(pool->mut);
-      // Required loop due to spurious wake-ups.
-      while(pool->active_thread_count > 0)
-      {
-        pool->cv.wait(lk, [this]{return pool->active_thread_count == 0;});
-      }
-      lk.unlock();
+      assert(index == thread_count + 1);
 
-      // TODO figure out if we should wake up all threads
-      pool->flag_done = true;*/
-
-      while(!threads.empty())
+      while (!threads.empty())
       {
         auto& thread = threads.front();
         thread.join();
         threads.pop_front();
       }
-      /// Debugging checks
-      //assert(pool->active_thread_count == 0);
     }
-
-    template<typename... Args>
-    void add_thread(size_t index, void (*body)(Args...), Args... args)
-    {
-      //TODO do the systematic thing.
-      //TODO need to replace this with another counter
-      //pool->active_thread_count++;
-      //threads.emplace_back(body, args...);
-      //pool->active_thread_count--;
-      //pool->cv.notify_one();
-#ifdef USE_SYSTEMATIC_TESTING
-      // Don't use affinity with systematic testing.  We're only ever running
-      // one thread at a time in systematic testing mode and by pinning each
-      // thread to a core we massively increase contention.
-      UNUSED(index);
-      add_thread_impl(body, args...);
-#else
-    add_thread_impl(
-        &run_with_affinity, index, body, args...);
-#endif
-    }
-
   };
 }

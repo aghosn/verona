@@ -348,7 +348,7 @@ namespace verona::rt
     {
       active_thread_count = thread_count;
       {
-        ThreadPoolBuilder<ThreadPool> builder(this);
+        ThreadPoolBuilder<ThreadPool> builder(thread_count, this);
         Logging::cout() << "Starting all threads" << Logging::endl;
         for (auto* thread: active_pool)
         {
