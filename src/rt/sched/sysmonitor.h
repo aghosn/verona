@@ -8,6 +8,12 @@
 #include <chrono>
 #include <cassert>
 
+#ifdef USE_PREEMPTION
+#include <signal.h>
+#include <pthread.h>
+#include <iostream>
+#include "preempt.h"
+#endif
 
 namespace verona::rt
 {
@@ -22,11 +28,34 @@ namespace verona::rt
       friend Scheduler;
       /// When true, the SysMonitor should stop.
       std::atomic_bool done = false;
+      std::atomic<size_t> preempt_count;
 #ifdef USE_SYSTEMATIC_TESTING
     friend class ThreadSyncSystematic<SysMonitor<Scheduler>>;
     Systematic::Local* local_systematic{nullptr};
 #endif
       SysMonitor() {}
+
+#ifdef USE_PREEMPTION
+    static void signal_handler(int sig, siginfo_t *info, void* _context)
+    {
+      UNUSED(sig);
+      UNUSED(info);
+      UNUSED(_context);
+      Preempt::inc_interrupts();
+      ucontext_t *context = (ucontext_t*)_context;
+      if (context == nullptr)
+        abort();
+      get().preempt_count++;
+      auto *t = Scheduler::get().local();
+      if (t == nullptr)
+        abort();
+      if (!Preempt::preemptable()) {
+        return;
+      }
+      Preempt::inc_preemptions();
+      //abort();
+    }
+#endif
     
     public:
       SysMonitor(SysMonitor const&) = delete;
@@ -36,6 +65,18 @@ namespace verona::rt
        static SysMonitor<Scheduler> instance;
         return instance;
       }
+
+#ifdef USE_PREEMPTION
+      // Register the handler for preemption signals
+      void init_preemption()
+      {
+        struct sigaction sa;
+        sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+        sa.sa_sigaction = signal_handler;
+        sigaction(SIGUSR1, &sa, NULL);
+        preempt_count = 0;
+      }
+#endif
 
       void run_monitor(ThreadPoolBuilder& builder)
       {
@@ -84,7 +125,14 @@ namespace verona::rt
               Logging::cout() << "System monitor detected lack of progress on core " << i << Logging::endl;
               // We pass the count as argument in case there was some progress
               // in the meantime.
+#ifdef USE_PREEMPTION
+             UNUSED(builder);
+#ifndef USE_SYSTEMATIC_TESTING
+            pthread_kill(pool->cores[i]->thread, SIGUSR1);
+#endif
+#else
               Scheduler::get().spawnThread(builder, pool->cores[i], count);
+#endif
             }
           }
         }
@@ -95,6 +143,9 @@ namespace verona::rt
         // we know nothing should be modifying it right now and can thus exit 
         // to join on every single thread.
         Logging::cout() << "System monitor exit" << Logging::endl;
+#ifdef USE_PREEMPTION
+        std::cout << "Preemption count " << preempt_count << std::endl;
+#endif
         Systematic::finished_thread();
       }
 

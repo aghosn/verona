@@ -332,6 +332,10 @@ namespace verona::rt
 #ifdef USE_SYSTEM_MONITOR
       sys_monitor_thread = new T;
       sys_monitor_thread->systematic_id = 0;
+#ifdef USE_PREEMPTION
+      Monitor::get().init_preemption();
+      Preempt::reset();
+#endif
 #endif
       Logging::cout() << "Runtime initialised" << Logging::endl;
       init_barrier();
@@ -398,6 +402,9 @@ namespace verona::rt
       state.reset<ThreadState::NotInLD>();
 #ifdef USE_SYSTEM_MONITOR
       delete sys_monitor_thread;
+#endif
+#ifdef USE_PREEMPTION
+      Preempt::reset();
 #endif
       Epoch::flush(ThreadAlloc::get());
       delete core_pool;

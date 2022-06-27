@@ -26,10 +26,16 @@ endif()
 
 set(DEFAULT_SYSMONITOR false)
 set(ENABLE_SYSMONITOR ${DEFAULT_SYSMONITOR} CACHE BOOL "Use a system monitor to allow more than one scheduler thread per core.")
+set (DEFAULT_PREEMPT false)
+set(ENABLE_PREEMTION ${DEFAULT_PREEMPT} CACHE BOOL "Use a system monitor with preemption. Requires ENABLE_SYSMONITOR.")
 
 if (${ENABLE_SYSMONITOR})
   message(STATUS "Enabling system monitor in verona runtime")
   add_definitions(-DUSE_SYSTEM_MONITOR)
+  if (${ENABLE_PREEMTION})
+    message (STATUS "Enable preemption from the monitor")
+    add_definitions(-DUSE_PREEMPTION)
+  endif()
 endif()
 
 add_library(verona_rt INTERFACE)

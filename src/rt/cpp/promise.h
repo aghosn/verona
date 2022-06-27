@@ -54,13 +54,18 @@ namespace verona::rt
           std::enable_if_t<std::is_invocable_v<F, std::variant<T, PromiseErr>>>>
       void then(F&& fn)
       {
+        //TODO(aghosn) do I need to instrument this?
         promise->then(std::forward<F>(fn));
       }
 
-      PromiseR() : promise(nullptr) {}
+      PromiseR() : promise(nullptr)
+      {
+        NO_PREEMPT();
+      }
 
       PromiseR(Promise* p, TransferOwnership transfer = NoTransfer) : promise(p)
       {
+        NO_PREEMPT();
         if (transfer == NoTransfer)
           Cown::acquire(p);
       }
@@ -70,24 +75,28 @@ namespace verona::rt
        */
       PromiseR(const PromiseR& other)
       {
+        NO_PREEMPT();
         promise = other.promise;
         Cown::acquire(promise);
       }
 
       PromiseR(PromiseR&& old)
       {
+        NO_PREEMPT();
         promise = old.promise;
         old.promise = nullptr;
       }
 
       ~PromiseR()
       {
+        NO_PREEMPT();
         if (promise)
           Cown::release(ThreadAlloc::get(), promise);
       }
 
       PromiseR& operator=(PromiseR&& old)
       {
+        NO_PREEMPT();
         if (promise)
           Cown::release(ThreadAlloc::get(), promise);
         promise = old.promise;
@@ -98,6 +107,7 @@ namespace verona::rt
       template<TransferOwnership transfer = NoTransfer>
       Promise* get_promise()
       {
+        NO_PREEMPT();
         Promise* ret = promise;
 
         if constexpr (transfer == NoTransfer)
@@ -126,6 +136,7 @@ namespace verona::rt
 
       PromiseW(Promise* p) : promise(p)
       {
+        NO_PREEMPT();
         Cown::acquire(p);
       }
 
@@ -142,12 +153,14 @@ namespace verona::rt
 
       PromiseW(PromiseW&& old)
       {
+        NO_PREEMPT();
         promise = old.promise;
         old.promise = nullptr;
       }
 
       PromiseW& operator=(PromiseW&& old)
       {
+        NO_PREEMPT();
         if (promise)
           Cown::release(ThreadAlloc::get(), promise);
         promise = old.promise;
@@ -157,6 +170,7 @@ namespace verona::rt
 
       ~PromiseW()
       {
+        NO_PREEMPT();
         if (promise)
         {
           if (!promise->fulfilled)
@@ -203,6 +217,7 @@ namespace verona::rt
      */
     Promise()
     {
+      NO_PREEMPT();
       VCown<Promise<T>>::wake();
       fulfilled = false;
     }
@@ -213,6 +228,7 @@ namespace verona::rt
      */
     static std::pair<PromiseR, PromiseW> create_promise()
     {
+      NO_PREEMPT();
       Promise* p = new Promise<T>;
       PromiseR r(p);
       PromiseW w(p);
@@ -227,6 +243,7 @@ namespace verona::rt
      */
     static void fulfill(PromiseW&& wp, T&& v)
     {
+      NO_PREEMPT();
       PromiseW tmp = std::move(wp);
       tmp.promise->val = std::move(v);
       tmp.promise->fulfilled = true;

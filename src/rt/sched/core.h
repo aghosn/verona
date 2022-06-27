@@ -5,6 +5,10 @@
 #include "mpmcq.h"
 #include "schedulerstats.h"
 
+#ifdef USE_PREEMPTION
+#include <pthread.h>
+#endif
+
 namespace verona::rt
 {
   template<class T>
@@ -24,8 +28,10 @@ namespace verona::rt
         std::atomic<std::size_t> progress_counter = 0;
         std::atomic<std::size_t> servicing_threads = 0;
         std::atomic<std::size_t> last_worker = 0;
+#ifdef USE_PREEMPTION
+        pthread_t thread;
+#endif
 
-        
         /// Moved from the scheduler thread
         std::atomic<size_t> total_cowns = 0;
         std::atomic<size_t> free_cowns = 0;

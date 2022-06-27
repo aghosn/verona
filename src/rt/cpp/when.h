@@ -3,6 +3,8 @@
 
 #include "cown.h"
 
+#include "sched/preempt.h"
+
 #include <functional>
 #include <tuple>
 #include <utility>
@@ -43,6 +45,7 @@ class When
   template<size_t index = 0>
   void array_assign(Cown** array)
   {
+    NO_PREEMPT();
     if constexpr (index >= sizeof...(Args))
     {
       return;
@@ -59,6 +62,7 @@ class When
   template<typename... Ts>
   When(Ts... args) : cown_tuple(args...)
   {
+    NO_PREEMPT();
     static_assert(
       std::conjunction_v<std::is_base_of<cown_ptr_base, Ts>...>,
       "Not a cown_ptr");
@@ -72,6 +76,7 @@ class When
   template<typename C>
   static acquired_cown<C> cown_ptr_to_acquired(cown_ptr<C> c)
   {
+    NO_PREEMPT();
     return acquired_cown<C>(c);
   }
 
@@ -82,6 +87,7 @@ public:
   template<typename F>
   void operator<<(F&& f)
   {
+    NO_PREEMPT();
     if constexpr (sizeof...(Args) == 0)
     {
       verona::rt::schedule_lambda(std::forward<F>(f));
@@ -114,5 +120,6 @@ public:
 template<typename... Args>
 When<Args...> when(Args... args)
 {
+  NO_PREEMPT();
   return When<Args...>(args...);
 }

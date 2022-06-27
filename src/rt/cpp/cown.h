@@ -6,6 +6,8 @@
 #include <utility>
 #include <verona.h>
 
+#include "sched/preempt.h"
+
 /**
  * Used in static asserts to check passed values are cown_ptr types.
  *
@@ -49,7 +51,9 @@ private:
   public:
     template<typename... Args>
     ActualCown(Args&&... ts) : value(std::forward<Args>(ts)...)
-    {}
+    {
+      NO_PREEMPT();
+    }
 
     template<typename TT>
     friend class acquired_cown;
@@ -65,6 +69,7 @@ private:
    */
   Cown* underlying_cown()
   {
+    NO_PREEMPT();
     return allocated_cown;
   }
 
@@ -74,7 +79,9 @@ private:
    * This is internal, and the `make_cown` below is the public interface,
    * which has better behaviour for implicit template arguments.
    */
-  cown_ptr(ActualCown* cown) : allocated_cown(cown) {}
+  cown_ptr(ActualCown* cown) : allocated_cown(cown) {
+    NO_PREEMPT();
+  }
 
 public:
   /**
@@ -82,6 +89,7 @@ public:
    */
   cown_ptr(const cown_ptr& other)
   {
+    NO_PREEMPT();
     allocated_cown = other.allocated_cown;
     verona::rt::Cown::acquire(allocated_cown);
   }
@@ -93,12 +101,14 @@ public:
    */
   cown_ptr(cown_ptr&& other)
   {
+    NO_PREEMPT();
     allocated_cown = other.allocated_cown;
     other.allocated_cown = nullptr;
   }
 
   ~cown_ptr()
   {
+    NO_PREEMPT();
     // Condition to handle moved cown ptrs.
     if (allocated_cown != nullptr)
     {
@@ -130,6 +140,7 @@ public:
 template<typename T, typename... Args>
 cown_ptr<T> make_cown(Args&&... ts)
 {
+  NO_PREEMPT();
   return cown_ptr<T>(
     new typename cown_ptr<T>::ActualCown(std::forward<Args>(ts)...));
 }
@@ -159,27 +170,34 @@ private:
   /// Constructor is private, as only `When` can construct one.
   /// TODO: Consider if we can reduce the reference count here, as the
   /// runtime is holding references too.
-  acquired_cown(const cown_ptr<T>& origin) : origin_cown(origin) {}
+  acquired_cown(const cown_ptr<T>& origin) : origin_cown(origin)
+  {
+    NO_PREEMPT();
+  }
 
 public:
   /// Get a handle on the underlying cown.
   cown_ptr<T> cown() const
   {
+    NO_PREEMPT();
     return origin_cown;
   }
 
   T* operator->()
   {
+    NO_PREEMPT();
     return &(origin_cown.allocated_cown->value);
   }
 
   T& operator*()
   {
+    NO_PREEMPT();
     return origin_cown.allocated_cown->value;
   }
 
   operator T&()
   {
+    NO_PREEMPT();
     return origin_cown.allocated_cown->value;
   }
 

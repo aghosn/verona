@@ -14,6 +14,13 @@
 #include <condition_variable>
 #include <snmalloc/snmalloc.h>
 
+#ifdef USE_PREEMPTION
+#include <pthread.h>
+#include <sys/mman.h>
+#include <signal.h>
+#include "preempt.h"
+#endif
+
 namespace verona::rt
 {
   /**
@@ -94,6 +101,12 @@ namespace verona::rt
 #endif
 #endif
 
+#ifdef USE_PREEMPTION
+#define BEHAVIOUR_STACK_SIZE 0x5000
+    void* signal_stack = nullptr;
+    char* behaviour_stack = nullptr;
+#endif
+
     /// SchedulerList pointers;
     SchedulerThread<T>* prev = nullptr;
     SchedulerThread<T>* next = nullptr;
@@ -108,9 +121,28 @@ namespace verona::rt
     SchedulerThread()
     {
       Logging::cout() << "Scheduler Thread created" << Logging::endl;
+#ifdef USE_PREEMPTION
+      signal_stack = mmap(NULL, 0x2000, PROT_READ | PROT_WRITE,
+          MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN | MAP_STACK, -1, 0);
+      if (signal_stack == MAP_FAILED)
+        abort();
+      behaviour_stack = (char*) mmap(NULL, BEHAVIOUR_STACK_SIZE, PROT_READ|PROT_WRITE,
+          MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0);
+      if (behaviour_stack == MAP_FAILED)
+        abort();
+      behaviour_stack += BEHAVIOUR_STACK_SIZE;
+#endif
     }
 
-    ~SchedulerThread() {}
+    ~SchedulerThread()
+    {
+#ifdef USE_PREEMPTION
+      if (signal_stack != nullptr && (munmap(signal_stack, 0x2000) == -1))
+        abort();
+      if (behaviour_stack != nullptr && (munmap(behaviour_stack, BEHAVIOUR_STACK_SIZE) == -1))
+        abort();
+#endif
+    }
   
     void setCore(Core<T>* core)
     {
@@ -183,6 +215,22 @@ namespace verona::rt
       victim = core->next;
       T* cown = nullptr;
       this->core->servicing_threads++;
+#ifdef USE_PREEMPTION
+      this->core->thread = pthread_self();
+      if (this->signal_stack != nullptr)
+      {
+        NO_PREEMPT();
+        stack_t ss;
+        ss.ss_sp = this->signal_stack;
+        ss.ss_size = 0x2000;
+        ss.ss_flags = 0;
+        if (sigaltstack(&ss, NULL) == -1)
+          abort();
+        // Register the behaviour stack.
+        ThreadStacks& stacks = Preempt::thread_stacks();
+        stacks.behaviour_stack = (byte*) this->behaviour_stack;
+      }
+#endif
 
 #ifdef USE_SYSTEMATIC_TESTING
       Systematic::attach_systematic_thread(this->local_systematic);

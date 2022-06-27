@@ -12,6 +12,10 @@
 #include "schedulerthread.h"
 #include "core.h"
 
+#ifdef USE_PREEMPTION
+#include "preempt.h"
+#endif
+
 #include <algorithm>
 
 namespace verona::rt
@@ -651,8 +655,14 @@ namespace verona::rt
       Scheduler::local()->message_body = &body;
 
       // Run the behaviour.
-      body.behaviour->f();
 
+#ifdef USE_PREEMPTION
+      using fncast = void (*)(void*);
+      fncast casted = (fncast)(body.behaviour->get_function());
+      Preempt::switch_to_behaviour(casted,(void*) body.behaviour);
+#else
+      body.behaviour->f();
+#endif
       for (size_t i = 0; i < body.count; i++)
       {
         if (body.cowns[i])

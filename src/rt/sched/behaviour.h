@@ -63,6 +63,10 @@ namespace verona::rt
   public:
     Behaviour(const Descriptor* desc) : descriptor(desc) {}
 
+    Descriptor::Function get_function()
+    {
+      return get_descriptor()->f;
+    }
   protected:
     inline size_t size() const
     {
