@@ -1,5 +1,7 @@
 #pragma once
 
+#include "sched/stack.h"
+
 namespace verona::rt
 {
 
@@ -17,26 +19,34 @@ __asm__(
   "to_behaviour:\n"
   "\tmov %rsp, (%r8) #Save system stack.\n"
   "\tmov %rcx, %rsp  # Switch stack\n"
-  "\tcall *%rdx # Call the function; arguments are already in correct registers\n"
+  "\tcall *%rdx # Call the __switcher; arguments are already in correct registers\n"
 );
 
 __asm__(
   "\t.type to_system,@function\n"
   "to_system:\n"
+  "\t mov $0x0, %eax # returned without preemption\n"
   "\tmov %rdi, %rsp # Stack pointer for the system, 1st argument\n"
   "\tret # Return on the system stack\n"
 );
 
-typedef unsigned char byte;
+__asm__(
+  "\t.type trampoline_preempt,@function\n"
+  "trampoline_preempt:\n"
+  "\tret # just return\n"
+);
+
 
 typedef struct {
   byte* system_stack;
   byte* behaviour_stack;
 } ThreadStacks;
 
-extern "C" void to_behaviour(void (*target)(void*), void*, void (*) (void(* )(void*), void*), byte* behaviour_stack, byte** system_stack);
+extern "C" bool to_behaviour(void (*target)(void*), void*, void (*) (void(* )(void*), void*), byte* behaviour_stack, byte** system_stack);
 extern "C" void to_system(byte* system_stack);
+extern "C" void trampoline_preempt(void);
 
+#define BEHAVIOUR_STACK_SIZE 0x5000
   class Preempt
   {
 
@@ -91,13 +101,14 @@ extern "C" void to_system(byte* system_stack);
         return stacks;
       }
 
-      static void switch_to_behaviour(void (*fn)(void*), void* behaviour)
+      static bool switch_to_behaviour(void (*fn)(void*), void* behaviour)
       {
         ThreadStacks& stacks = thread_stacks();
         if (stacks.behaviour_stack == nullptr)
           abort();
-        to_behaviour(fn, behaviour, _switcher, stacks.behaviour_stack, &stacks.system_stack); 
+        return to_behaviour(fn, behaviour, _switcher, stacks.behaviour_stack, &stacks.system_stack); 
       }
+
     private:
 
       // @warning This function never returns.

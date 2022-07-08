@@ -18,11 +18,18 @@
 #include <pthread.h>
 #include <sys/mman.h>
 #include <signal.h>
+#include <ucontext.h>
 #include "preempt.h"
 #endif
 
 namespace verona::rt
 {
+  enum CownSched {
+    NoReschedule,
+    Reschedule,
+    Preempted,
+  };
+
   /**
    * There is typically one scheduler thread pinned to each physical CPU core.
    * Each scheduler thread is responsible for running cowns in its queue and
@@ -102,9 +109,8 @@ namespace verona::rt
 #endif
 
 #ifdef USE_PREEMPTION
-#define BEHAVIOUR_STACK_SIZE 0x5000
     void* signal_stack = nullptr;
-    char* behaviour_stack = nullptr;
+    BehaviourStack* behaviour_stack = nullptr;
 #endif
 
     /// SchedulerList pointers;
@@ -126,11 +132,7 @@ namespace verona::rt
           MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN | MAP_STACK, -1, 0);
       if (signal_stack == MAP_FAILED)
         abort();
-      behaviour_stack = (char*) mmap(NULL, BEHAVIOUR_STACK_SIZE, PROT_READ|PROT_WRITE,
-          MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0);
-      if (behaviour_stack == MAP_FAILED)
-        abort();
-      behaviour_stack += BEHAVIOUR_STACK_SIZE;
+      behaviour_stack = BehaviourStack::allocate_stack(); 
 #endif
     }
 
@@ -139,8 +141,7 @@ namespace verona::rt
 #ifdef USE_PREEMPTION
       if (signal_stack != nullptr && (munmap(signal_stack, 0x2000) == -1))
         abort();
-      if (behaviour_stack != nullptr && (munmap(behaviour_stack, BEHAVIOUR_STACK_SIZE) == -1))
-        abort();
+      BehaviourStack::deallocate_stack(behaviour_stack);
 #endif
     }
   
@@ -228,7 +229,7 @@ namespace verona::rt
           abort();
         // Register the behaviour stack.
         ThreadStacks& stacks = Preempt::thread_stacks();
-        stacks.behaviour_stack = (byte*) this->behaviour_stack;
+        stacks.behaviour_stack = this->behaviour_stack->get_top();
       }
 #endif
 
@@ -312,9 +313,47 @@ namespace verona::rt
           core->progress_counter++;
         core->last_worker = this->systematic_id;
         
-        bool reschedule = cown->run(*alloc, state);
+        CownSched reschedule = cown->run(*alloc, state);
 
-        if (reschedule)
+        if (reschedule == Preempted)
+        {
+#ifdef USE_PREEMPTION
+          ThreadStacks& stacks = Preempt::thread_stacks();
+          if (stacks.behaviour_stack == nullptr)
+            abort();
+          BehaviourStack* stack = BehaviourStack::stack_from_top(stacks.behaviour_stack);
+          
+          // If the stack was already a preempted cown, we can keep the same behaviour stack.
+          if (stack->type == MARKED_PREEMPTED)
+          {
+            if (stack->saved_stack != stacks.behaviour_stack)
+              abort();
+          } else {
+            // First preemption, mark it as preempted and allocate a new stack. 
+            stack->type = MARKED_PREEMPTED;
+            behaviour_stack = BehaviourStack::allocate_stack();
+            stacks.behaviour_stack = behaviour_stack->get_top();
+          }
+          T::preempted_wrapper(
+              [cown, stack]()
+                {
+                  if (cown == nullptr)
+                    abort();
+                  // Stack magic: make sure we save the current stack.
+                  ThreadStacks& stacks = Preempt::thread_stacks();
+                  stack->saved_stack = stacks.behaviour_stack;
+                  stack->cown = (byte*) cown;
+                  stacks.behaviour_stack = stack->get_top();
+                  setcontext(&stack->context);
+                  abort();
+                }
+            );
+#else
+          abort();
+#endif
+        }
+        
+        if (reschedule == Reschedule)
         {
           if (should_steal_for_fairness)
           {

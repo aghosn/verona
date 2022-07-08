@@ -14,6 +14,8 @@
 
 #ifdef USE_PREEMPTION
 #include "preempt.h"
+#include "preempted_behaviour.h"
+#include "stack.h"
 #endif
 
 #include <algorithm>
@@ -588,7 +590,7 @@ namespace verona::rt
      * Otherwise, all cowns have been acquired and we can execute the message
      * behaviour.
      **/
-    bool run_step(MultiMessage* m)
+    CownSched run_step(MultiMessage* m)
     {
       MultiMessage::MultiMessageBody& body = *(m->get_body());
       Alloc& alloc = ThreadAlloc::get();
@@ -615,7 +617,7 @@ namespace verona::rt
 
       if (body.exec_count_down.fetch_sub(1) > 1)
       {
-        return false;
+        return NoReschedule;
       }
 
       if (e == EpochMark::EPOCH_NONE)
@@ -659,7 +661,21 @@ namespace verona::rt
 #ifdef USE_PREEMPTION
       using fncast = void (*)(void*);
       fncast casted = (fncast)(body.behaviour->get_function());
-      Preempt::switch_to_behaviour(casted,(void*) body.behaviour);
+      bool res = Preempt::switch_to_behaviour(casted,(void*) body.behaviour);
+      if (res)
+        return Preempted;
+
+      // Check if the behaviour was a preempted one, do internal cleanup.
+      ThreadStacks& stacks = Preempt::thread_stacks();
+      BehaviourStack* bs = BehaviourStack::stack_from_top(stacks.behaviour_stack);
+      if (bs->type == MARKED_PREEMPTED)
+      {
+        if (bs->cown == nullptr || bs->message == nullptr)
+          abort();
+        Cown* c = (Cown*)(bs->cown);
+        c->late_cleanup((MultiMessage*)bs->message);
+        UNUSED(c);
+      }
 #else
       body.behaviour->f();
 #endif
@@ -676,7 +692,25 @@ namespace verona::rt
       alloc.dealloc(body.behaviour, body.behaviour->size());
       alloc.dealloc<sizeof(MultiMessage::MultiMessageBody)>(m->get_body());
 
-      return true;
+      return Reschedule;
+    }
+
+    void late_cleanup(MultiMessage* m)
+    {
+      MultiMessage::MultiMessageBody& body = *(m->get_body());
+      Alloc& alloc = ThreadAlloc::get();
+      for (size_t i = 0; i < body.count; i++)
+      {
+        if (body.cowns[i])
+          Cown::release(alloc, body.cowns[i]);
+      }
+
+      Logging::cout() << "MultiMessage " << m << " completed and running on "
+                      << this << Logging::endl;
+
+      // Free the body and the behaviour.
+      alloc.dealloc(body.behaviour, body.behaviour->size());
+      alloc.dealloc<sizeof(MultiMessage::MultiMessageBody)>(m->get_body());
     }
 
   public:
@@ -688,6 +722,28 @@ namespace verona::rt
     {
       schedule<Behaviour, transfer, Args...>(
         1, &cown, std::forward<Args>(args)...);
+    }
+
+    //TODO(aghosn) this is probably not correct.
+    static void fake_trace(const Object* o, ObjectStack& st)
+    {
+      UNUSED(o);
+      UNUSED(st);
+      return;
+    }
+
+    // TODO(aghosn) wrap a cown into an empty cown to reschedule it.
+    template<typename T>
+    static Cown* preempted_wrapper(T f)
+    {
+      static constexpr Descriptor desc = {
+        vsizeof<Cown>, fake_trace, nullptr, nullptr};
+      auto p = ThreadAlloc::get().alloc<desc.size>();
+      auto o = Object::register_object(p, &desc);
+      auto preempt = new (o) Cown;
+      Cown::schedule<PreemptedBehaviour<T>,
+        YesTransfer>(preempt, std::forward<T>(f));
+      return preempt;
     }
 
     /**
@@ -762,7 +818,7 @@ namespace verona::rt
      * called, and it is guaranteed to return true, so it will be rescheduled
      * or false if it is part of a multi-message acquire.
      **/
-    bool run(Alloc& alloc, ThreadState::State)
+    CownSched run(Alloc& alloc, ThreadState::State)
     {
       auto until = queue.peek_back();
       yield(); // Reading global state in peek_back().
@@ -803,7 +859,7 @@ namespace verona::rt
           // by keeping in scheduler queue until the prescan phase has
           // finished.
           if (Scheduler::in_prescan())
-            return true;
+            return Reschedule;
 
           // Reschedule if we have processed a message.
           // This is primarily an optimisation to keep busy cowns active cowns
@@ -813,7 +869,7 @@ namespace verona::rt
           //      This is designed to be effective if a cown is receiving a lot
           //      of messages.
           if (batch_size != 0)
-            return true;
+            return Reschedule;
 
           // Reschedule if cown does not go to sleep.
           if (!queue.mark_sleeping(alloc, notify))
@@ -830,12 +886,12 @@ namespace verona::rt
               // having been received, and then we wouldn't process anything
               // else.
             }
-            return true;
+            return Reschedule;
           }
 
           Logging::cout() << "Unschedule cown " << this << Logging::endl;
           Cown::release(alloc, this);
-          return false;
+          return NoReschedule;
         }
 
         assert(!queue.is_sleeping());
@@ -852,8 +908,17 @@ namespace verona::rt
         // A function that returns false indicates that the cown should not
         // be rescheduled, even if it has pending work. This also means the
         // cown's queue should not be marked as empty, even if it is.
-        if (!run_step(curr))
-          return false;
+        auto rv = run_step(curr);
+        if (rv == NoReschedule || rv == Preempted)
+        {
+          if (rv == Preempted)
+          {
+            ThreadStacks& stacks = Preempt::thread_stacks();
+            BehaviourStack* bs = BehaviourStack::stack_from_top(stacks.behaviour_stack);
+            bs->message = (byte*)curr;
+          }
+          return rv;
+        }
 
         // Reschedule the other cowns.
         for (size_t s = 0; s < senders_count; s++)
@@ -866,7 +931,7 @@ namespace verona::rt
 
       } while ((curr != until) && (batch_size < batch_limit));
 
-      return true;
+      return Reschedule;
     }
 
     bool try_collect(Alloc& alloc, EpochMark epoch)

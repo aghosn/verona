@@ -2,6 +2,7 @@
 #include <cpp/when.h>
 #include <sched/preempt.h>
 
+bool ran = false;
 
 void long_running()
 {
@@ -24,9 +25,8 @@ void long_running()
   Logging::cout() << "Preempt me if you can (and you should)" << Logging::endl;
   {
     size_t nb_preempt = verona::rt::Preempt::get_preemptions();
-    while(nb_preempt == verona::rt::Preempt::get_preemptions())
+    while(nb_preempt == verona::rt::Preempt::get_preemptions() && !ran)
     {
-      Logging::cout() << "In the second loop." << Logging::endl;
       yield();
     }
   }
@@ -35,6 +35,7 @@ void long_running()
 void short_running()
 {
   Logging::cout() << "Short running behavior" << Logging::endl;
+  ran = true;
 }
 
 void test_inner()

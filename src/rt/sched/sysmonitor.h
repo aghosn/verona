@@ -13,6 +13,7 @@
 #include <pthread.h>
 #include <iostream>
 #include "preempt.h"
+#include "stack.h"
 #endif
 
 namespace verona::rt
@@ -53,7 +54,23 @@ namespace verona::rt
         return;
       }
       Preempt::inc_preemptions();
-      //abort();
+
+       // We can preempt
+      ThreadStacks& stacks = Preempt::thread_stacks(); 
+      if (stacks.system_stack == nullptr || stacks.behaviour_stack == nullptr)
+        abort();
+      greg_t rsp = context->uc_mcontext.gregs[REG_RSP];
+      BehaviourStack* bstack = BehaviourStack::stack_from_top(stacks.behaviour_stack);
+      if (rsp <= (greg_t)(&bstack->limit))
+        abort();
+
+      // Copy the context.
+      memcpy(&bstack->context, context, sizeof(ucontext_t)); 
+      // Replace rsp and rip to use the trampoline back to the runtime stack.
+      // Change rax to show preemption.
+      context->uc_mcontext.gregs[REG_RAX] = 0x1;
+      context->uc_mcontext.gregs[REG_RSP] = (greg_t)(stacks.system_stack); 
+      context->uc_mcontext.gregs[REG_RIP] = (greg_t)(trampoline_preempt); 
     }
 #endif
     
@@ -80,6 +97,7 @@ namespace verona::rt
 
       void run_monitor(ThreadPoolBuilder& builder)
       {
+#ifdef USE_SYSTEM_MONITOR
 #ifdef USE_SYSTEMATIC_TESTING
         Systematic::start();
         Systematic::attach_systematic_thread(this->local_systematic);
@@ -147,6 +165,9 @@ namespace verona::rt
         std::cout << "Preemption count " << preempt_count << std::endl;
 #endif
         Systematic::finished_thread();
+#else
+        UNUSED(builder);
+#endif
       }
 
       void threadExit()
