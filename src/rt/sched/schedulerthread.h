@@ -326,14 +326,21 @@ namespace verona::rt
           // If the stack was already a preempted cown, we can keep the same behaviour stack.
           if (stack->type == MARKED_PREEMPTED)
           {
-            if (stack->saved_stack != stacks.behaviour_stack)
+            // Check that the saved stack is the one associated with this
+            // thread.
+            if (stack->saved_stack != behaviour_stack->get_top())
               abort();
+            // Switch back to the usable behaviour stack.
+            stacks.behaviour_stack = behaviour_stack->get_top();
           } else {
             // First preemption, mark it as preempted and allocate a new stack. 
+
             stack->type = MARKED_PREEMPTED;
             behaviour_stack = BehaviourStack::allocate_stack();
             stacks.behaviour_stack = behaviour_stack->get_top();
           }
+
+          // Reschedule inside an empty cown.
           T::preempted_wrapper(
               [cown, stack]()
                 {
@@ -345,16 +352,29 @@ namespace verona::rt
                   stack->cown = (byte*) cown;
                   stacks.behaviour_stack = stack->get_top();
                   setcontext(&stack->context);
+
+                  // Should never reach this point
                   abort();
                 }
             );
 #else
           abort();
 #endif
+          cown = nullptr;
         }
-        
+
         if (reschedule == Reschedule)
         {
+          // Check if we need to cleanup the original cown
+          ThreadStacks& stacks = Preempt::thread_stacks();
+          BehaviourStack* bs = BehaviourStack::stack_from_top(stacks.behaviour_stack);
+          if (bs->type == MARKED_PREEMPTED)
+          {
+            T* c = (T*) bs->cown;
+            schedule_fifo(c);
+            //TODO handle stack allocation/deallocation too.
+          }
+
           if (should_steal_for_fairness)
           {
             schedule_fifo(cown);

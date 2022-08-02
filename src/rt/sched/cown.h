@@ -662,8 +662,9 @@ namespace verona::rt
       using fncast = void (*)(void*);
       fncast casted = (fncast)(body.behaviour->get_function());
       bool res = Preempt::switch_to_behaviour(casted,(void*) body.behaviour);
-      if (res)
+      if (res) { 
         return Preempted;
+      }
 
       // Check if the behaviour was a preempted one, do internal cleanup.
       ThreadStacks& stacks = Preempt::thread_stacks();
@@ -674,7 +675,6 @@ namespace verona::rt
           abort();
         Cown* c = (Cown*)(bs->cown);
         c->late_cleanup((MultiMessage*)bs->message);
-        UNUSED(c);
       }
 #else
       body.behaviour->f();
@@ -691,7 +691,6 @@ namespace verona::rt
       // Free the body and the behaviour.
       alloc.dealloc(body.behaviour, body.behaviour->size());
       alloc.dealloc<sizeof(MultiMessage::MultiMessageBody)>(m->get_body());
-
       return Reschedule;
     }
 
@@ -711,6 +710,17 @@ namespace verona::rt
       // Free the body and the behaviour.
       alloc.dealloc(body.behaviour, body.behaviour->size());
       alloc.dealloc<sizeof(MultiMessage::MultiMessageBody)>(m->get_body());
+
+      // Second part of the cleanup
+      auto* senders = body.cowns;
+      const size_t senders_count = body.count;
+
+      for (size_t s = 0; s < senders_count; s++)
+      {
+        if ((senders[s]) && (senders[s] != this))
+          senders[s]->schedule();
+      }
+      alloc.dealloc(senders, senders_count * sizeof(Cown*));
     }
 
   public:
@@ -916,7 +926,9 @@ namespace verona::rt
             ThreadStacks& stacks = Preempt::thread_stacks();
             BehaviourStack* bs = BehaviourStack::stack_from_top(stacks.behaviour_stack);
             bs->message = (byte*)curr;
+            return Preempted;
           }
+
           return rv;
         }
 

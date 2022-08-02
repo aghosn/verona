@@ -11,7 +11,6 @@
 #ifdef USE_PREEMPTION
 #include <signal.h>
 #include <pthread.h>
-#include <iostream>
 #include "preempt.h"
 #include "stack.h"
 #endif
@@ -161,9 +160,6 @@ namespace verona::rt
         // we know nothing should be modifying it right now and can thus exit 
         // to join on every single thread.
         Logging::cout() << "System monitor exit" << Logging::endl;
-#ifdef USE_PREEMPTION
-        std::cout << "Preemption count " << preempt_count << std::endl;
-#endif
         Systematic::finished_thread();
 #else
         UNUSED(builder);
