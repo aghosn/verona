@@ -9,6 +9,10 @@
 #include "schedulerstats.h"
 #include "threadpool.h"
 
+#include "core.h"
+#include "ds/dllist.h"
+#include "schedulerlist.h"
+
 #include <snmalloc/snmalloc.h>
 
 namespace verona::rt
@@ -34,17 +38,18 @@ namespace verona::rt
     size_t systematic_id = 0;
 
   private:
-    using Scheduler = ThreadPool<SchedulerThread<T>>;
+    using Scheduler = ThreadPool<SchedulerThread<T>, T>;
     friend Scheduler;
     friend T;
+    friend DLList<SchedulerThread<T>>;
+    friend SchedulerList<SchedulerThread<T>>;
 
     template<typename Owner>
     friend class Noticeboard;
 
     static constexpr uint64_t TSC_QUIESCENCE_TIMEOUT = 1'000'000;
 
-    T* token_cown = nullptr;
-
+    Core<T>* core = nullptr;
 #ifdef USE_SYSTEMATIC_TESTING
     friend class ThreadSyncSystematic<SchedulerThread>;
     Systematic::Local* local_systematic{nullptr};
@@ -53,10 +58,8 @@ namespace verona::rt
     LocalSync local_sync{};
 #endif
 
-    MPMCQ<T> q;
     Alloc* alloc = nullptr;
-    SchedulerThread<T>* next = nullptr;
-    SchedulerThread<T>* victim = nullptr;
+    Core<T>* victim = nullptr;
 
     bool running = true;
 
@@ -72,27 +75,35 @@ namespace verona::rt
     EpochMark prev_epoch = EpochMark::EPOCH_B;
 
     ThreadState::State state = ThreadState::State::NotInLD;
-    SchedulerStats stats;
 
     T* list = nullptr;
-    size_t total_cowns = 0;
-    std::atomic<size_t> free_cowns = 0;
 
     /// The MessageBody of a running behaviour.
     typename T::MessageBody* message_body = nullptr;
 
+    /// SchedulerList pointers.
+    SchedulerThread<T>* prev = nullptr;
+    SchedulerThread<T>* next = nullptr;
+
     T* get_token_cown()
     {
-      assert(token_cown);
-      return token_cown;
+      assert(core != nullptr);
+      assert(core ->token_cown);
+      return core->token_cown;
     }
 
-    SchedulerThread() : token_cown{T::create_token_cown()}, q{token_cown}
+    SchedulerThread() 
     {
-      token_cown->set_owning_thread(this);
+      Logging::cout() << "Scheduler Thread created" << Logging::endl;
     }
 
     ~SchedulerThread() {}
+
+    void setCore(Core<T>* core)
+    {
+      this->core = core;
+      core->token_cown->set_owning_core(core);
+    }
 
     inline void stop()
     {
@@ -111,26 +122,26 @@ namespace verona::rt
         scheduled_unscanned_cown = true;
       }
       assert(!a->queue.is_sleeping());
-      q.enqueue(*alloc, a);
+      core->q.enqueue(*alloc, a);
 
       if (Scheduler::get().unpause())
-        stats.unpause();
+        core->stats.unpause();
     }
 
-    inline void schedule_lifo(T* a)
+    static inline void schedule_lifo(Core<T>* c, T* a)
     {
       // A lifo scheduled cown is coming from an external source, such as
       // asynchronous I/O.
       Logging::cout() << "LIFO scheduling cown " << a << " onto "
-                      << systematic_id << Logging::endl;
-      q.enqueue_front(ThreadAlloc::get(), a);
+                      << c->affinity << Logging::endl;
+      c->q.enqueue_front(ThreadAlloc::get(), a);
       Logging::cout() << "LIFO scheduled cown " << a << " onto "
-                      << systematic_id << Logging::endl;
+                      << c->affinity << Logging::endl;
 
-      stats.lifo();
+      c->stats.lifo();
 
       if (Scheduler::get().unpause())
-        stats.unpause();
+        c->stats.unpause();
     }
 
     template<typename... Args>
@@ -152,8 +163,10 @@ namespace verona::rt
 
       Scheduler::local() = this;
       alloc = &ThreadAlloc::get();
-      victim = next;
+      assert(this->core != nullptr);
+      victim = core->next;
       T* cown = nullptr;
+      this->core->servicing_threads++;
 
 #ifdef USE_SYSTEMATIC_TESTING
       Systematic::attach_systematic_thread(this->local_systematic);
@@ -162,7 +175,7 @@ namespace verona::rt
       while (true)
       {
         if (
-          (total_cowns < (free_cowns << 1))
+          (this->core->total_cowns < (this->core->free_cowns << 1))
 #ifdef USE_SYSTEMATIC_TESTING
           || Systematic::coin()
 #endif
@@ -180,7 +193,7 @@ namespace verona::rt
 
         if (cown == nullptr)
         {
-          cown = q.dequeue(*alloc);
+          cown = core->q.dequeue(*alloc);
           if (cown != nullptr)
             Logging::cout()
               << "Pop cown " << clear_thread_bit(cown) << Logging::endl;
@@ -222,6 +235,18 @@ namespace verona::rt
 
         Logging::cout() << "Running cown " << cown << Logging::endl;
 
+        // Update progress counter on that core.
+        Core<T>* cown_core = cown->owning_core();
+        assert(this->core != nullptr);
+
+        // If the cown comes from another core, both core counts are incremented.
+        // This reflects both CPU utilization and queue progress.
+        if (cown_core != nullptr)
+          cown_core->progress_counter++;
+        if (cown_core != this->core)
+          core->progress_counter++;
+        core->last_worker = this->systematic_id;
+
         bool reschedule = cown->run(*alloc, state);
 
         if (reschedule)
@@ -238,7 +263,7 @@ namespace verona::rt
             // otherwise run this cown again. Don't push to the queue
             // immediately to avoid another thread stealing our only cown.
 
-            T* n = q.dequeue(*alloc);
+            T* n = core->q.dequeue(*alloc);
 
             if (n != nullptr)
             {
@@ -247,7 +272,7 @@ namespace verona::rt
             }
             else
             {
-              if (q.nothing_old())
+              if (core->q.nothing_old())
               {
                 Logging::cout() << "Queue empty" << Logging::endl;
                 // We have effectively reached token cown.
@@ -302,8 +327,15 @@ namespace verona::rt
 
       Logging::cout() << "End teardown (phase 2)" << Logging::endl;
 
-      q.destroy(*alloc);
-
+      if (core != nullptr)
+      {
+        auto val = core->servicing_threads.fetch_sub(1);
+        if (val == 1)
+        {
+          Logging::cout() << "Destroying core " << core->affinity << Logging::endl;
+          core->q.destroy(*alloc);
+        }
+      }
       Systematic::finished_thread();
 
       // Reset the local thread pointer as this physical thread could be reused
@@ -317,7 +349,7 @@ namespace verona::rt
       T* cown;
 
       // Try to steal from the victim thread.
-      if (victim != this)
+      if (victim != this->core)
       {
         cown = victim->q.dequeue(*alloc);
 
@@ -325,7 +357,7 @@ namespace verona::rt
         {
           // stats.steal();
           Logging::cout() << "Fast-steal cown " << clear_thread_bit(cown)
-                          << " from " << victim->systematic_id << Logging::endl;
+                          << " from " << victim->affinity << Logging::endl;
           result = cown;
           return true;
         }
@@ -353,7 +385,7 @@ namespace verona::rt
       {
         yield();
 
-        if (q.nothing_old())
+        if (core->q.nothing_old())
         {
           n_ld_tokens = 0;
         }
@@ -362,22 +394,22 @@ namespace verona::rt
         ld_protocol();
 
         // Check if some other thread has pushed work on our queue.
-        cown = q.dequeue(*alloc);
+        cown = core->q.dequeue(*alloc);
 
         if (cown != nullptr)
           return cown;
 
         // Try to steal from the victim thread.
-        if (victim != this)
+        if (victim != this->core)
         {
           cown = victim->q.dequeue(*alloc);
 
           if (cown != nullptr)
           {
-            stats.steal();
+            core->stats.steal();
             Logging::cout()
               << "Stole cown " << clear_thread_bit(cown) << " from "
-              << victim->systematic_id << Logging::endl;
+              << victim->affinity << Logging::endl;
             return cown;
           }
         }
@@ -409,7 +441,7 @@ namespace verona::rt
           // We've been spinning looking for work for some time. While paused,
           // our running flag may be set to false, in which case we terminate.
           if (Scheduler::get().pause())
-            stats.pause();
+            core->stats.pause();
         }
       }
 
@@ -441,9 +473,9 @@ namespace verona::rt
       if (has_thread_bit(cown))
       {
         auto unmasked = clear_thread_bit(cown);
-        SchedulerThread* sched = unmasked->owning_thread();
+        Core<T>* core = unmasked->owning_core();
 
-        if (sched == this)
+        if (core == this->core)
         {
           if (Scheduler::get().fair)
           {
@@ -461,24 +493,25 @@ namespace verona::rt
         else
         {
           Logging::cout() << "Reached token: stolen from "
-                          << sched->systematic_id << Logging::endl;
+                          << core->affinity << Logging::endl;
         }
 
         // Put back the token
-        sched->q.enqueue(*alloc, cown);
+        core->q.enqueue(*alloc, cown);
         return false;
       }
 
       // Register this cown with the scheduler thread if it is not currently
       // registered with a scheduler thread.
-      if (cown->owning_thread() == nullptr)
+      if (cown->owning_core() == nullptr)
       {
         Logging::cout() << "Bind cown to scheduler thread: " << this
                         << Logging::endl;
-        cown->set_owning_thread(this);
+        assert(this->core != nullptr);
+        cown->set_owning_core(this->core);
         cown->next = list;
         list = cown;
-        total_cowns++;
+        this->core->total_cowns++;
       }
 
       return true;
@@ -545,7 +578,7 @@ namespace verona::rt
           sprev == ThreadState::PreScan && snext == ThreadState::PreScan &&
           Scheduler::get().unpause())
         {
-          stats.unpause();
+          core->stats.unpause();
         }
 
         if (snext == sprev)
@@ -566,7 +599,7 @@ namespace verona::rt
           case ThreadState::PreScan:
           {
             if (Scheduler::get().unpause())
-              stats.unpause();
+              core->stats.unpause();
 
             enter_prescan();
             return;
@@ -730,8 +763,8 @@ namespace verona::rt
         }
         p = &(c->next);
       }
-
-      free_cowns -= count;
+      assert(this->core != nullptr);
+      this->core->free_cowns -= count;
     }
   };
 } // namespace verona::rt
