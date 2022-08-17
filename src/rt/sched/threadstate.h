@@ -111,14 +111,15 @@ namespace verona::rt
 
     // ThreadState counters.
     struct StateCounters {
-      size_t active_threads = 0;
+      std::atomic<bool> retracted = false;
+      std::atomic<State> state = NotInLD;
+      std::atomic<size_t> vote_yes = 0;
+      std::atomic<size_t> voters = 0;
+      std::atomic<size_t> active_threads = 0;
       std::atomic<size_t> barrier_count = 0;
     };
 
   private:
-    State state{NotInLD};
-    bool retracted{false};
-    std::atomic<size_t> vote_yes{0};
     StateCounters internal_state;
 
   public:
@@ -126,12 +127,12 @@ namespace verona::rt
 
     State get_state()
     {
-      return state;
+      return internal_state.state;
     }
 
-    State next(State s, size_t total_votes)
+    State next(State s)
     {
-      switch (state)
+      switch (internal_state.state)
       {
         case NotInLD:
         {
@@ -143,8 +144,8 @@ namespace verona::rt
 
             case WantLD:
             {
-              state = PreScan;
-              return vote_one<PreScan, Scan>(total_votes);
+              internal_state.state = PreScan;
+              return vote_one<PreScan, Scan>();
             }
 
             default:
@@ -159,7 +160,7 @@ namespace verona::rt
             case NotInLD:
             case WantLD:
             case Finished:
-              return vote_one<PreScan, Scan>(total_votes);
+              return vote_one<PreScan, Scan>();
 
             case PreScan:
               return PreScan;
@@ -174,7 +175,7 @@ namespace verona::rt
           switch (s)
           {
             case PreScan:
-              return vote<Scan, AllInScan>(total_votes);
+              return vote<Scan, AllInScan>();
 
             case Scan:
               return Scan;
@@ -194,7 +195,7 @@ namespace verona::rt
               return AllInScan;
 
             case BelieveDone_Vote:
-              return vote<BelieveDone_Voted, BelieveDone>(total_votes);
+              return vote<BelieveDone_Voted, BelieveDone>();
 
             case BelieveDone_Voted:
               return BelieveDone_Voted;
@@ -212,12 +213,12 @@ namespace verona::rt
               return BelieveDone;
 
             case BelieveDone_Confirm:
-              return vote<BelieveDone_Ack, ReallyDone>(total_votes);
+              return vote<BelieveDone_Ack, ReallyDone>();
 
             case BelieveDone_Retract:
             {
-              retracted = true;
-              return vote<BelieveDone_Ack, ReallyDone>(total_votes);
+              internal_state.retracted = true;
+              return vote<BelieveDone_Ack, ReallyDone>();
             }
 
             case BelieveDone_Ack:
@@ -235,13 +236,13 @@ namespace verona::rt
             case BelieveDone_Ack:
             case ReallyDone:
             {
-              if (retracted)
+              if (internal_state.retracted)
               {
-                vote<ReallyDone_Retract, AllInScan>(total_votes);
+                vote<ReallyDone_Retract, AllInScan>();
                 return ReallyDone_Retract;
               }
 
-              vote<ReallyDone_Confirm, Sweep>(total_votes);
+              vote<ReallyDone_Confirm, Sweep>();
               return ReallyDone_Confirm;
             }
 
@@ -262,7 +263,7 @@ namespace verona::rt
               return Sweep;
 
             case Sweep:
-              return vote<Finished, NotInLD>(total_votes);
+              return vote<Finished, NotInLD>();
 
             case Finished:
               return Finished;
@@ -281,28 +282,73 @@ namespace verona::rt
     void reset()
     {
       if (next == AllInScan)
-        retracted = false;
+        internal_state.retracted = false;
 
-      vote_yes.store(0);
-      state = next;
+      internal_state.vote_yes.store(0);
+      internal_state.state = next;
     }
 
     template<State next>
     void reset_one()
     {
       if (next == AllInScan)
-        retracted = false;
+        internal_state.retracted = false;
 
-      vote_yes.store(1);
-      state = next;
+      internal_state.vote_yes.store(1);
+      internal_state.state = next;
     }
 
     void set_barrier(size_t thread_count)
     {
+      internal_state.retracted = false;
+      internal_state.state = NotInLD;
+      internal_state.vote_yes = 0;
+      internal_state.voters = thread_count;
       internal_state.barrier_count = thread_count;
       internal_state.active_threads = thread_count;
     }
 
+  private:
+    template<State intermediate, State next>
+    State vote()
+    {
+      size_t vote = internal_state.vote_yes.fetch_add(1) + 1;
+
+      if (vote == internal_state.voters)
+      {
+        reset<next>();
+        return next;
+      }
+
+      return intermediate;
+    }
+
+    template<State intermediate, State next>
+    State vote_one()
+    {
+      size_t vote = internal_state.vote_yes.fetch_add(1) + 1;
+
+      if (vote == internal_state.voters)
+      {
+        reset_one<next>();
+        return next;
+      }
+
+      return intermediate;
+    }
+  public:
+
+    /// @warn Requires holding the threadpool lock.
+    bool add_thread()
+    {
+      if (internal_state.state >= Scan)
+        return false;
+      internal_state.active_threads++;
+      internal_state.voters++;
+      internal_state.barrier_count++;
+      return true;
+    }
+    
     /// @warn Should be holding the threadpool lock.
     size_t exit_thread()
     {
@@ -324,33 +370,35 @@ namespace verona::rt
       internal_state.active_threads++;
     }
 
-  private:
-    template<State intermediate, State next>
-    State vote(size_t total_votes)
+    /// @warn Should be holding the threadpool lock.
+    ///
+    /// Allows a thread to park, i.e., stop servicing cowns.
+    bool park_thread()
     {
-      size_t vote = vote_yes.fetch_add(1) + 1;
+      // The thread cannot park if the LD protocol is in progress
+      // or if this is the last active thread.
+      if (internal_state.state != NotInLD || internal_state.active_threads < 2)
+        return false;
 
-      if (vote == total_votes)
-      {
-        reset<next>();
-        return next;
-      }
-
-      return intermediate;
+      // Make sure nobody voted.
+      assert(internal_state.vote_yes == 0);
+      internal_state.voters--;
+      internal_state.active_threads--;
+      return true;
     }
 
-    template<State intermediate, State next>
-    State vote_one(size_t total_votes)
+    /// @warn Should be holding the threadpool lock.
+    ///
+    /// Increase the number of threads pariticipating in the ld protocol, i.e.,
+    //  servicing cowns.
+    bool unpark_thread()
     {
-      size_t vote = vote_yes.fetch_add(1) + 1;
-
-      if (vote == total_votes)
-      {
-        reset_one<next>();
-        return next;
-      }
-
-      return intermediate;
+      if (internal_state.state != NotInLD)
+        return false;
+      assert(internal_state.vote_yes == 0);
+      internal_state.voters++;
+      internal_state.active_threads++;
+      return true;
     }
   };
 

@@ -70,8 +70,8 @@ namespace verona::rt
     /// Contains both free and active threads; protects accesses with a lock.
     SchedulerList<T>* threads = nullptr;
 
-    /// How many threads are being managed by this pool
-    size_t thread_count = 0;
+    /// How many cores are available to this pool
+    size_t core_count = 0;
 
     /// Count of external event sources, such as I/O, that will prevent
     /// quiescence.
@@ -299,10 +299,10 @@ namespace verona::rt
     {
       Logging::cout() << "Init runtime" << Logging::endl;
 
-      if ((thread_count != 0) || (count == 0))
+      if ((core_count != 0) || (count == 0))
         abort();
 
-      thread_count = count;
+      core_count = count;
 
       // Build a circular linked list of scheduler threads.
       threads = new SchedulerList<T>();
@@ -336,10 +336,11 @@ namespace verona::rt
     void run_with_startup(void (*startup)(Args...), Args... args)
     {
       {
-        ThreadPoolBuilder builder(thread_count);
+        ThreadPoolBuilder builder(core_count);
 
         Logging::cout() << "Starting all threads" << Logging::endl;
-        for (size_t i = 0; i < thread_count; i++) 
+        // Start with one thread per core.
+        for (size_t i = 0; i < core_count; i++) 
         {
           T* t = threads->popFree();
           if (t == nullptr)
@@ -371,7 +372,7 @@ namespace verona::rt
 #ifdef USE_SYSTEMATIC_TESTING
       Object::reset_ids();
 #endif
-      thread_count = 0;
+      core_count = 0;
       state.reset<ThreadState::NotInLD>();
 
       Epoch::flush(ThreadAlloc::get());
@@ -388,7 +389,7 @@ namespace verona::rt
     inline ThreadState::State next_state(ThreadState::State s)
     {
       auto h = sync.handle(local());
-      return state.next(s, thread_count);
+      return state.next(s);
     }
 
     bool check_for_work()
@@ -529,7 +530,7 @@ namespace verona::rt
 
     void init_barrier()
     {
-      state.set_barrier(thread_count);
+      state.set_barrier(core_count);
     }
 
     void enter_barrier()
