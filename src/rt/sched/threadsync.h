@@ -170,8 +170,6 @@ namespace verona::rt
           Logging::cout() << "Sleep" << Logging::endl;
           thread->local_sync.sem.sleep();
           Logging::cout() << "Awake!" << Logging::endl;
-
-          sync.lock.lock();
         } 
         else 
         {
@@ -183,6 +181,8 @@ namespace verona::rt
           thread->pool_sync.sem.sleep();
           Logging::cout() << "Awake!" << Logging::endl;
         }
+
+        sync.lock.lock();
       }
 
       ThreadSyncHandle(T* thread, ThreadSync& sync) : thread(thread), sync(sync)
