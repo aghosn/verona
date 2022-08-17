@@ -14,6 +14,10 @@
 #include "corepool.h"
 #include "schedulerlist.h"
 
+#ifdef USE_SYSMONITOR
+#include "sysmonitor.h"
+#endif
+
 #include <condition_variable>
 #include <mutex>
 #include <snmalloc/snmalloc.h>
@@ -30,6 +34,11 @@ namespace verona::rt
   private:
     friend T;
     friend void verona::rt::yield();
+
+#ifdef USE_SYSMONITOR
+    using Monitor = SysMonitor<ThreadPool<T, E>>;
+    friend Monitor;
+#endif
 
     static constexpr uint64_t TSC_PAUSE_SLOP = 1'000'000;
     static constexpr uint64_t TSC_UNPAUSE_SLOP = TSC_PAUSE_SLOP / 2;
@@ -88,6 +97,10 @@ namespace verona::rt
 
     /// Systematic ids.
     size_t systematic_ids = 0;
+
+#ifdef USE_SYSMONITOR
+    T* sysmonitor_thread = nullptr;
+#endif
 
   public:
     static ThreadPool<T, E>& get()
@@ -323,6 +336,13 @@ namespace verona::rt
 #endif
         threads->addFree(t);
       }
+
+#ifdef USE_SYSMONITOR
+      /// Create the monitor thread.
+      sysmonitor_thread = new T;
+      sysmonitor_thread->systematic_id = 0;
+#endif
+
       Logging::cout() << "Runtime initialised" << Logging::endl;
       init_barrier();
     }
@@ -335,6 +355,10 @@ namespace verona::rt
     template<typename... Args>
     void run_with_startup(void (*startup)(Args...), Args... args)
     {
+#ifdef USE_SYSMONITOR
+      /// Required reset when reusing the runtime.
+      Monitor::get().done = false;
+#endif 
       {
         ThreadPoolBuilder builder(core_count);
 
@@ -349,6 +373,15 @@ namespace verona::rt
           threads->addActive(t);
           builder.add_thread(t->core->affinity, &T::run, t, startup, args...);
         }
+
+#ifdef USE_SYSMONITOR
+        /// Run the system monitor.
+#ifdef USE_SYSTEMATIC_TESTING
+        Monitor::get().local_systematic = Systematic::create_systematic_thread(systematic_ids++); 
+#endif
+        Monitor::get().run_monitor(builder);
+#endif
+
       }
       Logging::cout() << "All threads stopped" << Logging::endl;
 
@@ -378,6 +411,11 @@ namespace verona::rt
       Epoch::flush(ThreadAlloc::get());
       delete core_pool;
       delete threads;
+
+#ifdef USE_SYSMONITOR
+      delete sysmonitor_thread;
+#endif
+
     }
 
     static bool debug_not_running()
@@ -536,9 +574,27 @@ namespace verona::rt
     void enter_barrier()
     {
       auto inc = barrier_incarnation;
+
+#ifdef USE_SYSMONITOR
+      if (!Monitor::get().done)
+        abort();
+#endif
+
       {
         auto h = sync.handle(local());
         auto barrier_count = state.exit_thread();
+
+#ifdef USE_SYSMONITOR
+        UNUSED(inc);
+        if (barrier_count != 0)
+        {
+          h.pause();
+        }
+        else
+        {
+          h.unpause_all();
+        }
+#else
         if (barrier_count != 0)
         {
           while (inc == barrier_incarnation)
@@ -550,7 +606,97 @@ namespace verona::rt
         init_barrier();
         barrier_incarnation++;
         h.unpause_all();
+#endif
       }
     }
+
+#ifdef USE_SYSMONITOR 
+    /// Set of functions used only when the system monitor is enabled.
+
+    bool thread_park()
+    {
+      auto h = sync.handle(local());
+      return state.park_thread();
+    }
+
+    void spawnThread(ThreadPoolBuilder& builder, Core<E>* core, size_t count)
+    {
+      // Quick check to bail.
+      if (count != core->progress_counter)
+      {
+        Logging::cout() << "Progress detected on core " << core->affinity
+          << Logging::endl;
+        return;
+      }
+
+      // Lock everything
+      auto h = sync.handle(sysmonitor_thread);
+
+      // This has to be done with the scheduler list locked in case someone
+      // is executing stop() or tries to park itself.
+      threads->m.lock();
+      T* thread = nullptr;
+      bool needsSysThread = false;
+      if (threads->free.is_empty())
+      {
+        thread = new T;
+        thread->systematic_id = systematic_ids++;
+        needsSysThread = true;
+      }
+      else
+      {
+        thread = threads->free.pop();
+      }
+      // At that point the thread is in neither sublists and does not have a core
+      assert(thread->core == nullptr);
+
+      thread->core = core;
+      threads->active.insert_back(thread);
+      
+      // Freshly created thread
+      if (needsSysThread)
+      {
+        bool success = state.add_thread();
+        // Bail
+        if (!success)
+        {
+          threads->active.remove(thread);
+          threads->m.unlock();
+          systematic_ids--;
+          delete thread;
+          return;
+        }
+        threads->m.unlock();
+        Logging::cout() << "Spawning extra platform thread " <<
+          thread->systematic_id << Logging::endl;
+#ifdef USE_SYSTEMATIC_TESTING
+          thread->local_systematic = 
+          Systematic::create_systematic_thread(thread->systematic_id);
+#endif
+        builder.add_extra_thread(&T::run, thread, &nop);
+        return;
+      } else {
+        bool success = state.unpark_thread();
+        if (!success)
+        {
+          threads->active.remove(thread);
+          threads->free.insert_back(thread);
+          threads->m.unlock();
+          return;
+        }
+      }
+      threads->m.unlock();
+      Logging::cout() << "Unpark extra scheduler thread on core " << core->affinity
+        << Logging::endl;
+      // Wake-up the existing thread
+      thread->unpark();
+    }
+
+    void wakeWorkers()
+    {
+      Logging::cout() << "Unparking all the workers" << Logging::endl;
+      threads->forall([](T* worker){worker->unpark();});
+    }
+#endif
   };
 } // namespace verona::rt

@@ -3,7 +3,7 @@
 #include "core.h"
 #include "pal/threading.h"
 
-#ifdef USE_SYSTEM_MONITOR
+#ifdef USE_SYSMONITOR
 #include "sysmonitor.h"
 #endif
 
@@ -17,7 +17,7 @@ namespace verona::rt
     private:
       friend P;
 
-#ifdef USE_SYSTEM_MONITOR
+#ifdef USE_SYSMONITOR
       friend SysMonitor<P>;
 #endif
 

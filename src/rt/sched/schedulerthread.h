@@ -13,6 +13,10 @@
 #include "ds/dllist.h"
 #include "schedulerlist.h"
 
+#ifdef USE_SYSMONITOR
+#include "sysmonitor.h"
+#endif
+
 #include <snmalloc/snmalloc.h>
 
 namespace verona::rt
@@ -43,6 +47,10 @@ namespace verona::rt
     friend T;
     friend DLList<SchedulerThread<T>>;
     friend SchedulerList<SchedulerThread<T>>;
+
+#ifdef USE_SYSMONITOR
+    using Monitor = SysMonitor<Scheduler>;
+#endif
 
     template<typename Owner>
     friend class Noticeboard;
@@ -84,6 +92,18 @@ namespace verona::rt
     /// SchedulerList pointers.
     SchedulerThread<T>* prev = nullptr;
     SchedulerThread<T>* next = nullptr;
+
+    /// Sync for parking threads when sysmonitor is enabled.
+#ifdef USE_SYSMONITOR
+    LocalSync pool_sync{};
+#ifdef USE_SYSTEMATIC_TESTING
+    friend class ThreadSyncSystematic<SchedulerThread<T>>;
+    ThreadSyncSystematic<SchedulerThread<T>> syncp;
+#else
+    friend class ThreadSync<SchedulerThread<T>, 0>;
+    ThreadSync<SchedulerThread<T>, 0> syncp;
+#endif
+#endif
 
     T* get_token_cown()
     {
@@ -301,10 +321,35 @@ namespace verona::rt
           cown = nullptr;
         }
 
+#ifdef USE_SYSMONITOR
+        /// There are more workers and this is not the last one who made progress,
+        /// and we are not in the ld protocol.
+        if (cown == nullptr && core->servicing_threads > 1 &&
+            core->last_worker != this->systematic_id &&
+            Scheduler::get().thread_park())
+        {
+          this->core->servicing_threads--;
+          this->core = nullptr;
+          this->park();
+
+          /// The thread gets woken up after this point.
+          if (core == nullptr)
+          {
+            assert(!running);
+            break;
+          }
+          continue;
+        }
+#endif
+
         yield();
       }
 
       Logging::cout() << "Begin teardown (phase 1)" << Logging::endl;
+
+#ifdef USE_SYSMONITOR
+      Monitor::get().threadExit();
+#endif 
 
       cown = list;
       while (cown != nullptr)
@@ -766,5 +811,45 @@ namespace verona::rt
       assert(this->core != nullptr);
       this->core->free_cowns -= count;
     }
+
+#ifdef USE_SYSMONITOR
+    /// Set of functions used only when the system monitor is enabled
+
+    /// Park a thread, i.e., make it sleep on its handle without an associated core.
+    void park()
+    {
+      // @warn make sure we correctly acquire locks in order wrt. sysmonitor.
+      // This needs to be in the freelist before acquiring the mutex otherwise
+      // it could deadlock with the threadpool monitor.
+      Scheduler::get().threads->moveActiveToFree(this);
+      Logging::cout() << "parking" << Logging::endl;
+      {
+        auto h = syncp.handle(this);
+        h.pause();
+      }
+
+      Logging::cout() << " unparked!" << Logging::endl;
+      if (!running)
+      {
+        Logging::cout() << "not running, bail" << Logging::endl;
+        // We need to bail
+        return;
+      }
+      // Woken up without being attributed a core.
+      if (core == nullptr)
+        abort();
+
+      // We have a core, we should be able to return wherever we came from.
+      cpu::set_affinity(core->affinity);
+      Logging::cout() << " servicing core " << core->affinity << Logging::endl;
+    }
+
+    /// Called by another thread to unpark this scheduler thread.
+    void unpark()
+    {
+      Logging::cout() << "calling unpark on " << systematic_id << Logging::endl;
+      syncp.unpause_all(this);
+    }
+#endif
   };
 } // namespace verona::rt

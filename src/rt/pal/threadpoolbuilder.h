@@ -42,7 +42,12 @@ namespace verona::rt
   public:
     ThreadPoolBuilder(size_t thread_count)
     {
+
+#ifdef USE_SYSMONITOR
+      this->thread_count = thread_count;
+#else
       this->thread_count = thread_count - 1;
+#endif
     }
 
     /**
@@ -79,8 +84,13 @@ namespace verona::rt
      */
     ~ThreadPoolBuilder()
     {
+
+#ifdef USE_SYSMONITOR
+      assert(index == thread_count);
+#else
       assert(index == thread_count + 1);
-      
+#endif     
+
       while (!threads.empty())
       {
         auto& thread = threads.front();

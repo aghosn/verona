@@ -24,6 +24,14 @@ if(NOT MSVC)
   endif()
 endif()
 
+set(DEFAULT_SYSMONITOR false)
+set(USE_SYSMONITOR ${DEFAULT_SYSMONITOR} CACHE BOOL "Use a system monitor to allow more than one scheduler thread per core")
+
+if (${USE_SYSMONITOR})
+  message(STATUS "Enabling system monitor in verona runtime.")
+  add_definitions(-DUSE_SYSMONITOR)
+  add_definitions(-DMONITOR_QUANTUM=10)
+endif()
 
 add_library(verona_rt INTERFACE)
 # ASAN must be added first, or it gets upset.
