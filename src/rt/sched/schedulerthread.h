@@ -808,8 +808,10 @@ namespace verona::rt
         }
         p = &(c->next);
       }
-      assert(this->core != nullptr);
-      this->core->free_cowns -= count;
+      // The core can be null during the teardown.
+      assert(during_teardown || ( this->core != nullptr));
+      if (this->core != nullptr)
+        this->core->free_cowns -= count;
     }
 
 #ifdef USE_SYSMONITOR
