@@ -9,6 +9,8 @@
 
 #include <snmalloc/snmalloc.h>
 
+#include "sched/preempt.h"
+
 namespace verona::rt
 {
   static void yield();
@@ -140,6 +142,7 @@ namespace verona::rt
 
   inline std::ostream& operator<<(std::ostream& os, EpochMark e)
   {
+    NO_PREEMPT();
     switch (e)
     {
       case EpochMark::EPOCH_NONE:
@@ -186,6 +189,7 @@ namespace verona::rt
 
     inline friend std::ostream& operator<<(std::ostream& os, RegionMD md)
     {
+      NO_PREEMPT();
       switch (md)
       {
         case RegionMD::UNMARKED:
@@ -212,6 +216,7 @@ namespace verona::rt
 #ifdef USE_SYSTEMATIC_TESTING
     inline friend std::ostream& operator<<(std::ostream& os, const Object* o)
     {
+      NO_PREEMPT();
       return os << o->id<false>();
     }
 #endif
@@ -263,6 +268,7 @@ namespace verona::rt
 
     Header& get_header() const
     {
+      NO_PREEMPT();
       return *((Header*)real_start());
     }
 
@@ -271,6 +277,7 @@ namespace verona::rt
     // been region allocated.
     static void* last_alloc(void* next)
     {
+      NO_PREEMPT();
       static thread_local void* last = nullptr;
       auto prev = last;
       last = next;
@@ -282,6 +289,7 @@ namespace verona::rt
     /// I.e. the start of the objects verona header.
     std::byte* real_start() const
     {
+      NO_PREEMPT();
       return ((std::byte*)this) - sizeof(Header);
     }
 
@@ -293,6 +301,7 @@ namespace verona::rt
     /// subclasses of rt::Object are actually part of the runtime.
     static Object* register_object(void* base, const Descriptor* desc)
     {
+      NO_PREEMPT();
       Object* obj = object_start(base);
       obj->get_header().descriptor = desc;
 #ifndef NDEBUG
@@ -312,11 +321,13 @@ namespace verona::rt
     /// start of the object.
     static Object* object_start(void* p)
     {
+      NO_PREEMPT();
       return (Object*)((char*)p + sizeof(Object::Header));
     }
 
     Object()
     {
+      NO_PREEMPT();
       // This assertion fails of register_object was not called prior to
       // initialising this object.  This is probably due to not being
       // allocated with the Verona region allocator
@@ -328,6 +339,7 @@ namespace verona::rt
 
     inline const Descriptor* get_descriptor() const
     {
+      NO_PREEMPT();
       return (
         const Descriptor*)((uintptr_t)get_header().descriptor.load(std::memory_order_relaxed) & ~MARK_MASK);
     }
@@ -342,6 +354,7 @@ namespace verona::rt
     template<bool scramble = true>
     inline uintptr_t id() const
     {
+      NO_PREEMPT();
 #ifdef USE_SYSTEMATIC_TESTING
       if constexpr (scramble)
         return Systematic::get_scrambler().perm(get_header().sys_id);
@@ -361,16 +374,19 @@ namespace verona::rt
 
     bool debug_is_iso()
     {
+      NO_PREEMPT();
       return get_class() == RegionMD::ISO;
     }
 
     bool debug_is_mutable()
     {
+      NO_PREEMPT();
       return get_class() == RegionMD::UNMARKED;
     }
 
     bool debug_is_immutable()
     {
+      NO_PREEMPT();
       switch (get_class())
       {
         case RegionMD::SCC_PTR:
@@ -385,16 +401,19 @@ namespace verona::rt
 
     bool debug_is_cown()
     {
+      NO_PREEMPT();
       return get_class() == RegionMD::COWN;
     }
 
     bool debug_is_rc()
     {
+      NO_PREEMPT();
       return get_class() == RegionMD::RC;
     }
 
     bool debug_test_rc(size_t test_rc)
     {
+      NO_PREEMPT();
       assert(debug_is_immutable());
       Object* o = immutable();
       return o->get_header().bits ==
@@ -403,28 +422,33 @@ namespace verona::rt
 
     intptr_t debug_rc()
     {
+      NO_PREEMPT();
       return (intptr_t)get_header().bits >> SHIFT;
     }
 
     bool is_rc_candidate()
     {
+      NO_PREEMPT();
       return get_class() == RegionMD::UNMARKED ||
         get_class() == RegionMD::MARKED || get_class() == RegionMD::ISO;
     }
 
     Object* debug_immutable_root()
     {
+      NO_PREEMPT();
       return immutable();
     }
 
     Object* debug_next()
     {
+      NO_PREEMPT();
       assert(debug_is_iso() || debug_is_mutable());
       return (Object*)(get_header().bits & ~MASK);
     }
 
     static bool debug_is_aligned(const void* o)
     {
+      NO_PREEMPT();
       return ((uintptr_t)o & MASK) == 0;
     }
 
@@ -453,37 +477,44 @@ namespace verona::rt
   private:
     inline RegionMD get_class()
     {
+      NO_PREEMPT();
       return (RegionMD)(get_header().bits & MASK);
     }
 
     inline size_t size()
     {
+      NO_PREEMPT();
       return get_descriptor()->size;
     }
 
     inline bool is_type(const Descriptor* desc)
     {
+      NO_PREEMPT();
       return get_descriptor() == desc;
     }
 
     inline void init_iso()
     {
+      NO_PREEMPT();
       get_header().bits = (size_t)this | (uint8_t)RegionMD::ISO;
     }
 
     inline void init_next(Object* o)
     {
+      NO_PREEMPT();
       get_header().next = o;
     }
 
     inline Object* get_next()
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::UNMARKED);
       return get_header().next;
     }
 
     inline Object* get_next_any_mark()
     {
+      NO_PREEMPT();
       assert(
         (get_class() == RegionMD::MARKED) ||
         (get_class() == RegionMD::UNMARKED) ||
@@ -494,6 +525,7 @@ namespace verona::rt
 
     inline size_t get_ref_count()
     {
+      NO_PREEMPT();
       assert(
         (get_class() == RegionMD::OPEN_ISO) ||
         (get_class() == RegionMD::MARKED) ||
@@ -503,6 +535,7 @@ namespace verona::rt
 
     inline void incref_rc_region()
     {
+      NO_PREEMPT();
       assert(
         (get_class() == RegionMD::OPEN_ISO) ||
         (get_class() == RegionMD::MARKED) ||
@@ -512,6 +545,7 @@ namespace verona::rt
 
     inline void decref_rc_region()
     {
+      NO_PREEMPT();
       assert(
         (get_class() == RegionMD::OPEN_ISO) ||
         (get_class() == RegionMD::MARKED) ||
@@ -521,17 +555,20 @@ namespace verona::rt
 
     inline void init_ref_count()
     {
+      NO_PREEMPT();
       get_header().bits = RegionMD::UNMARKED + ONE_RC;
     }
 
     inline void init_iso_ref_count(size_t count)
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::ISO);
       get_header().bits = (count << SHIFT) | (uint8_t)RegionMD::OPEN_ISO;
     }
 
     inline void set_next(Object* o)
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::UNMARKED);
       get_header().next = o;
     }
@@ -539,6 +576,7 @@ namespace verona::rt
   public:
     inline RegionBase* get_region()
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::ISO);
       return (RegionBase*)(get_header().bits & ~MASK);
     }
@@ -546,49 +584,58 @@ namespace verona::rt
   private:
     inline void set_region(RegionBase* region)
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::ISO || get_class() == RegionMD::OPEN_ISO);
       get_header().bits = (size_t)region | (uint8_t)RegionMD::ISO;
     }
 
     inline Object* get_scc()
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::SCC_PTR);
       return (Object*)(get_header().bits & ~MASK);
     }
 
     inline void set_scc(Object* o)
     {
+      NO_PREEMPT();
       get_header().bits = (size_t)o | (uint8_t)RegionMD::SCC_PTR;
     }
 
     inline void make_scc()
     {
+      NO_PREEMPT();
       get_header().bits = (size_t)RegionMD::RC + ONE_RC;
     }
 
     inline void make_nonatomic_scc()
     {
+      NO_PREEMPT();
       get_header().bits = (size_t)RegionMD::NONATOMIC_RC + ONE_RC;
     }
 
     inline void make_atomic()
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::NONATOMIC_RC);
       get_header().bits = (get_header().bits & ~MASK) | (uint8_t)RegionMD::RC;
     }
 
     inline void make_cown()
     {
+      NO_PREEMPT();
       get_header().bits = (size_t)RegionMD::COWN + ONE_RC;
     }
 
     inline bool is_pending()
     {
+      NO_PREEMPT();
       return get_class() == RegionMD::PENDING;
     }
 
     inline void set_pending_rank(size_t rank)
     {
+      NO_PREEMPT();
       // If this is balanced it should never get above 64.
       assert(rank < 128);
       get_header().bits = (rank << SHIFT) | (size_t)RegionMD::PENDING;
@@ -596,17 +643,20 @@ namespace verona::rt
 
     inline void set_pending()
     {
+      NO_PREEMPT();
       set_pending_rank(0);
     }
 
     inline size_t pending_rank()
     {
+      NO_PREEMPT();
       assert(is_pending());
       return get_header().bits >> SHIFT;
     }
 
     inline Object* root_and_class(RegionMD& c)
     {
+      NO_PREEMPT();
       c = get_class();
 
       switch (c)
@@ -640,6 +690,7 @@ namespace verona::rt
 
     inline Object* immutable()
     {
+      NO_PREEMPT();
       RegionMD c;
       Object* r = root_and_class(c);
 
@@ -650,36 +701,42 @@ namespace verona::rt
 
     inline void mark()
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::UNMARKED);
       get_header().bits |= (uint8_t)RegionMD::MARKED;
     }
 
     inline void mark_iso()
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::ISO);
       get_header().bits |= (uint8_t)RegionMD::MARKED;
     }
 
     inline void unmark()
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::MARKED);
       get_header().bits &= ~(size_t)RegionMD::MARKED;
     }
 
     inline bool is_opened()
     {
+      NO_PREEMPT();
       return get_class() == RegionMD::OPEN_ISO;
     }
 
   public:
     inline EpochMark get_epoch_mark()
     {
+      NO_PREEMPT();
       return (EpochMark)((uintptr_t)get_header().descriptor.load() & MARK_MASK);
     }
 
   private:
     inline bool in_epoch(EpochMark e)
     {
+      NO_PREEMPT();
       assert(
         (get_class() == RegionMD::RC) || (get_class() == RegionMD::SCC_PTR) ||
         (get_class() == RegionMD::COWN));
@@ -689,6 +746,7 @@ namespace verona::rt
 
     inline void set_epoch_mark(EpochMark e)
     {
+      NO_PREEMPT();
       Logging::cout() << "Object epoch: " << this << " (" << get_class() << ") "
                       << get_epoch_mark() << " -> " << e << Logging::endl;
 
@@ -702,6 +760,7 @@ namespace verona::rt
 
     inline void set_epoch(EpochMark e)
     {
+      NO_PREEMPT();
       assert(
         (get_class() == RegionMD::RC) || (get_class() == RegionMD::SCC_PTR) ||
         (get_class() == RegionMD::COWN));
@@ -715,17 +774,20 @@ namespace verona::rt
 
     inline void set_rc_colour(RcColour colour)
     {
+      NO_PREEMPT();
       get_header().descriptor_bits =
         (get_header().descriptor_bits & ~MARK_MASK) | (uintptr_t)colour;
     }
 
     inline RcColour get_rc_colour()
     {
+      NO_PREEMPT();
       return (RcColour)((uintptr_t)get_header().descriptor_bits & MARK_MASK);
     }
 
     inline bool has_ext_ref()
     {
+      NO_PREEMPT();
       assert(!debug_is_immutable());
 
       return ((uintptr_t)get_header().descriptor.load() & (uintptr_t)1) ==
@@ -734,6 +796,7 @@ namespace verona::rt
 
     inline void set_has_ext_ref()
     {
+      NO_PREEMPT();
       assert(!debug_is_immutable());
       assert(((uintptr_t)get_header().descriptor.load() & MARK_MASK) == 0);
 
@@ -744,6 +807,7 @@ namespace verona::rt
 
     inline void clear_has_ext_ref()
     {
+      NO_PREEMPT();
       assert(!debug_is_immutable());
       get_header().descriptor.store(
         (const Descriptor*)((uintptr_t)get_header().descriptor.load() & ~(uintptr_t)1),
@@ -752,6 +816,7 @@ namespace verona::rt
 
     inline bool cown_marked_for_scan(EpochMark e)
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::COWN);
       EpochMark t = get_epoch_mark();
       return (t == e) || (t > EpochMark::EPOCH_B);
@@ -759,6 +824,7 @@ namespace verona::rt
 
     inline bool cown_scanned(EpochMark e)
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::COWN);
       EpochMark t = get_epoch_mark();
       return (t == e) || (t == EpochMark::SCANNED);
@@ -766,18 +832,21 @@ namespace verona::rt
 
     inline void cown_mark_for_scan()
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::COWN);
       set_epoch_mark(EpochMark::SCHEDULED_FOR_SCAN);
     }
 
     inline void cown_mark_scanned()
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::COWN);
       set_epoch_mark(EpochMark::SCANNED);
     }
 
     inline void incref_nonatomic()
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::NONATOMIC_RC);
       get_header().bits += ONE_RC;
     }
@@ -785,6 +854,7 @@ namespace verona::rt
     // Returns true if you are incrementing from zero.
     inline bool incref()
     {
+      NO_PREEMPT();
       assert((get_class() == RegionMD::RC) || (get_class() == RegionMD::COWN));
 
       return get_header().rc.fetch_add(ONE_RC) == get_class();
@@ -792,6 +862,7 @@ namespace verona::rt
 
     inline bool decref()
     {
+      NO_PREEMPT();
       // This does not perform the atomic subtraction if rc == 1 on entry.
       // Otherwise, will perform the atomic subtraction, which may be the
       // last one given other concurrent decrefs.
@@ -828,6 +899,7 @@ namespace verona::rt
      **/
     inline bool decref_cown()
     {
+      NO_PREEMPT();
       // This always performs the atomic subtraction, since the cown should
       // see its own rc as zero this is due to how weak reference to cowns
       // interact.  An attempt to acquire a weak reference will increase the
@@ -855,6 +927,7 @@ namespace verona::rt
      **/
     inline bool acquire_strong_from_weak()
     {
+      NO_PREEMPT();
       // Check if top bit is set, if not then we have validily created a new
       // strong reference
       if (get_header().rc.fetch_add(ONE_RC) < FINISHED_RC)
@@ -871,32 +944,38 @@ namespace verona::rt
 
     inline bool has_finaliser()
     {
+      NO_PREEMPT();
       return get_descriptor()->finaliser != nullptr;
     }
 
     inline bool has_notified()
     {
+      NO_PREEMPT();
       return get_descriptor()->notified != nullptr;
     }
 
     inline bool has_destructor()
     {
+      NO_PREEMPT();
       return get_descriptor()->destructor != nullptr;
     }
 
     static inline bool is_trivial(const Descriptor* desc)
     {
+      NO_PREEMPT();
       return desc->destructor == nullptr && desc->finaliser == nullptr;
     }
 
     inline bool is_trivial()
     {
+      NO_PREEMPT();
       return is_trivial(get_descriptor());
     }
 
   public:
     inline bool cown_zero_rc()
     {
+      NO_PREEMPT();
       assert(get_class() == RegionMD::COWN);
 
       return get_header().rc.load(std::memory_order_relaxed) == FINISHED_RC;
@@ -905,29 +984,34 @@ namespace verona::rt
   private:
     inline void trace(ObjectStack& f) const
     {
+      NO_PREEMPT();
       get_descriptor()->trace(this, f);
     }
 
     inline void finalise(Object* region, ObjectStack& isos)
     {
+      NO_PREEMPT();
       if (has_finaliser())
         get_descriptor()->finaliser(this, region, isos);
     }
 
     inline void notified()
     {
+      NO_PREEMPT();
       if (has_notified())
         get_descriptor()->notified(this);
     }
 
     inline void destructor()
     {
+      NO_PREEMPT();
       if (has_destructor())
         get_descriptor()->destructor(this);
     }
 
     inline void dealloc(Alloc& alloc)
     {
+      NO_PREEMPT();
       alloc.dealloc(&this->get_header(), size());
     }
 
@@ -935,6 +1019,7 @@ namespace verona::rt
     static void
     add_sub_region(Object* obj, Object* region, ObjectStack& sub_regions)
     {
+      NO_PREEMPT();
       // Should be the entry-point of the region.
       assert(
         (region == nullptr) || (region->get_class() == Object::RegionMD::ISO) ||

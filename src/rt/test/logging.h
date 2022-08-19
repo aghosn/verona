@@ -24,6 +24,9 @@
 #include <snmalloc/snmalloc.h>
 #include <sstream>
 
+
+#include "sched/preempt.h"
+
 namespace Logging
 {
 #ifdef USE_SYSTEMATIC_TESTING
@@ -81,6 +84,7 @@ namespace Logging
   public:
     LocalLog()
     {
+      NO_PREEMPT();
       if constexpr (flight_recorder)
       {
         reset();
@@ -90,12 +94,14 @@ namespace Logging
   private:
     static size_t get_start()
     {
+      NO_PREEMPT();
       static size_t start = snmalloc::Aal::tick();
       return start;
     }
 
     void add(size_t pp, size_t val)
     {
+      NO_PREEMPT();
       alock.internal_acquire();
       working_index = verona::rt::bits::inc_mod(working_index, size);
       log[working_index].header.time = val;
@@ -105,6 +111,7 @@ namespace Logging
 
     void eject()
     {
+      NO_PREEMPT();
       alock.internal_acquire();
       systematic_id = get_systematic_id();
       working_index = verona::rt::bits::inc_mod(working_index, size);
@@ -116,6 +123,7 @@ namespace Logging
 
     void suspend_logging(bool external)
     {
+      NO_PREEMPT();
       if (external)
         alock.external_acquire();
 
@@ -124,6 +132,7 @@ namespace Logging
 
     void resume_logging(bool external)
     {
+      NO_PREEMPT();
       if (external)
         alock.external_release();
 
@@ -132,6 +141,7 @@ namespace Logging
 
     void reset()
     {
+      NO_PREEMPT();
       log[0].header.time = 0;
       log[0].header.items = 0;
       index = 0;
@@ -140,6 +150,7 @@ namespace Logging
 
     bool peek_time(size_t& time)
     {
+      NO_PREEMPT();
       auto entry_size = log[index % size].header.items;
 
       if (entry_size == 0)
@@ -154,6 +165,7 @@ namespace Logging
 
     void pop_and_print(std::ostream& o)
     {
+      NO_PREEMPT();
       size_t time;
       assert(peek_time(time));
 
@@ -186,10 +198,14 @@ namespace Logging
 
     LocalLog* log = nullptr;
 #ifdef USE_FLIGHT_RECORDER
-    ThreadLocalLog() : log(LocalLogPool::acquire()) {}
+    ThreadLocalLog() : log(LocalLogPool::acquire())
+    {
+      NO_PREEMPT();
+    }
 
     ~ThreadLocalLog()
     {
+      NO_PREEMPT();
       LocalLogPool::release(log);
     }
 #endif
@@ -197,12 +213,14 @@ namespace Logging
   public:
     static ThreadLocalLog& get()
     {
+      NO_PREEMPT();
       static thread_local ThreadLocalLog mine;
       return mine;
     }
 
     static void dump(std::ostream& o)
     {
+      NO_PREEMPT();
       if constexpr (flight_recorder)
       {
         o << "Crash log begins with most recent events" << std::endl;
@@ -261,6 +279,7 @@ namespace Logging
   template<typename T>
   static std::ostream& pretty_printer(std::ostream& os, T const& e)
   {
+    NO_PREEMPT();
     return os << e;
   }
   class SysLog
@@ -271,12 +290,14 @@ namespace Logging
 
     static std::stringstream& get_ss()
     {
+      NO_PREEMPT();
       static thread_local std::stringstream ss;
       return ss;
     }
 
     inline static bool& get_logging()
     {
+      NO_PREEMPT();
       static bool logging = false;
       return logging;
     }
@@ -284,6 +305,7 @@ namespace Logging
     template<typename T>
     inline SysLog& inner_cons(const T& value)
     {
+      NO_PREEMPT();
       static_assert(sizeof(T) <= sizeof(size_t));
 
       if constexpr (systematic)
@@ -317,6 +339,7 @@ namespace Logging
 #ifdef USE_SYSTEMATIC_TESTING
     SysLog()
     {
+      NO_PREEMPT();
       if constexpr (systematic)
       {
         o = &std::cout;
@@ -327,6 +350,7 @@ namespace Logging
 
     static void dump_flight_recorder(std::string id = "")
     {
+      NO_PREEMPT();
       static snmalloc::FlagWord dump_in_progress;
 
       snmalloc::FlagLock f(dump_in_progress);
@@ -342,23 +366,27 @@ namespace Logging
 
     inline SysLog& operator<<(const char* value)
     {
+      NO_PREEMPT();
       return inner_cons(value);
     }
 
     inline SysLog& operator<<(const void* value)
     {
+      NO_PREEMPT();
       return inner_cons(value);
     }
 
     template<typename T>
     inline SysLog& operator<<(const T& value)
     {
+      NO_PREEMPT();
       static_assert(sizeof(T) <= sizeof(size_t));
       return inner_cons(value);
     }
 
     inline SysLog& operator<<(std::ostream& (*f)(std::ostream&))
     {
+      NO_PREEMPT();
       if constexpr (systematic)
       {
         if (get_logging())
@@ -379,6 +407,7 @@ namespace Logging
 
     inline static void enable_logging()
     {
+      NO_PREEMPT();
       get_logging() = true;
     }
   };
@@ -386,6 +415,7 @@ namespace Logging
 #if defined(CI_BUILD) && defined(_MSC_VER)
   inline LONG ExceptionHandler(_EXCEPTION_POINTERS* ExceptionInfo)
   {
+    NO_PREEMPT();
     // On any exception dump the flight recorder
     // TODO:  Out of memory filtering
     // TODO:  Handle crashes in the dump method.
@@ -456,6 +486,7 @@ namespace Logging
 
   inline static void crash_dump()
   {
+    NO_PREEMPT();
     // This can't happen as this is only in response to a ping,
     // but GCC complains, and this is not fast path, so additional
     // check is not a problem.
@@ -523,6 +554,7 @@ namespace Logging
 
   inline static void signal_handler(int sig, siginfo_t*, void*)
   {
+    NO_PREEMPT();
     static std::atomic_flag run_already{};
 
     constexpr size_t max_stack_frames = 64;
@@ -558,6 +590,7 @@ namespace Logging
 
   inline static void enable_crash_logging()
   {
+    NO_PREEMPT();
 #if defined(CI_BUILD) && defined(_MSC_VER)
     AddVectoredExceptionHandler(0, &ExceptionHandler);
 #elif defined(CI_BUILD) && defined(USE_EXECINFO)
@@ -575,17 +608,20 @@ namespace Logging
 
   inline static void enable_logging()
   {
+    NO_PREEMPT();
     SysLog::enable_logging();
   }
 
   inline SysLog& cout()
   {
+    NO_PREEMPT();
     static SysLog cout_log;
     return cout_log;
   }
 
   inline std::ostream& endl(std::ostream& os)
   {
+    NO_PREEMPT();
     if constexpr (systematic || flight_recorder)
     {
       os << std::endl;

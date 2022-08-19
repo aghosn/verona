@@ -7,6 +7,8 @@
 #include <new>
 #include <type_traits>
 
+#include "sched/preempt.h"
+
 namespace verona::rt
 {
   using namespace snmalloc;
@@ -51,11 +53,13 @@ namespace verona::rt
   private:
     static void gc_trace(const Object* o, ObjectStack& st)
     {
+      NO_PREEMPT();
       ((T*)o)->trace(st);
     }
 
     static void gc_notified(Object* o)
     {
+      NO_PREEMPT();
       if constexpr (has_notified<T>::value)
         ((T*)o)->notified(o);
       else
@@ -66,6 +70,7 @@ namespace verona::rt
 
     static void gc_final(Object* o, Object* region, ObjectStack& sub_regions)
     {
+      NO_PREEMPT();
       if constexpr (has_finaliser<T>::value)
         ((T*)o)->finaliser(region, sub_regions);
       else
@@ -78,6 +83,7 @@ namespace verona::rt
 
     static void gc_destructor(Object* o)
     {
+      NO_PREEMPT();
       ((T*)o)->~T();
     }
 
@@ -88,6 +94,7 @@ namespace verona::rt
 
     static Descriptor* desc()
     {
+      NO_PREEMPT();
       static Descriptor desc = {vsizeof<T>,
                                 gc_trace,
                                 has_finaliser<T>::value ? gc_final : nullptr,
@@ -100,6 +107,7 @@ namespace verona::rt
 
     void operator delete(void*)
     {
+      NO_PREEMPT();
       // Should not be called directly, present to allow calling if the
       // constructor throws an exception. The object lifetime is managed by the
       // region.
@@ -107,6 +115,7 @@ namespace verona::rt
 
     void operator delete(void*, size_t)
     {
+      NO_PREEMPT();
       // Should not be called directly, present to allow calling if the
       // constructor throws an exception. The object lifetime is managed by the
       // region.
@@ -114,6 +123,7 @@ namespace verona::rt
 
     void operator delete(void*, Alloc&)
     {
+      NO_PREEMPT();
       // Should not be called directly, present to allow calling if the
       // constructor throws an exception. The object lifetime is managed by the
       // region.
@@ -121,6 +131,7 @@ namespace verona::rt
 
     void operator delete(void*, Object*)
     {
+      NO_PREEMPT();
       // Should not be called directly, present to allow calling if the
       // constructor throws an exception. The object lifetime is managed by the
       // region.
@@ -128,6 +139,7 @@ namespace verona::rt
 
     void operator delete(void*, Alloc&, Object*)
     {
+      NO_PREEMPT();
       // Should not be called directly, present to allow calling if the
       // constructor throws an exception. The object lifetime is managed by the
       // region.
@@ -135,6 +147,7 @@ namespace verona::rt
 
     void operator delete(void*, RegionType)
     {
+      NO_PREEMPT();
       // Should not be called directly, present to allow calling if the
       // constructor throws an exception. The object lifetime is managed by the
       // region.
@@ -158,11 +171,13 @@ namespace verona::rt
 
     void* operator new(size_t)
     {
+      NO_PREEMPT();
       return api::create_object(VBase<T, Object>::desc());
     }
 
     void* operator new(size_t, RegionType rt)
     {
+      NO_PREEMPT();
       return api::create_fresh_region<V>(rt, V::desc());
     }
   };
@@ -176,16 +191,21 @@ namespace verona::rt
   class VCown : public VBase<T, Cown>
   {
   public:
-    VCown() : VBase<T, Cown>() {}
+    VCown() : VBase<T, Cown>()
+    {
+      NO_PREEMPT();
+    }
 
     void* operator new(size_t)
     {
+      NO_PREEMPT();
       return Object::register_object(
         ThreadAlloc::get().alloc<vsizeof<T>>(), VBase<T, Cown>::desc());
     }
 
     void* operator new(size_t, Alloc& alloc)
     {
+      NO_PREEMPT();
       return Object::register_object(
         alloc.alloc<vsizeof<T>>(), VBase<T, Cown>::desc());
     }

@@ -18,6 +18,8 @@
 #include <chrono>
 #include <cassert>
 
+#include "sched/preempt.h"
+
 
 namespace verona::rt
 {
@@ -41,12 +43,14 @@ namespace verona::rt
 
       static SysMonitor<Scheduler>& get()
       {
+        NO_PREEMPT();
        static SysMonitor<Scheduler> instance;
         return instance;
       }
 
       void run_monitor(ThreadPoolBuilder& builder)
       {
+        NO_PREEMPT();
 #ifdef USE_SYSTEMATIC_TESTING
         Systematic::start();
         Systematic::attach_systematic_thread(this->local_systematic);
@@ -104,6 +108,7 @@ namespace verona::rt
 
       void threadExit()
       {
+        NO_PREEMPT();
         Logging::cout() << "Thread exit: setting done to true" << Logging::endl;
         // if a thread exits, we are done
         done = true;

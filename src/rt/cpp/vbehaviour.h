@@ -6,6 +6,8 @@
 #include "../sched/cown.h"
 #include "type_traits"
 
+#include "sched/preempt.h"
+
 namespace verona::rt
 {
   using namespace snmalloc;
@@ -29,6 +31,7 @@ namespace verona::rt
   private:
     static void gc_trace(const Behaviour* msg, ObjectStack& st)
     {
+      NO_PREEMPT();
       (static_cast<const T*>(msg))->trace(st);
     }
 
@@ -40,12 +43,14 @@ namespace verona::rt
       // If behaviour has a destructor tidy up the behaviour.
       if constexpr (!std::is_trivially_destructible_v<T>)
       {
+        NO_PREEMPT();
         t->~T();
       }
     }
 
     static const Behaviour::Descriptor* desc()
     {
+      NO_PREEMPT();
       static constexpr Behaviour::Descriptor desc = {sizeof(T), f, gc_trace};
 
       return &desc;
@@ -56,6 +61,7 @@ namespace verona::rt
   public:
     VBehaviour() : Behaviour(desc())
     {
+      NO_PREEMPT();
       static_assert(
         std::is_base_of_v<Behaviour, T>,
         "Template parameter must inherit from Behaviour.");
@@ -69,10 +75,14 @@ namespace verona::rt
      **/
     void* operator new(size_t, VBehaviour* obj)
     {
+      NO_PREEMPT();
       return obj;
     }
 
-    void operator delete(void*, VBehaviour*) {}
+    void operator delete(void*, VBehaviour*)
+    {
+      NO_PREEMPT();
+    }
 
     void* operator new(size_t) = delete;
     void* operator new[](size_t size) = delete;

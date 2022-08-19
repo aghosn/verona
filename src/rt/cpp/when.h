@@ -9,6 +9,8 @@
 #include <utility>
 #include <verona.h>
 
+#include "sched/preempt.h"
+
 namespace verona::cpp
 {
   using namespace verona::rt;
@@ -48,6 +50,7 @@ namespace verona::cpp
     template<size_t index = 0>
     void array_assign(Cown** array)
     {
+      NO_PREEMPT();
       if constexpr (index >= sizeof...(Args))
       {
         return;
@@ -64,6 +67,7 @@ namespace verona::cpp
     template<typename... Ts>
     When(Ts... args) : cown_tuple(args...)
     {
+      NO_PREEMPT();
       static_assert(
         std::conjunction_v<std::is_base_of<cown_ptr_base, Ts>...>,
         "Not a cown_ptr");
@@ -77,6 +81,7 @@ namespace verona::cpp
     template<typename C>
     static acquired_cown<C> cown_ptr_to_acquired(cown_ptr<C> c)
     {
+      NO_PREEMPT();
       return acquired_cown<C>(c);
     }
 
@@ -87,6 +92,7 @@ namespace verona::cpp
     template<typename F>
     void operator<<(F&& f)
     {
+      NO_PREEMPT();
       if constexpr (sizeof...(Args) == 0)
       {
         verona::rt::schedule_lambda(std::forward<F>(f));
@@ -119,6 +125,7 @@ namespace verona::cpp
   template<typename... Args>
   When<Args...> when(Args... args)
   {
+    NO_PREEMPT();
     return When<Args...>(args...);
   }
 } // namespace verona::cpp
