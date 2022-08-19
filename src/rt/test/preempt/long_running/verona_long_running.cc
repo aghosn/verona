@@ -4,6 +4,10 @@
 #include <atomic>
 #include <test/harness.h>
 
+#ifdef USE_PREEMPTION
+#include <sched/preempt.h>
+#endif 
+
 using namespace verona::cpp;
 
 std::atomic<size_t> counter = 0;
@@ -16,7 +20,11 @@ void long_running()
 {
   Logging::cout() << "Starting the long running" << std::endl;
   while(counter != 0) {
-    Logging::cout() << "Long running about to yield " <<  counter << Logging::endl;
+/*
+#ifdef USE_PREEMPTION
+    assert(Preempt::is_preemptable());
+#endif
+*/
     yield();
   }
   Logging::cout() << "Long running behavior just finished" << std::endl;
@@ -50,7 +58,7 @@ int verona_main(SystematicTestHarness& harness)
 {
 // This test is unable to complete without the system monitor, which is 
 // disabled with systematic testing.
-#if defined(USE_SYSMONITOR) and not defined(USE_PREEMPTION)
+#if defined(USE_SYSMONITOR) and not defined(USE_PREEMPTION) 
   harness.run(test1); 
 #else
   UNUSED(harness);

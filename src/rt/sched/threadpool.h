@@ -341,6 +341,10 @@ namespace verona::rt
       /// Create the monitor thread.
       sysmonitor_thread = new T;
       sysmonitor_thread->systematic_id = 0;
+#ifdef USE_PREEMPTION
+      /// Register the signal handler for preemption.
+      Monitor::init_preemption();
+#endif
 #endif
 
       Logging::cout() << "Runtime initialised" << Logging::endl;

@@ -36,6 +36,7 @@ namespace verona::rt
         SchedulerStats stats;
 
 #ifdef USE_PREEMPTION
+        std::atomic<bool> thread_valid = false;
         pthread_t thread;
 #endif
 

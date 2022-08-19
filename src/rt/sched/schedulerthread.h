@@ -234,6 +234,7 @@ namespace verona::rt
         abort();
       ThreadStacks& stacks = ThreadStacks::get(); 
       stacks.behaviour = this->behaviour_stack->top();
+      this->core->thread_valid = true;
 #endif
 
 #ifdef USE_SYSTEMATIC_TESTING

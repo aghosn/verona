@@ -11,6 +11,7 @@
 /// rather than spawning extra scheduler threads.
 ///
 /// The MONITOR_QUANTUM variable is set at compile time.
+#include "preempt.h"
 #ifdef USE_SYSMONITOR
 
 #include "pal/threadpoolbuilder.h"
@@ -26,6 +27,10 @@
 #ifdef USE_PREEMPTION
 #include <signal.h>
 #include <pthread.h>
+
+
+/// The signal used for preemption.
+#define SIG_PREEMPT SIGUSR1
 #endif
 
 
@@ -106,6 +111,12 @@ namespace verona::rt
 #else
               // TODO send a signal to the thread.
               UNUSED(builder);
+#ifndef USE_SYSTEMATIC_TESTING
+              /// Send the signal to the thread.
+              if (pool->cores[i]->thread_valid) {
+                pthread_kill(pool->cores[i]->thread, SIG_PREEMPT);
+              }
+#endif
 #endif
             }
           }
@@ -133,8 +144,12 @@ namespace verona::rt
 #ifdef USE_PREEMPTION
       static void signal_handler(int sig, siginfo_t* info, void* _context)
       {
+        bool preemptable = Preempt::is_preemptable();
+        NO_PREEMPT();
+
         UNUSED(info);
-        assert(sig == SIGUSR1);
+        assert(sig == SIG_PREEMPT);
+
         ucontext_t* context = (ucontext_t*)_context;
 
         /// We are unable to proceed with preemption if we do not have a context.
@@ -147,11 +162,22 @@ namespace verona::rt
           abort();
 
         /// The thread is in a NO_PREEMPT block.
-        if (!Preempt::is_preemptable())
+        if (!preemptable)
           return;
 
         /// The thread is preemptable.
         //ThreadStacks& stacks = Preempt::get_thread_stacks();
+        //TODO
+      }
+
+      /// Register the handler for preemption's signal.
+      /// We use SIGUSR1.
+      static void init_preemption()
+      {
+        struct sigaction sa;
+        sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+        sa.sa_sigaction = signal_handler;
+        sigaction(SIG_PREEMPT, &sa, NULL);
       }
 #endif
   };
