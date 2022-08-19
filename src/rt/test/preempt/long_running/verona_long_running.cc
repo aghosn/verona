@@ -50,7 +50,7 @@ int verona_main(SystematicTestHarness& harness)
 {
 // This test is unable to complete without the system monitor, which is 
 // disabled with systematic testing.
-#ifdef USE_SYSMONITOR
+#if defined(USE_SYSMONITOR) and not defined(USE_PREEMPTION)
   harness.run(test1); 
 #else
   UNUSED(harness);

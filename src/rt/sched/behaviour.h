@@ -6,6 +6,8 @@
 
 #include <snmalloc/snmalloc.h>
 
+#include "sched/preempt.h"
+
 namespace verona::rt
 {
   using namespace snmalloc;
@@ -62,6 +64,11 @@ namespace verona::rt
 
   public:
     Behaviour(const Descriptor* desc) : descriptor(desc) {}
+
+    fncast get_function()
+    {
+      return (fncast) get_descriptor()->f;
+    }
 
   protected:
     inline size_t size() const

@@ -14,6 +14,8 @@
 
 #include <algorithm>
 
+#include "sched/preempt.h"
+
 namespace verona::rt
 {
   using namespace snmalloc;
@@ -584,7 +586,7 @@ namespace verona::rt
      * Otherwise, all cowns have been acquired and we can execute the message
      * behaviour.
      **/
-    bool run_step(MultiMessage* m)
+    CownSched run_step(MultiMessage* m)
     {
       MultiMessage::MultiMessageBody& body = *(m->get_body());
       Alloc& alloc = ThreadAlloc::get();
@@ -611,7 +613,7 @@ namespace verona::rt
 
       if (body.exec_count_down.fetch_sub(1) > 1)
       {
-        return false;
+        return NoReschedule;
       }
 
       if (e == EpochMark::EPOCH_NONE)
@@ -650,9 +652,20 @@ namespace verona::rt
 
       Scheduler::local()->message_body = &body;
 
+#ifdef USE_PREEMPTION
+      /// At that point we should not be preemptable.
+      assert(!Preempt::is_preemptable());
+
+      bool res = BehaviourStack::switch_to_behaviour(
+          body.behaviour->get_function(), body.behaviour);
+
+      /// This will be true if the behaviour got preempted.
+      assert(!res);
+      assert(!Preempt::is_preemptable());
+#else
       // Run the behaviour.
       body.behaviour->f();
-
+#endif
       for (size_t i = 0; i < body.count; i++)
       {
         if (body.cowns[i])
@@ -666,7 +679,7 @@ namespace verona::rt
       alloc.dealloc(body.behaviour, body.behaviour->size());
       alloc.dealloc<sizeof(MultiMessage::MultiMessageBody)>(m->get_body());
 
-      return true;
+      return Reschedule;
     }
 
   public:
@@ -752,7 +765,7 @@ namespace verona::rt
      * called, and it is guaranteed to return true, so it will be rescheduled
      * or false if it is part of a multi-message acquire.
      **/
-    bool run(Alloc& alloc, ThreadState::State)
+    CownSched run(Alloc& alloc, ThreadState::State)
     {
       auto until = queue.peek_back();
       yield(); // Reading global state in peek_back().
@@ -793,7 +806,7 @@ namespace verona::rt
           // by keeping in scheduler queue until the prescan phase has
           // finished.
           if (Scheduler::in_prescan())
-            return true;
+            return Reschedule;
 
           // Reschedule if we have processed a message.
           // This is primarily an optimisation to keep busy cowns active cowns
@@ -803,7 +816,7 @@ namespace verona::rt
           //      This is designed to be effective if a cown is receiving a lot
           //      of messages.
           if (batch_size != 0)
-            return true;
+            return Reschedule;
 
           // Reschedule if cown does not go to sleep.
           if (!queue.mark_sleeping(alloc, notify))
@@ -820,12 +833,12 @@ namespace verona::rt
               // having been received, and then we wouldn't process anything
               // else.
             }
-            return true;
+            return Reschedule;
           }
 
           Logging::cout() << "Unschedule cown " << this << Logging::endl;
           Cown::release(alloc, this);
-          return false;
+          return NoReschedule;
         }
 
         assert(!queue.is_sleeping());
@@ -842,8 +855,9 @@ namespace verona::rt
         // A function that returns false indicates that the cown should not
         // be rescheduled, even if it has pending work. This also means the
         // cown's queue should not be marked as empty, even if it is.
-        if (!run_step(curr))
-          return false;
+        auto rv = run_step(curr);
+        if (rv == NoReschedule)
+          return NoReschedule;
 
         // Reschedule the other cowns.
         for (size_t s = 0; s < senders_count; s++)
@@ -856,7 +870,7 @@ namespace verona::rt
 
       } while ((curr != until) && (batch_size < batch_limit));
 
-      return true;
+      return Reschedule;
     }
 
     bool try_collect(Alloc& alloc, EpochMark epoch)

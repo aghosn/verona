@@ -10,6 +10,7 @@
 #define NO_PREEMPT() {}
 #endif
 
+typedef void(*fncast)(void*);
 
 
 #if defined(USE_SYSMONITOR) and defined(USE_PREEMPTION)
@@ -43,11 +44,11 @@ namespace verona::rt
       /// Whether the current thread can be preempted.
       static bool is_preemptable()
       {
-        return counter() == 0;
+        return (counter() == 0 && flag());
       }
 
       /// Turn off preemption regardless of counter.
-      void disable_preemption()
+      static void disable_preemption()
       {
         bool& _flag = flag();
         _flag = false;
@@ -55,7 +56,7 @@ namespace verona::rt
 
       /// Re-enables preemption.
       /// This does not reset the counter.
-      void reenable_preemption()
+      static void reenable_preemption()
       {
         bool& _flag = flag();
         _flag = true;
@@ -77,9 +78,11 @@ namespace verona::rt
       /// the counter value.
       /// _flag == true   -> preemptable.
       /// _flag == false  -> non-preemptable.
+      ///
+      /// Preemption is disabled at startup.
       static bool& flag()
       {
-        static thread_local bool _flag = true;
+        static thread_local bool _flag = false;
         return _flag;
       }
 

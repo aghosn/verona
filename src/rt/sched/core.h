@@ -5,6 +5,10 @@
 #include "mpmcq.h"
 #include "schedulerstats.h"
 
+#ifdef USE_PREEMPTION
+#include <pthread.h>
+#endif
+
 namespace verona::rt
 {
   template<class T>
@@ -31,6 +35,9 @@ namespace verona::rt
         std::atomic<size_t> free_cowns = 0;
         SchedulerStats stats;
 
+#ifdef USE_PREEMPTION
+        pthread_t thread;
+#endif
 
       public:
         Core() : token_cown{T::create_token_cown()}, q{token_cown}

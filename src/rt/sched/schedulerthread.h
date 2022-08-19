@@ -19,8 +19,21 @@
 
 #include <snmalloc/snmalloc.h>
 
+#include "sched/preempt.h"
+
+#ifdef USE_PREEMPTION
+#include "sched/behaviour_stack.h"
+#include <pthread.h>
+#endif
+
 namespace verona::rt
 {
+  /// Return value for cown run.
+  enum CownSched {
+    NoReschedule,
+    Reschedule,
+    Preempted,
+  };
   /**
    * There is typically one scheduler thread pinned to each physical CPU core.
    * Each scheduler thread is responsible for running cowns in its queue and
@@ -105,6 +118,11 @@ namespace verona::rt
 #endif
 #endif
 
+#ifdef USE_PREEMPTION
+    _BYTE* signal_stack = nullptr;
+    BehaviourStack* behaviour_stack = nullptr;
+#endif
+
     T* get_token_cown()
     {
       assert(core != nullptr);
@@ -114,10 +132,20 @@ namespace verona::rt
 
     SchedulerThread() 
     {
+#ifdef USE_PREEMPTION
+      signal_stack = BehaviourStack::allocate_signal_stack(); 
+      behaviour_stack = BehaviourStack::allocate_stack();
+#endif
       Logging::cout() << "Scheduler Thread created" << Logging::endl;
     }
 
-    ~SchedulerThread() {}
+    ~SchedulerThread()
+    {
+#ifdef USE_PREEMPTION
+      BehaviourStack::deallocate_signal_stack(signal_stack);
+      BehaviourStack::deallocate_stack(behaviour_stack);
+#endif 
+    }
 
     void setCore(Core<T>* core)
     {
@@ -179,6 +207,9 @@ namespace verona::rt
     template<typename... Args>
     void run_inner(void (*startup)(Args...), Args... args)
     {
+#ifdef USE_PREEMPTION
+      Preempt::disable_preemption();
+#endif
       startup(args...);
 
       Scheduler::local() = this;
@@ -187,6 +218,23 @@ namespace verona::rt
       victim = core->next;
       T* cown = nullptr;
       this->core->servicing_threads++;
+
+#ifdef USE_PREEMPTION
+      /// Set up the signal stack information.
+      assert(signal_stack != nullptr);
+      assert(behaviour_stack != nullptr);
+
+      /// Link the thread to the core.
+      this->core->thread = pthread_self();
+      stack_t ss;
+      ss.ss_sp = this->signal_stack;
+      ss.ss_size = SIGNAL_STACK_SIZE;
+      ss.ss_flags = 0;
+      if (sigaltstack(&ss, NULL) == -1)
+        abort();
+      ThreadStacks& stacks = ThreadStacks::get(); 
+      stacks.behaviour = this->behaviour_stack->top();
+#endif
 
 #ifdef USE_SYSTEMATIC_TESTING
       Systematic::attach_systematic_thread(this->local_systematic);
@@ -267,9 +315,9 @@ namespace verona::rt
           core->progress_counter++;
         core->last_worker = this->systematic_id;
 
-        bool reschedule = cown->run(*alloc, state);
+        CownSched reschedule = cown->run(*alloc, state);
 
-        if (reschedule)
+        if (reschedule == Reschedule)
         {
           if (should_steal_for_fairness)
           {

@@ -7,6 +7,9 @@
 /// The implementation strives to return to a stable state with one scheduler
 /// thread per core.
 ///
+/// When preemption is enabled, the sysmonitor preempts long running behaviours
+/// rather than spawning extra scheduler threads.
+///
 /// The MONITOR_QUANTUM variable is set at compile time.
 #ifdef USE_SYSMONITOR
 
@@ -19,6 +22,11 @@
 #include <cassert>
 
 #include "sched/preempt.h"
+
+#ifdef USE_PREEMPTION
+#include <signal.h>
+#include <pthread.h>
+#endif
 
 
 namespace verona::rt
@@ -90,9 +98,15 @@ namespace verona::rt
             if (scan[i] == count && !pool->cores[i]->q.nothing_old())
             {
               Logging::cout() << "System monitor detected lack of progress on core " << i << Logging::endl;
+
+#ifndef USE_PREEMPTION
               // We pass the count as argument in case there was some progress
               // in the meantime.
               Scheduler::get().spawnThread(builder, pool->cores[i], count);
+#else
+              // TODO send a signal to the thread.
+              UNUSED(builder);
+#endif
             }
           }
         }
@@ -113,6 +127,33 @@ namespace verona::rt
         // if a thread exits, we are done
         done = true;
       }
+
+    private:
+    /// Preemption functions.
+#ifdef USE_PREEMPTION
+      static void signal_handler(int sig, siginfo_t* info, void* _context)
+      {
+        UNUSED(info);
+        assert(sig == SIGUSR1);
+        ucontext_t* context = (ucontext_t*)_context;
+
+        /// We are unable to proceed with preemption if we do not have a context.
+        if (context == nullptr)
+          abort();
+
+        /// Make sure we have a local scheduler thread set.
+        auto* t = Scheduler::get().local();
+        if (t == nullptr)
+          abort();
+
+        /// The thread is in a NO_PREEMPT block.
+        if (!Preempt::is_preemptable())
+          return;
+
+        /// The thread is preemptable.
+        //ThreadStacks& stacks = Preempt::get_thread_stacks();
+      }
+#endif
   };
 }
 #endif
