@@ -28,6 +28,7 @@
 #include <signal.h>
 #include <pthread.h>
 
+#include "sched/behaviour_stack.h"
 
 /// The signal used for preemption.
 #define SIG_PREEMPT SIGUSR1
@@ -166,8 +167,27 @@ namespace verona::rt
           return;
 
         /// The thread is preemptable.
-        //ThreadStacks& stacks = Preempt::get_thread_stacks();
-        //TODO
+        ThreadStacks& stacks = ThreadStacks::get();
+        if (stacks.system == nullptr || stacks.behaviour == nullptr)
+          abort();
+        greg_t rsp = context->uc_mcontext.gregs[REG_RSP];
+        BehaviourStack* bstack = BehaviourStack::from_top(stacks.behaviour);  
+
+        /// Check that we did not overwrite the content of the stack in the lower
+        /// addresses.
+        if (rsp <= (greg_t)(&bstack->limit))
+          abort();
+
+        /// Copy the context
+        memcpy(&bstack->context, context, sizeof(ucontext_t));
+        /// Replace rsp and rip to use the trampoline back to the runtime stack.
+        /// Change %rax to signal preemption.
+        context->uc_mcontext.gregs[REG_RAX] = 0x1;
+        context->uc_mcontext.gregs[REG_RSP] = (greg_t)(stacks.system);
+        context->uc_mcontext.gregs[REG_RIP] = (greg_t)(trampoline_preempt);
+
+        // Disable preemption before returning.
+        Preempt::disable_preemption();
       }
 
       /// Register the handler for preemption's signal.

@@ -317,9 +317,73 @@ namespace verona::rt
         core->last_worker = this->systematic_id;
 
         CownSched reschedule = cown->run(*alloc, state);
+        
+        if (reschedule == Preempted)
+        {
+#ifndef USE_PREEMPTION
+          /// This should never happen if preemption is not enabled.
+          abort();
+#else
+          ThreadStacks& stacks = ThreadStacks::get();
+          if (stacks.behaviour == nullptr || behaviour_stack == nullptr)
+            abort();
+          BehaviourStack* stack = BehaviourStack::from_top(stacks.behaviour);
+
+          // If the stack was already preempted, we can keep it.
+          if (stack->type == MARKED_PREEMPTED)
+          {
+            // Check the saved stack is the one associated with this thread.
+            if (stack->saved != behaviour_stack->top())
+            {
+              abort();
+            }
+
+            // Switch back to the usable stack.
+            stacks.behaviour = behaviour_stack->top();
+          } else {
+            // First time preemption, mark it and allocate a new stack.
+            stack->type = MARKED_PREEMPTED;
+            behaviour_stack = BehaviourStack::allocate_stack();
+            stacks.behaviour = behaviour_stack->top();
+          }
+
+          // Reschedule inside an empty cown.
+          T::preempted_wrapper(
+              [cown, stack]()
+              {
+                if (cown == nullptr)
+                  abort();
+                // Stack magic: make sure we save the current stack.
+                ThreadStacks& stacks = ThreadStacks::get();
+                stack->saved = stacks.behaviour;
+                stack->cown = (_BYTE*) cown;
+                stacks.behaviour = stack->top();
+                setcontext(&stack->context);
+
+                // Should never return.
+                abort();
+              }
+          );
+#endif
+          cown = nullptr;
+        }
 
         if (reschedule == Reschedule)
         {
+
+#ifdef USE_PREEMPTION
+          // Check if we need to cleanup the original cown.
+          ThreadStacks& stacks = ThreadStacks::get();
+          BehaviourStack* bs = BehaviourStack::from_top(stacks.behaviour);
+          if (bs->type == MARKED_PREEMPTED)
+          {
+            T* c = (T*) bs->cown;
+            assert(c != nullptr);
+            schedule_fifo(c);
+            //TODO handle stack deallocation.
+          }
+#endif
+
           if (should_steal_for_fairness)
           {
             schedule_fifo(cown);

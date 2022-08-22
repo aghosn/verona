@@ -9,12 +9,17 @@
 #include "../test/systematic.h"
 #include "base_noticeboard.h"
 #include "multimessage.h"
+#include "preempt.h"
 #include "schedulerthread.h"
 #include "core.h"
 
 #include <algorithm>
 
 #include "sched/preempt.h"
+
+#ifdef USE_PREEMPTION
+#include "sched/preempted_behaviour.h"
+#endif
 
 namespace verona::rt
 {
@@ -36,6 +41,7 @@ namespace verona::rt
 
     void lock()
     {
+      NO_PREEMPT();
       auto u = false;
       while (!locked.compare_exchange_strong(u, true))
       {
@@ -49,6 +55,7 @@ namespace verona::rt
 
     void unlock()
     {
+      NO_PREEMPT();
       locked.store(false, std::memory_order_release);
     }
   };
@@ -80,6 +87,7 @@ namespace verona::rt
 
     Cown(bool initialise = true)
     {
+      NO_PREEMPT();
       make_cown();
 
       if (initialise)
@@ -147,6 +155,7 @@ namespace verona::rt
 
     static Cown* create_token_cown()
     {
+      NO_PREEMPT();
       static constexpr Descriptor desc = {
         vsizeof<Cown>, nullptr, nullptr, nullptr};
       auto p = ThreadAlloc::get().alloc<desc.size>();
@@ -162,22 +171,26 @@ namespace verona::rt
 
     void set_owning_core(Core<Cown>* owner)
     {
+      NO_PREEMPT();
       core_status = (uintptr_t)owner;
     }
 
     void mark_collected()
     {
+      NO_PREEMPT();
       core_status |= 1;
     }
 
     bool is_collected()
     {
+      NO_PREEMPT();
       return (core_status.load(std::memory_order_relaxed) & collected_mask) !=
         0;
     }
 
     Core<Cown>* owning_core()
     {
+      NO_PREEMPT();
       return
         (Core<Cown>*)(core_status.load(std::memory_order_relaxed) & thread_mask);
     }
@@ -188,6 +201,7 @@ namespace verona::rt
 
     void flush_all(Alloc& alloc)
     {
+      NO_PREEMPT();
       for (auto b : noticeboards)
       {
         b->flush_all(alloc);
@@ -196,6 +210,7 @@ namespace verona::rt
 
     void flush_some(Alloc& alloc)
     {
+      NO_PREEMPT();
       for (auto b : noticeboards)
       {
         b->flush_some(alloc);
@@ -204,6 +219,7 @@ namespace verona::rt
 
     void register_noticeboard(BaseNoticeboard* nb)
     {
+      NO_PREEMPT();
       noticeboards.push_back(nb);
     }
 
@@ -211,6 +227,7 @@ namespace verona::rt
 
     void reschedule()
     {
+      NO_PREEMPT();
       if (queue.wake())
       {
         Cown::acquire(this);
@@ -220,6 +237,7 @@ namespace verona::rt
 
     bool can_lifo_schedule()
     {
+      NO_PREEMPT();
       // TODO: correctly indicate if this cown can be lifo scheduled.
       // This requires some form of pinning.
       return false;
@@ -227,11 +245,13 @@ namespace verona::rt
 
     void wake()
     {
+      NO_PREEMPT();
       queue.wake();
     }
 
     static void acquire(Object* o)
     {
+      NO_PREEMPT();
       Logging::cout() << "Cown " << o << " acquire" << Logging::endl;
       assert(o->debug_is_cown());
       o->incref();
@@ -239,6 +259,7 @@ namespace verona::rt
 
     static void release(Alloc& alloc, Cown* o)
     {
+      NO_PREEMPT();
       Logging::cout() << "Cown " << o << " release" << Logging::endl;
       assert(o->debug_is_cown());
       Cown* a = ((Cown*)o);
@@ -294,6 +315,7 @@ namespace verona::rt
      **/
     void weak_release(Alloc& alloc)
     {
+      NO_PREEMPT();
       Logging::cout() << "Cown " << this << " weak release" << Logging::endl;
       if (weak_count.fetch_sub(1) == 1)
       {
@@ -322,6 +344,7 @@ namespace verona::rt
 
     void weak_acquire()
     {
+      NO_PREEMPT();
       Logging::cout() << "Cown " << this << " weak acquire" << Logging::endl;
       assert(weak_count > 0);
       weak_count++;
@@ -336,11 +359,13 @@ namespace verona::rt
      **/
     bool acquire_strong_from_weak()
     {
+      NO_PREEMPT();
       return Object::acquire_strong_from_weak();
     }
 
     static void mark_for_scan(Object* o, EpochMark epoch)
     {
+      NO_PREEMPT();
       Cown* cown = (Cown*)o;
 
       if (cown->cown_marked_for_scan(epoch))
@@ -363,6 +388,7 @@ namespace verona::rt
 
     void mark_notify()
     {
+      NO_PREEMPT();
       if (queue.mark_notify())
       {
         Cown::acquire(this);
@@ -374,6 +400,7 @@ namespace verona::rt
   protected:
     void schedule()
     {
+      NO_PREEMPT();
       // This should only be called if the cown is known to have been
       // unscheduled, for example when detecting a previously empty message
       // queue on send, or when rescheduling after a multi-message.
@@ -396,6 +423,7 @@ namespace verona::rt
   private:
     bool in_epoch(EpochMark epoch)
     {
+      NO_PREEMPT();
       bool result = Object::in_epoch(epoch);
       yield();
       return result;
@@ -403,17 +431,20 @@ namespace verona::rt
 
     void dealloc(Alloc& alloc)
     {
+      NO_PREEMPT();
       Object::dealloc(alloc);
       yield();
     }
 
     bool scanned(EpochMark epoch)
     {
+      NO_PREEMPT();
       return in_epoch(epoch);
     }
 
     void scan(Alloc& alloc, EpochMark epoch)
     {
+      NO_PREEMPT();
       // Scan our data for cown references.
       if (!cown_scanned(epoch))
       {
@@ -427,6 +458,7 @@ namespace verona::rt
 
     static void scan_stack(Alloc& alloc, EpochMark epoch, ObjectStack& f)
     {
+      NO_PREEMPT();
       while (!f.empty())
       {
         Object* o = f.pop();
@@ -459,6 +491,7 @@ namespace verona::rt
 
     void cown_notified()
     {
+      NO_PREEMPT();
       // This is not a message make sure we know that.
       // TODO: Back pressure.  This means that a notification that sends to
       // an overloaded cown will not mute this cown.  We could set up a fake
@@ -493,6 +526,7 @@ namespace verona::rt
      **/
     static void fast_send(MultiMessage::MultiMessageBody* body, EpochMark epoch)
     {
+      NO_PREEMPT();
       auto& alloc = ThreadAlloc::get();
       const auto last = body->count - 1;
       assert(body->index <= last);
@@ -561,6 +595,7 @@ namespace verona::rt
      **/
     bool try_fast_send(MultiMessage* m)
     {
+      NO_PREEMPT();
 #ifdef USE_SYSTEMATIC_TESTING_WEAK_NOTICEBOARDS
       flush_all(ThreadAlloc::get());
       yield();
@@ -588,6 +623,9 @@ namespace verona::rt
      **/
     CownSched run_step(MultiMessage* m)
     {
+#ifdef USE_PREEMPTION
+      assert(Preempt::check_counter(0) && !Preempt::is_preemptable());
+#endif
       MultiMessage::MultiMessageBody& body = *(m->get_body());
       Alloc& alloc = ThreadAlloc::get();
 
@@ -658,10 +696,24 @@ namespace verona::rt
 
       bool res = BehaviourStack::switch_to_behaviour(
           body.behaviour->get_function(), body.behaviour);
-
-      /// This will be true if the behaviour got preempted.
-      assert(!res);
       assert(!Preempt::is_preemptable());
+      
+      if (res)
+      {
+        /// Behaviour was preempted.
+        return Preempted;
+      }
+
+      // Check if the behaviour was a preempted one, do internal cleanup.
+      ThreadStacks& stacks = ThreadStacks::get();
+      BehaviourStack* bs = BehaviourStack::from_top(stacks.behaviour);
+      if (bs->type == MARKED_PREEMPTED)
+      {
+        if (bs->cown == nullptr || bs->message == nullptr)
+          abort();
+        Cown* c = (Cown*) bs->cown;
+        c->late_cleanup((MultiMessage*) bs->message);
+      }
 #else
       // Run the behaviour.
       body.behaviour->f();
@@ -681,6 +733,35 @@ namespace verona::rt
 
       return Reschedule;
     }
+
+#ifdef USE_PREEMPTION
+    void late_cleanup(MultiMessage* m)
+    {
+      MultiMessage::MultiMessageBody& body = *(m->get_body());
+      Alloc& alloc = ThreadAlloc::get();
+      for (size_t i = 0; i < body.count; i++)
+      {
+        if (body.cowns[i])
+          Cown::release(alloc, body.cowns[i]);
+      }
+      Logging::cout() << "MultiMessage " << m << " completed and running on "
+                      << this << Logging::endl;
+      // Free the body and the behaviour.
+      alloc.dealloc(body.behaviour, body.behaviour->size());
+      alloc.dealloc<sizeof(MultiMessage::MultiMessageBody)>(m->get_body());
+
+      // Second part of the cleanup
+      auto* senders = body.cowns;
+      const size_t senders_count = body.count;
+
+      for (size_t s = 0; s < senders_count; s++)
+      {
+        if ((senders[s]) && (senders[s] != this))
+          senders[s]->schedule();
+      }
+      alloc.dealloc(senders, senders_count * sizeof(Cown*));
+    }
+#endif 
 
   public:
     template<
@@ -706,6 +787,7 @@ namespace verona::rt
       typename... Args>
     static void schedule(size_t count, Cown** cowns, Args&&... args)
     {
+      NO_PREEMPT();
       static_assert(std::is_base_of_v<Behaviour, Be>);
       Logging::cout() << "Schedule behaviour of type: " << typeid(Be).name()
                       << Logging::endl;
@@ -855,9 +937,26 @@ namespace verona::rt
         // A function that returns false indicates that the cown should not
         // be rescheduled, even if it has pending work. This also means the
         // cown's queue should not be marked as empty, even if it is.
+#ifdef USE_PREEMPTION
+        assert(Preempt::check_counter(0));
+#endif
         auto rv = run_step(curr);
-        if (rv == NoReschedule)
-          return NoReschedule;
+        if (rv == NoReschedule || rv == Preempted)
+        {
+
+          if (rv == Preempted)
+          {
+#ifdef USE_PREEMPTION
+            ThreadStacks& stacks = ThreadStacks::get();
+            BehaviourStack* bs = BehaviourStack::from_top(stacks.behaviour);
+            bs->message = (_BYTE*)curr;
+#else
+            // Should not happend if preemption is not enabled.
+            abort();
+#endif
+          }
+          return rv;
+        }
 
         // Reschedule the other cowns.
         for (size_t s = 0; s < senders_count; s++)
@@ -875,6 +974,7 @@ namespace verona::rt
 
     bool try_collect(Alloc& alloc, EpochMark epoch)
     {
+      NO_PREEMPT();
       Logging::cout() << "try_collect: " << this << " (" << get_epoch_mark()
                       << ")" << Logging::endl;
 
@@ -906,6 +1006,7 @@ namespace verona::rt
 
     inline bool is_live(EpochMark send_epoch)
     {
+      NO_PREEMPT();
       return in_epoch(EpochMark::SCHEDULED_FOR_SCAN) || in_epoch(send_epoch);
     }
 
@@ -916,6 +1017,7 @@ namespace verona::rt
      **/
     void queue_collect(Alloc& alloc)
     {
+      NO_PREEMPT();
       thread_local ObjectStack* work_list = nullptr;
 
       // If there is a already a queue, use it
@@ -947,6 +1049,7 @@ namespace verona::rt
 
     void collect(Alloc& alloc)
     {
+      NO_PREEMPT();
       // If this was collected by leak detector, then don't double dealloc
       // cown body, when the ref count drops.
       if (is_collected())
@@ -1008,6 +1111,7 @@ namespace verona::rt
 
     bool release_early()
     {
+      NO_PREEMPT();
       auto* body = Scheduler::local()->message_body;
       auto* senders = body->cowns;
       const size_t senders_count = body->count;
@@ -1038,6 +1142,7 @@ namespace verona::rt
      */
     static MultiMessage* stub_msg(Alloc& alloc)
     {
+      NO_PREEMPT();
       return MultiMessage::make_message(alloc, nullptr, EpochMark::EPOCH_NONE);
     }
 
@@ -1053,6 +1158,30 @@ namespace verona::rt
         MultiMessage::make_body(alloc, count, cowns, &unmute_behaviour);
       return MultiMessage::make_message(alloc, body, epoch);
     }
+
+#ifdef USE_PREEMPTION
+    //TODO(aghosn) this is probably not correct.
+    static void fake_trace(const Object* o, ObjectStack& st)
+    {
+      UNUSED(o);
+      UNUSED(st);
+      return;
+    }
+
+    /// Wraps a preempted cown into an empty cown to reschedule it.
+    template<typename T>
+    static Cown* preempted_wrapper(T f)
+    {
+      static constexpr Descriptor desc = {
+        vsizeof<Cown>, fake_trace, nullptr, nullptr};
+      auto p = ThreadAlloc::get().alloc<desc.size>();
+      auto o = Object::register_object(p, &desc);
+      auto preempt = new (o) Cown;
+      Cown::schedule<PreemptedBehaviour<T>,
+        YesTransfer>(preempt, std::forward<T>(f));
+      return preempt;
+    }
+#endif
   };
 
   namespace cown

@@ -14,6 +14,8 @@ typedef unsigned char _BYTE;
 #define BEHAVIOUR_STACK_SIZE  0x5000 
 #define SIGNAL_STACK_SIZE     0x2000
 
+#define MARKED_PREEMPTED 0xdeadbeef
+
 
 namespace verona::rt
 {
@@ -39,12 +41,19 @@ namespace verona::rt
     "\tret # Return on the system stack\n"
   );
 
+  __asm__(
+    "\t.type trampoline_preempt,@function\n"
+    "trampoline_preempt:\n"
+    "\tret # Just return on the system stack\n"
+  );
+
   /// Switches to a behaviour stack. Arguments are:
   /// fn, behaviour, _switcher, stacks.behaviour, &stacks.system
   extern "C" bool to_behaviour(
       fncast, void*,
       void (*) (void(* )(void*), void*), _BYTE*, _BYTE**);
   extern "C" void to_system(_BYTE* system_stack);
+  extern "C" void trampoline_preempt(void);
 
   /// Convenience struct holding pointers to the system and behaviour stacks.
   struct ThreadStacks {
@@ -69,8 +78,8 @@ namespace verona::rt
     /// Encodes whether this is a preempted behaviour's stack.
     uint64_t type;
 
-    /// Premmpted behaviour information.
-    _BYTE* saved_stack;
+    /// Preempted behaviour information.
+    _BYTE* saved;
     _BYTE* cown;
     _BYTE* message;
     ucontext_t context;
@@ -137,6 +146,7 @@ namespace verona::rt
       ThreadStacks& stacks = ThreadStacks::get();
       if (stacks.behaviour == nullptr)
         abort();
+      assert(Preempt::check_counter(0));
       return to_behaviour(fn, behaviour, _switcher, stacks.behaviour, &stacks.system);
     }
 
@@ -146,6 +156,7 @@ namespace verona::rt
     {
       /// Enable preemption now.
       Preempt::reenable_preemption();
+      assert(Preempt::is_preemptable());
       fn(behaviour);
       Preempt::disable_preemption();
       ThreadStacks& stacks = ThreadStacks::get();

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <atomic>
+#include <cstdint>
+#include <cassert>
+
 /// NO_PREEMPT macro creates a local Preempt variable that increments
 /// the thread-local counter. As the local variable's scope ends, the counter
 /// is decremented. This simple mechanism thus supports nested runtime calls 
@@ -14,6 +18,8 @@ typedef void(*fncast)(void*);
 
 
 #if defined(USE_SYSMONITOR) and defined(USE_PREEMPTION)
+
+#define DISABLE_MASK ((uint64_t)(1) << 63)
 
 namespace verona::rt
 {
@@ -35,7 +41,7 @@ namespace verona::rt
       /// Deallocation of a preempt object decrements the counter.
       ~Preempt()
       {
-        size_t& c = counter();
+        std::atomic<uint64_t>& c = counter();
         if (c == 0)
           abort();
         c--;
@@ -44,48 +50,44 @@ namespace verona::rt
       /// Whether the current thread can be preempted.
       static bool is_preemptable()
       {
-        return (counter() == 0 && flag());
+        std::atomic<uint64_t>& c = counter();
+        return (c == 0 /*&& flag()*/);
       }
 
       /// Turn off preemption regardless of counter.
       static void disable_preemption()
       {
-        bool& _flag = flag();
-        _flag = false;
+        std::atomic<uint64_t>& c = counter();
+        c |= DISABLE_MASK;
       }
 
       /// Re-enables preemption.
       /// This does not reset the counter.
       static void reenable_preemption()
       {
-        bool& _flag = flag();
-        _flag = true;
+        std::atomic<uint64_t>& c = counter();
+        c &= ~(DISABLE_MASK);
+      }
+
+
+
+      static bool check_counter(uint64_t value)
+      {
+        std::atomic<uint64_t>& c = counter();
+        uint64_t v = c & ~(DISABLE_MASK);
+        return v == value;
       }
 
     private:
-
       /// The _counter is defined as thread local here within a static function.
       /// This is the only viable way we found to define this variable while
       /// protecting it from potential modifications.
       /// Note that this mechanism relies on TLS and might not work with sandboxes.
-      static size_t& counter()
+      static std::atomic<uint64_t>& counter()
       {
-        static thread_local size_t _counter = 0;
+        static thread_local std::atomic<uint64_t> _counter = 0;
         return _counter;
       }
-
-      /// The _flag allows to completely disable preemption regardless of
-      /// the counter value.
-      /// _flag == true   -> preemptable.
-      /// _flag == false  -> non-preemptable.
-      ///
-      /// Preemption is disabled at startup.
-      static bool& flag()
-      {
-        static thread_local bool _flag = false;
-        return _flag;
-      }
-
   };
 } //namespace verona::rt;
 
