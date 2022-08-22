@@ -36,7 +36,6 @@ namespace verona::rt
   __asm__(
     "\t.type to_system,@function\n"
     "to_system:\n"
-    "\t mov $0x0, %eax # returned without preemption\n"
     "\tmov %rdi, %rsp # Stack pointer for the system, 1st argument\n"
     "\tret # Return on the system stack\n"
   );
@@ -49,7 +48,7 @@ namespace verona::rt
 
   /// Switches to a behaviour stack. Arguments are:
   /// fn, behaviour, _switcher, stacks.behaviour, &stacks.system
-  extern "C" bool to_behaviour(
+  extern "C" void to_behaviour(
       fncast, void*,
       void (*) (void(* )(void*), void*), _BYTE*, _BYTE**);
   extern "C" void to_system(_BYTE* system_stack);
@@ -59,10 +58,11 @@ namespace verona::rt
   struct ThreadStacks {
     _BYTE* system;
     _BYTE* behaviour;
+    bool preempted;
 
     static ThreadStacks& get()
     {
-      static thread_local ThreadStacks  stacks = {nullptr, nullptr};
+      static thread_local ThreadStacks  stacks = {nullptr, nullptr, false};
       return stacks;
     }
   }; 
@@ -141,7 +141,7 @@ namespace verona::rt
 
 
     /// Switching functions.
-    static bool switch_to_behaviour(fncast fn, void* behaviour)
+    static void switch_to_behaviour(fncast fn, void* behaviour)
     {
       ThreadStacks& stacks = ThreadStacks::get();
       if (stacks.behaviour == nullptr)
@@ -162,6 +162,7 @@ namespace verona::rt
       ThreadStacks& stacks = ThreadStacks::get();
       if (stacks.system == nullptr)
         abort();
+      stacks.preempted = false;
       to_system(stacks.system);
 
       /// Should never return.

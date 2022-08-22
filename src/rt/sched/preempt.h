@@ -32,6 +32,9 @@ namespace verona::rt
   {
 
     public:
+      inline static std::atomic<uint64_t> preempted_address;
+      inline static std::atomic<uint64_t> preempted_count;
+      inline static std::atomic<uint64_t> preempted_interrupts;
       /// Instantiation of a preempt object increments the counter.
       Preempt()
       {

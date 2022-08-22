@@ -694,9 +694,12 @@ namespace verona::rt
       /// At that point we should not be preemptable.
       assert(!Preempt::is_preemptable());
 
-      bool res = BehaviourStack::switch_to_behaviour(
+      BehaviourStack::switch_to_behaviour(
           body.behaviour->get_function(), body.behaviour);
       assert(!Preempt::is_preemptable());
+      ThreadStacks& stacks = ThreadStacks::get();
+      bool res = stacks.preempted;
+      stacks.preempted = false;
       
       if (res)
       {
@@ -705,7 +708,6 @@ namespace verona::rt
       }
 
       // Check if the behaviour was a preempted one, do internal cleanup.
-      ThreadStacks& stacks = ThreadStacks::get();
       BehaviourStack* bs = BehaviourStack::from_top(stacks.behaviour);
       if (bs->type == MARKED_PREEMPTED)
       {

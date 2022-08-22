@@ -115,6 +115,7 @@ namespace verona::rt
 #ifndef USE_SYSTEMATIC_TESTING
               /// Send the signal to the thread.
               if (pool->cores[i]->thread_valid) {
+                Preempt::preempted_interrupts++;
                 pthread_kill(pool->cores[i]->thread, SIG_PREEMPT);
               }
 #endif
@@ -146,7 +147,8 @@ namespace verona::rt
       static void signal_handler(int sig, siginfo_t* info, void* _context)
       {
         bool preemptable = Preempt::is_preemptable();
-        NO_PREEMPT();
+        // Disable preemption before returning.
+        Preempt::disable_preemption();
 
         UNUSED(info);
         assert(sig == SIG_PREEMPT);
@@ -182,12 +184,17 @@ namespace verona::rt
         memcpy(&bstack->context, context, sizeof(ucontext_t));
         /// Replace rsp and rip to use the trampoline back to the runtime stack.
         /// Change %rax to signal preemption.
-        context->uc_mcontext.gregs[REG_RAX] = 0x1;
+        //context->uc_mcontext.gregs[REG_RAX] = 0x1;
+        // Let the system know the behaviour was preempted.
+        stacks.preempted = true;
         context->uc_mcontext.gregs[REG_RSP] = (greg_t)(stacks.system);
         context->uc_mcontext.gregs[REG_RIP] = (greg_t)(trampoline_preempt);
+        Preempt::preempted_address = (uint64_t) bstack->context.uc_mcontext.gregs[REG_RIP];
 
-        // Disable preemption before returning.
-        Preempt::disable_preemption();
+        /// Empty the signal set and resume by setting context.
+        Preempt::preempted_count++;
+        sigemptyset(&context->uc_sigmask);
+        setcontext(context);
       }
 
       /// Register the handler for preemption's signal.
@@ -198,6 +205,9 @@ namespace verona::rt
         sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
         sa.sa_sigaction = signal_handler;
         sigaction(SIG_PREEMPT, &sa, NULL);
+
+        Preempt::preempted_count = 0;
+        Preempt::preempted_interrupts = 0;
       }
 #endif
   };
