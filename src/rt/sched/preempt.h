@@ -88,7 +88,8 @@ namespace verona::rt
       /// Note that this mechanism relies on TLS and might not work with sandboxes.
       static std::atomic<uint64_t>& counter()
       {
-        static thread_local std::atomic<uint64_t> _counter = 0;
+        // Disable preemption at thread creation.
+        static thread_local std::atomic<uint64_t> _counter = DISABLE_MASK;
         return _counter;
       }
   };

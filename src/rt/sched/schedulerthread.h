@@ -23,6 +23,7 @@
 
 #ifdef USE_PREEMPTION
 #include "sched/behaviour_stack.h"
+#include "sched/preempt_state.h"
 #include <pthread.h>
 #endif
 
@@ -232,8 +233,8 @@ namespace verona::rt
       ss.ss_flags = 0;
       if (sigaltstack(&ss, NULL) == -1)
         abort();
-      ThreadStacks& stacks = ThreadStacks::get(); 
-      stacks.behaviour = this->behaviour_stack->top();
+      PreemptState& bs = PreemptState::get(); 
+      bs.behav_stack = this->behaviour_stack;
       this->core->thread_valid = true;
 #endif
 
@@ -324,10 +325,10 @@ namespace verona::rt
           /// This should never happen if preemption is not enabled.
           abort();
 #else
-          ThreadStacks& stacks = ThreadStacks::get();
-          if (stacks.behaviour == nullptr || behaviour_stack == nullptr)
+          PreemptState& bs = PreemptState::get();
+          if (bs.behav_stack == nullptr || behaviour_stack == nullptr)
             abort();
-          BehaviourStack* stack = BehaviourStack::from_top(stacks.behaviour);
+          BehaviourStack* stack = bs.behav_stack;
 
           // If the stack was already preempted, we can keep it.
           if (stack->type == MARKED_PREEMPTED)
@@ -339,12 +340,12 @@ namespace verona::rt
             }
 
             // Switch back to the usable stack.
-            stacks.behaviour = behaviour_stack->top();
+            bs.behav_stack = behaviour_stack;
           } else {
             // First time preemption, mark it and allocate a new stack.
             stack->type = MARKED_PREEMPTED;
             behaviour_stack = BehaviourStack::allocate_stack();
-            stacks.behaviour = behaviour_stack->top();
+            bs.behav_stack = behaviour_stack;
           }
 
           // Reschedule inside an empty cown.
@@ -354,10 +355,10 @@ namespace verona::rt
                 if (cown == nullptr)
                   abort();
                 // Stack magic: make sure we save the current stack.
-                ThreadStacks& stacks = ThreadStacks::get();
-                stack->saved = stacks.behaviour;
+                PreemptState& bs = PreemptState::get();
+                stack->saved = bs.behav_stack->top();
                 stack->cown = (_BYTE*) cown;
-                stacks.behaviour = stack->top();
+                bs.behav_stack = stack;
                 setcontext(&stack->context);
 
                 // Should never return.
@@ -373,8 +374,8 @@ namespace verona::rt
 
 #ifdef USE_PREEMPTION
           // Check if we need to cleanup the original cown.
-          ThreadStacks& stacks = ThreadStacks::get();
-          BehaviourStack* bs = BehaviourStack::from_top(stacks.behaviour);
+          PreemptState& state = PreemptState::get();
+          BehaviourStack* bs = state.behav_stack;
           if (bs->type == MARKED_PREEMPTED)
           {
             T* c = (T*) bs->cown;

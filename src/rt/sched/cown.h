@@ -19,6 +19,7 @@
 
 #ifdef USE_PREEMPTION
 #include "sched/preempted_behaviour.h"
+#include <ucontext.h>
 #endif
 
 namespace verona::rt
@@ -694,21 +695,25 @@ namespace verona::rt
       /// At that point we should not be preemptable.
       assert(!Preempt::is_preemptable());
 
-      BehaviourStack::switch_to_behaviour(
+      PreemptState& state = PreemptState::get();
+      state.done = false;
+      assert(state.behav_stack != nullptr);
+      PreemptState::initialize_behaviour(
           body.behaviour->get_function(), body.behaviour);
+      swapcontext(&state.sched_ctxt, &state.behav_stack->context); 
       assert(!Preempt::is_preemptable());
-      ThreadStacks& stacks = ThreadStacks::get();
-      bool res = stacks.preempted;
-      stacks.preempted = false;
+     
+      bool res = state.done;
+      state.done = false;
       
-      if (res)
+      if (!res)
       {
         /// Behaviour was preempted.
         return Preempted;
       }
 
       // Check if the behaviour was a preempted one, do internal cleanup.
-      BehaviourStack* bs = BehaviourStack::from_top(stacks.behaviour);
+      BehaviourStack* bs = state.behav_stack;
       if (bs->type == MARKED_PREEMPTED)
       {
         if (bs->cown == nullptr || bs->message == nullptr)
@@ -949,8 +954,8 @@ namespace verona::rt
           if (rv == Preempted)
           {
 #ifdef USE_PREEMPTION
-            ThreadStacks& stacks = ThreadStacks::get();
-            BehaviourStack* bs = BehaviourStack::from_top(stacks.behaviour);
+            PreemptState& state = PreemptState::get();
+            BehaviourStack* bs = state.behav_stack;
             bs->message = (_BYTE*)curr;
 #else
             // Should not happend if preemption is not enabled.

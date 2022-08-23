@@ -28,6 +28,7 @@
 #include <signal.h>
 #include <pthread.h>
 
+#include "sched/preempt_state.h"
 #include "sched/behaviour_stack.h"
 
 /// The signal used for preemption.
@@ -169,32 +170,20 @@ namespace verona::rt
           return;
 
         /// The thread is preemptable.
-        ThreadStacks& stacks = ThreadStacks::get();
-        if (stacks.system == nullptr || stacks.behaviour == nullptr)
+        PreemptState& state = PreemptState::get();
+        if (state.behav_stack == nullptr)
           abort();
         greg_t rsp = context->uc_mcontext.gregs[REG_RSP];
-        BehaviourStack* bstack = BehaviourStack::from_top(stacks.behaviour);  
+        BehaviourStack* bstack = state.behav_stack;  
 
         /// Check that we did not overwrite the content of the stack in the lower
         /// addresses.
         if (rsp <= (greg_t)(&bstack->limit))
           abort();
 
-        /// Copy the context
-        memcpy(&bstack->context, context, sizeof(ucontext_t));
-        /// Replace rsp and rip to use the trampoline back to the runtime stack.
-        /// Change %rax to signal preemption.
-        //context->uc_mcontext.gregs[REG_RAX] = 0x1;
-        // Let the system know the behaviour was preempted.
-        stacks.preempted = true;
-        context->uc_mcontext.gregs[REG_RSP] = (greg_t)(stacks.system);
-        context->uc_mcontext.gregs[REG_RIP] = (greg_t)(trampoline_preempt);
-        Preempt::preempted_address = (uint64_t) bstack->context.uc_mcontext.gregs[REG_RIP];
-
-        /// Empty the signal set and resume by setting context.
         Preempt::preempted_count++;
         sigemptyset(&context->uc_sigmask);
-        setcontext(context);
+        swapcontext(&bstack->context, &state.sched_ctxt); 
       }
 
       /// Register the handler for preemption's signal.
