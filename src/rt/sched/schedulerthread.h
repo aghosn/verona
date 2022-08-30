@@ -114,6 +114,7 @@ namespace verona::rt
 
     SchedulerThread() 
     {
+      core = nullptr;
       Logging::cout() << "Scheduler Thread created" << Logging::endl;
     }
 
@@ -820,6 +821,7 @@ namespace verona::rt
     /// Park a thread, i.e., make it sleep on its handle without an associated core.
     void park()
     {
+      assert(this->core == nullptr);
       // @warn make sure we correctly acquire locks in order wrt. sysmonitor.
       // This needs to be in the freelist before acquiring the mutex otherwise
       // it could deadlock with the threadpool monitor.

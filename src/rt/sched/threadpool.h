@@ -680,6 +680,7 @@ namespace verona::rt
         if (!success)
         {
           threads->active.remove(thread);
+          thread->core = nullptr;
           threads->free.insert_back(thread);
           threads->m.unlock();
           return;
