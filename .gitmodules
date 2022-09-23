@@ -19,3 +19,6 @@
 	path = external/llvm-project
 	url = https://github.com/llvm/llvm-project.git
 	shallow = true
+[submodule "external/WAVM"]
+	path = external/WAVM
+	url = https://github.com/WAVM/WAVM.git
