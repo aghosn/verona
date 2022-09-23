@@ -45,7 +45,6 @@ namespace sandbox
   WAVM_DEFINE_INTRINSIC_FUNCTION(
     env, ENames[Embeddings::E_MALLOC], I32, env_malloc, I32 size)
   {
-    std::cout << "in env_malloc " << size << std::endl;
     auto*& lib = WASMLibrary::get_library();
     void* res = lib->alloc_in_sandbox((size_t)size);
     int32_t offset = lib->sb_memory_offset(res);
@@ -55,7 +54,6 @@ namespace sandbox
   WAVM_DEFINE_INTRINSIC_FUNCTION(
     env, ENames[Embeddings::E_FREE], void, env_free, I32 ptr)
   {
-    std::cout << "in free " << ptr << std::endl;
     auto*& lib = WASMLibrary::get_library();
     void* v_ptr = lib->ptr_from_memory_offset(ptr);
     lib->free_in_sandbox(v_ptr);
@@ -64,7 +62,6 @@ namespace sandbox
   WAVM_DEFINE_INTRINSIC_FUNCTION(
     env, ENames[Embeddings::E_CALLOC], I32, env_calloc, I32 nmemb, I32 size)
   {
-    std::cout << "in calloc " << std::endl;
     auto*& lib = WASMLibrary::get_library();
     void* ptr = lib->alloc_in_sandbox(nmemb * size);
     int32_t offset = lib->sb_memory_offset(ptr);
