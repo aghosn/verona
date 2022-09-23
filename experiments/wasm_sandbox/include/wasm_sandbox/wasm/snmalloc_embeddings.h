@@ -65,8 +65,10 @@ namespace sandbox
     env, ENames[Embeddings::E_CALLOC], I32, env_calloc, I32 nmemb, I32 size)
   {
     std::cout << "in calloc " << std::endl;
-    abort();
-    return 0;
+    auto*& lib = WASMLibrary::get_library();
+    void* ptr = lib->alloc_in_sandbox(nmemb * size);
+    int32_t offset = lib->sb_memory_offset(ptr);
+    return offset;
   }
 
   WAVM_DEFINE_INTRINSIC_FUNCTION(
