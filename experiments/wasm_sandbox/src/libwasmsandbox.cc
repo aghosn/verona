@@ -73,8 +73,16 @@ namespace sandbox
   void WASMLibrary::instantiate(WAVM::Intrinsics::Module* modules...)
   {
     // Instantiate intrinsic module reference and functions.
-    state->intrinsics = WAVM::Intrinsics::instantiateModule(
-      state->compartment, {WAVM_INTRINSIC_MODULE_REF(env), modules}, "env");
+    if (modules)
+    {
+      state->intrinsics = WAVM::Intrinsics::instantiateModule(
+        state->compartment, {WAVM_INTRINSIC_MODULE_REF(env), modules}, "env");
+    }
+    else
+    {
+      state->intrinsics = WAVM::Intrinsics::instantiateModule(
+        state->compartment, {WAVM_INTRINSIC_MODULE_REF(env)}, "env");
+    }
 
     // Create a resolver for this module and the process resolver.
     Resolver& presolver = getProcessResolver(*process);
@@ -107,6 +115,10 @@ namespace sandbox
     if (state->memory)
     {
       setProcessMemory(*process, state->memory);
+      void* base = getMemoryBaseAddress(this->state->memory);
+      size_t size =
+        getMemoryNumPages(this->state->memory) * IR::numBytesPerPage;
+      region = std::make_unique<allocator::Region>(base, size);
     }
     else
     {
