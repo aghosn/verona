@@ -118,7 +118,7 @@ namespace sandbox
       void* base = getMemoryBaseAddress(this->state->memory);
       size_t size =
         getMemoryNumPages(this->state->memory) * IR::numBytesPerPage;
-      region = std::make_unique<allocator::Region>(base, size);
+      region = std::make_shared<allocator::Region>(base, size);
     }
     else
     {
@@ -200,6 +200,11 @@ namespace sandbox
     std::vector<UntaggedValue> untaggedInvokeResults;
     untaggedInvokeResults.resize(invokeSig.results().size());
 
+    // Set the current library.
+    WASMLibrary*& ref = get_library();
+    WASMLibrary* prev = ref;
+    ref = this;
+
     // Invoke the function.
     invokeFunction(
       state->context,
@@ -217,6 +222,8 @@ namespace sandbox
       const UntaggedValue& untaggedResult = untaggedInvokeResults[resultIndex];
       invokeResults[resultIndex] = Value(resultType, untaggedResult);
     }
+    // Reset th current library
+    ref = prev;
   }
 
   bool WASMLibrary::is_valid_address(void* ptr)
@@ -267,7 +274,8 @@ namespace sandbox
     {
       return nullptr;
     }
-    return allocator->alloc(sz);
+    auto& a = region->alloc;
+    return a.alloc(sz);
 #endif
   }
 
@@ -282,7 +290,8 @@ namespace sandbox
     this->call("free_in_sandbox", args, ret);
 #else
     assert(is_valid_address(ptr));
-    allocator->dealloc(ptr);
+    auto& a = region->alloc;
+    a.dealloc(ptr);
 #endif
   }
 
@@ -295,6 +304,14 @@ namespace sandbox
     args.push_back(I32(index));
     args.push_back(I32(offset));
     this->call("proxy", args, res);
+  }
+
+  // ——————————————————————————— Allocator Accesses ———————————————————————————
+
+  WASMLibrary*& WASMLibrary::get_library()
+  {
+    static thread_local WASMLibrary* current;
+    return current;
   }
 
 } // namespace sandbox.

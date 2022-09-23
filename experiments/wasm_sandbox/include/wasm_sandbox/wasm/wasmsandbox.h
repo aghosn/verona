@@ -54,7 +54,7 @@ namespace sandbox
     std::shared_ptr<VFS::FileSystem> sandboxFS;
     std::unique_ptr<CustomAllocator> allocator;
     std::unique_ptr<EmbedderResolver> resolver;
-    std::unique_ptr<allocator::Region> region;
+    std::shared_ptr<allocator::Region> region;
 
     /**
      * Returns true if the ptr address is within the WASM memory range.
@@ -65,15 +65,6 @@ namespace sandbox
      * Returns true if the offset is within the WASM memory.
      */
     bool is_valid_offset(int32_t offset);
-    /**
-     * Calcultes the memory offset for a given pointer.
-     */
-    int32_t sb_memory_offset(void* ptr);
-
-    /**
-     * Converts a sandbox memory offset into a valid pointer.
-     */
-    void* ptr_from_memory_offset(int32_t offset);
 
     /**
      * Ensures the LLVM thunks are instantiated.
@@ -91,6 +82,20 @@ namespace sandbox
       std::vector<IR::Value>& invokResults);
 
     void instantiate(WAVM::Intrinsics::Module* modules...);
+    /**
+     * Stack of currently opened libraries.
+     */
+    static WASMLibrary*& get_library();
+
+    /**
+     * Calcultes the memory offset for a given pointer.
+     */
+    int32_t sb_memory_offset(void* ptr);
+
+    /**
+     * Converts a sandbox memory offset into a valid pointer.
+     */
+    void* ptr_from_memory_offset(int32_t offset);
     virtual void send(int index, void* ptr);
     virtual void* alloc_in_sandbox(size_t bytes, size_t count = 1);
     virtual void free_in_sandbox(void* ptr);

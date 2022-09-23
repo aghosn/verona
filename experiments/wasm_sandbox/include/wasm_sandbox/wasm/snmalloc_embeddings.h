@@ -1,7 +1,10 @@
 #pragma once
 #include "WAVM/IR/Value.h"
 #include "WAVM/Runtime/Intrinsics.h"
+#include "wasm_sandbox/wasm/wasmsandbox.h"
+#include "wasmsandbox.h"
 
+#include <cassert>
 #include <iostream>
 
 using namespace WAVM;
@@ -43,15 +46,19 @@ namespace sandbox
     env, ENames[Embeddings::E_MALLOC], I32, env_malloc, I32 size)
   {
     std::cout << "in env_malloc " << size << std::endl;
-    abort();
-    return size;
+    auto*& lib = WASMLibrary::get_library();
+    void* res = lib->alloc_in_sandbox((size_t)size);
+    int32_t offset = lib->sb_memory_offset(res);
+    return offset;
   }
 
   WAVM_DEFINE_INTRINSIC_FUNCTION(
     env, ENames[Embeddings::E_FREE], void, env_free, I32 ptr)
   {
     std::cout << "in free " << ptr << std::endl;
-    abort();
+    auto*& lib = WASMLibrary::get_library();
+    void* v_ptr = lib->ptr_from_memory_offset(ptr);
+    lib->free_in_sandbox(v_ptr);
   }
 
   WAVM_DEFINE_INTRINSIC_FUNCTION(
