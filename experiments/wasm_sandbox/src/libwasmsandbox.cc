@@ -30,7 +30,6 @@ namespace sandbox
   WASMLibrary::WASMLibrary(const char* library_name, bool instantiate)
   : library_name(library_name)
   {
-    allocator = std::make_unique<CustomAllocator>();
     std::vector<WAVM::U8> wasmBytes;
     if (!readFile(library_name, wasmBytes))
     {

@@ -5,7 +5,6 @@
 #include "WAVM/Runtime/Runtime.h"
 #include "WAVM/VFS/SandboxFS.h"
 #include "WAVM/WASI/WASI.h"
-#include "wasm_sandbox/backend/allocator.h"
 #include "wasm_sandbox/backend/region.h"
 #include "wasm_sandbox/sandbox.h"
 #include "wasm_sandbox/wasm/embedder_resolver.h"
@@ -52,7 +51,6 @@ namespace sandbox
     std::unique_ptr<State> state;
     std::shared_ptr<WASI::Process> process;
     std::shared_ptr<VFS::FileSystem> sandboxFS;
-    std::unique_ptr<CustomAllocator> allocator;
     std::unique_ptr<EmbedderResolver> resolver;
     std::shared_ptr<allocator::Region> region;
 
