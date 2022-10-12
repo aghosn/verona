@@ -21,4 +21,4 @@
 	shallow = true
 [submodule "external/WAVM"]
 	path = external/WAVM
-	url = https://github.com/WAVM/WAVM.git
+	url = https://github.com/aghosn/WAVM.git

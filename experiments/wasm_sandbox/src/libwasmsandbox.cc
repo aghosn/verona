@@ -4,6 +4,7 @@
 #include "WAVM/Runtime/Intrinsics.h"
 #include "WAVM/Runtime/Linker.h"
 #include "WAVM/Runtime/Runtime.h"
+#include "WAVM/RuntimeABI/RuntimeABI.h"
 #include "WAVM/WASI/WASI.h"
 #include "WAVM/WASM/WASM.h"
 #include "wasm_sandbox/wasm/embedder_resolver.h"
@@ -130,6 +131,25 @@ namespace sandbox
     std::vector<Value> res;
     this->generate_thunks();
     this->call("sandbox_init", args, res);
+
+    // TODO debugging.
+    std::shared_ptr<LLVMJIT::Module> jit = accessJitModule(state->instance);
+    if (jit == nullptr)
+    {
+      fprintf(stderr, "Failing to access the jitModule\n");
+      abort();
+    }
+    // Incomplete type as well.
+    // jit.get()->memoryManager;
+    SectionInfo info;
+    if (getMemorySection(jit.get(), AccessRights::SectionType::Execute, &info))
+    {
+      fprintf(stderr, "Something went wrong accessing the section.\n");
+    }
+    else
+    {
+      fprintf(stdout, "We have a section: %lx\n", info.base);
+    }
   }
 
   void WASMLibrary::generate_thunks()
@@ -137,7 +157,6 @@ namespace sandbox
     const std::vector<Object*>& exports = getInstanceExports(state->instance);
     for (Object* e : exports)
     {
-      // TODO generate thunk.
       if (!isA(e, IR::ExternKind::function))
         continue;
       Function* func = asFunction(e);
