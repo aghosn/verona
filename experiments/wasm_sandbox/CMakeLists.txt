@@ -11,7 +11,7 @@ include_directories(BEFORE "${CMAKE_SOURCE_DIR}/include")
 set(DEFAULT_WASI_ALLOC false)
 set(USE_DEFAULT_WASI_ALLOC ${DEFAULT_WASI_ALLOC} CACHE BOOL "Use WASI malloc.")
 
-add_compile_options(-mcx16)
+add_compile_options(-mabi=aapcs)
 
 # Our main target.
 add_library(wasmsandbox SHARED ${LIBWASMSANDBOX_SOURCES})
